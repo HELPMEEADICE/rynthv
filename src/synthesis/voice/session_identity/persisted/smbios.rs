@@ -119,7 +119,6 @@ fn invalid_firmware() -> VoiceError {
     )
 }
 
-#[cfg(windows)]
 fn firmware_table() -> Result<PrivateBytes> {
     use std::{ffi::c_void, ptr};
 
@@ -144,11 +143,4 @@ fn firmware_table() -> Result<PrivateBytes> {
         return Err(invalid_firmware());
     }
     Ok(data)
-}
-
-#[cfg(not(windows))]
-fn firmware_table() -> Result<PrivateBytes> {
-    Err(VoiceError::new(
-        "Installed voice session keys are currently supported on Windows only",
-    ))
 }

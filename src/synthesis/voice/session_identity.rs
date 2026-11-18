@@ -5,15 +5,16 @@
 
 mod imported;
 mod online;
-#[cfg(windows)]
+#[cfg(all(windows, target_arch = "x86_64"))]
 mod persisted;
+#[cfg(all(windows, target_arch = "x86_64"))]
 mod platform;
 mod session;
 
-#[cfg(windows)]
+#[cfg(all(windows, target_arch = "x86_64"))]
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
-#[cfg(windows)]
+#[cfg(all(windows, target_arch = "x86_64"))]
 use zeroize::Zeroize;
 
 use super::{Result, VoiceError};
@@ -39,11 +40,8 @@ pub fn saved_identity(voice_name: &str, model_version: u8) -> Result<u64> {
 /// running session. Only the model value, voice name, model generation and a machine-
 /// condition fingerprint are saved. This function does not inspect or contact
 /// the original editor.
-pub fn save_imported_identity(
-    voice_name: &str,
-    model_version: u8,
-    identity: u64,
-) -> Result<PathBuf> {
+#[cfg(all(windows, target_arch = "x86_64"))]
+fn save_imported_identity(voice_name: &str, model_version: u8, identity: u64) -> Result<PathBuf> {
     validate_voice_name(voice_name)?;
     model_suffix(model_version)?;
     imported::save_bound(voice_name, model_version, identity)
@@ -102,7 +100,7 @@ fn validate_voice_name(voice_name: &str) -> Result<()> {
 ///
 /// The field must be the original descriptor identity; a file path, voice UUID,
 /// display name, authentication token or invented fallback is not equivalent.
-#[cfg(windows)]
+#[cfg(all(windows, target_arch = "x86_64"))]
 fn derive_local_identity(session_field: &[u8], voice_name: &str, model_version: u8) -> Result<u64> {
     if session_field.is_empty() {
         return Err(VoiceError::new(

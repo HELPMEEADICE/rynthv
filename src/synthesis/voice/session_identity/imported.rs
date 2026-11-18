@@ -6,10 +6,14 @@ mod storage;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+#[cfg(all(windows, target_arch = "x86_64"))]
 use sha2::{Digest, Sha256};
+#[cfg(all(windows, target_arch = "x86_64"))]
 use zeroize::Zeroize;
 
-use super::{Result, VoiceError, platform};
+#[cfg(all(windows, target_arch = "x86_64"))]
+use super::platform;
+use super::{Result, VoiceError};
 
 #[derive(Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -37,14 +41,14 @@ pub(super) fn read(voice_name: &str, model_version: u8) -> Result<Option<u64>> {
         return Ok(None);
     };
     if let Some(fingerprint) = &entry.machine_fingerprint {
-        #[cfg(not(windows))]
+        #[cfg(not(all(windows, target_arch = "x86_64")))]
         {
             let _ = fingerprint;
             return Err(VoiceError::new(
                 "该模型上下文绑定原 Windows 机器，请使用手动导入上下文文件将所选声库保存为便携上下文。",
             ));
         }
-        #[cfg(windows)]
+        #[cfg(all(windows, target_arch = "x86_64"))]
         if fingerprint != &machine_fingerprint()? {
             return Err(VoiceError::new(
                 "模型上下文与当前 Windows 用户或处理器不匹配。请重新获取本机上下文或手动导入。",
@@ -65,6 +69,7 @@ pub(super) fn read_source(voice_name: &str, model_version: u8, path: &Path) -> R
         })
 }
 
+#[cfg(all(windows, target_arch = "x86_64"))]
 pub(super) fn save_bound(voice_name: &str, model_version: u8, identity: u64) -> Result<PathBuf> {
     save(
         voice_name,
@@ -129,6 +134,7 @@ fn context_path() -> Result<PathBuf> {
         .map_err(VoiceError::new)
 }
 
+#[cfg(all(windows, target_arch = "x86_64"))]
 fn machine_fingerprint() -> Result<String> {
     let mut machine = platform::machine_identity()?;
     let digest = Sha256::digest(machine.as_bytes());

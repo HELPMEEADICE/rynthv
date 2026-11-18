@@ -1,18 +1,9 @@
 use super::super::{Result, VoiceError};
 
-#[cfg(all(windows, target_arch = "x86_64"))]
 pub(super) fn machine_identity() -> Result<String> {
     windows::machine_identity()
 }
 
-#[cfg(not(all(windows, target_arch = "x86_64")))]
-pub(super) fn machine_identity() -> Result<String> {
-    Err(VoiceError::new(
-        "Duration session identity is currently implemented for Windows x64 only",
-    ))
-}
-
-#[cfg(all(windows, target_arch = "x86_64"))]
 mod windows {
     use std::{arch::x86_64::__cpuid, ffi::c_void, mem::size_of, ptr};
 
