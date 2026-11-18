@@ -36,10 +36,18 @@ pub struct Sv1F0Stage<'a> {
 
 impl<'a> Sv1F0Stage<'a> {
     pub fn prepare(tree: &'a PreparedTree) -> Result<Self> {
-        Self::prepare_contract(tree, Contract::Compatible)
+        Self::prepare_contract(tree, Contract::Compatible, None)
     }
 
     pub fn prepare_native(tree: &'a PreparedTree, enhancement: f32) -> Result<Self> {
+        Self::prepare_native_conditioned(tree, enhancement, None)
+    }
+
+    pub(crate) fn prepare_native_conditioned(
+        tree: &'a PreparedTree,
+        enhancement: f32,
+        pitch: Option<&[f32]>,
+    ) -> Result<Self> {
         if !enhancement.is_finite() {
             return Err(VoiceError::new("Native DDS F0 enhancement must be finite"));
         }
@@ -48,10 +56,11 @@ impl<'a> Sv1F0Stage<'a> {
             Contract::Native {
                 enhancement: enhancement.clamp(0.0, 1.0),
             },
+            pitch,
         )
     }
 
-    fn prepare_contract(tree: &'a PreparedTree, contract: Contract) -> Result<Self> {
+    fn prepare_contract(tree: &'a PreparedTree, contract: Contract, pitch: Option<&[f32]>) -> Result<Self> {
         let wrapper = tree.node(tree.root_index())?;
         let payload = tree.payload(tree.root_index())?;
         if wrapper.type_id != F0_WRAPPER_TYPE_ID
@@ -80,11 +89,14 @@ impl<'a> Sv1F0Stage<'a> {
             ));
         }
         let frontend = Frontend::prepare(tree, root.children[0])?;
-        let mut style = tree
+        let stored = tree
             .tensor(root.children[1])?
             .vector()
-            .ok_or_else(|| VoiceError::new("Compatible F0 style is not a float vector"))?
-            .to_vec();
+            .ok_or_else(|| VoiceError::new("Compatible F0 style is not a float vector"))?;
+        let mut style = pitch.unwrap_or(stored).to_vec();
+        if style.len() != stored.len() || style.iter().any(|value| !value.is_finite()) {
+            return Err(VoiceError::new("Flat pitch embedding differs from the DDS F0 model"));
+        }
         // Enable the default scalar style flag. Add its learned contribution
         // to the stored style independently of position C.
         let mut runtime = ModelRuntime::new(tree);

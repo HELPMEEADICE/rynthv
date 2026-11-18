@@ -49,7 +49,7 @@ impl PreparedSv1TimbreFrames {
             phones: request.phones,
             linguistic: &linguistic,
             normalized_pitch: &normalized_pitch,
-            bank: &network.bank,
+            bank: network.bank,
             style: &network.styles.neutral,
             frame_styles: frame_styles.as_ref(),
             frame_factors: sampled_pitch.projection_factors.as_deref(),

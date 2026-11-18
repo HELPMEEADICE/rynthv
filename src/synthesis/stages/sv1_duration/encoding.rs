@@ -9,12 +9,9 @@ pub(super) fn encode(
     tree: &PreparedTree,
     children: &[usize; 6],
     configuration: Configuration,
+    constant: &[f32],
     phones: &[PhoneFeatures],
 ) -> Result<Vec<f32>> {
-    let constant = tree
-        .tensor(children[5])?
-        .vector()
-        .ok_or_else(|| VoiceError::new("SV1 duration constant is not a float vector"))?;
     let capacity = configuration
         .width
         .checked_mul(phones.len())

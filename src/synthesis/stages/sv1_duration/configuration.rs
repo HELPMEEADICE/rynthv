@@ -13,7 +13,7 @@ pub(super) struct Configuration {
     pub width: usize,
 }
 
-pub(super) fn validate(tree: &PreparedTree) -> Result<(Configuration, [usize; 6])> {
+pub(super) fn validate(tree: &PreparedTree) -> Result<(Configuration, [usize; 6], &[f32])> {
     let root = tree.node(tree.root_index())?;
     if root.type_id != types::DURATION_TYPE_ID {
         return Err(VoiceError::new("Not an original SV1 duration model"));
@@ -83,5 +83,6 @@ pub(super) fn validate(tree: &PreparedTree) -> Result<(Configuration, [usize; 6]
             width,
         },
         children,
+        constant,
     ))
 }

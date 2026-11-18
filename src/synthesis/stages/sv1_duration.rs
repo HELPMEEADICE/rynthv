@@ -1,6 +1,6 @@
 //! Six-child duration program for SV1 NOFS models.
 //!
-//! Its conditioning is a stored model vector. It has neither a session identity
+//! Its conditioning is a model or Flat voice vector. It has no session identity
 //! projection nor the impulse heads of the newer duration programs.
 
 mod configuration;
@@ -17,6 +17,7 @@ pub struct Sv1DurationStage<'a> {
     tree: &'a PreparedTree,
     children: [usize; 6],
     configuration: Configuration,
+    constant: &'a [f32],
 }
 
 pub struct Sv1DurationResult {
@@ -28,11 +29,20 @@ pub struct Sv1DurationResult {
 
 impl<'a> Sv1DurationStage<'a> {
     pub fn prepare(tree: &'a PreparedTree) -> Result<Self> {
-        let (configuration, children) = configuration::validate(tree)?;
+        Self::prepare_conditioned(tree, None)
+    }
+
+    pub(crate) fn prepare_conditioned(tree: &'a PreparedTree, timing: Option<&'a [f32]>) -> Result<Self> {
+        let (configuration, children, stored) = configuration::validate(tree)?;
+        let constant = timing.unwrap_or(stored);
+        if constant.len() != stored.len() || constant.iter().any(|value| !value.is_finite()) {
+            return Err(VoiceError::new("Flat timing embedding differs from the DDS duration model"));
+        }
         Ok(Self {
             tree,
             children,
             configuration,
+            constant,
         })
     }
 
@@ -42,7 +52,7 @@ impl<'a> Sv1DurationStage<'a> {
             Vec::new()
         } else {
             let features =
-                encoding::encode(self.tree, &self.children, self.configuration, &phones)?;
+                encoding::encode(self.tree, &self.children, self.configuration, self.constant, &phones)?;
             let scalars = self.tree.execute_node(self.children[1], &features)?;
             if scalars.len() != phones.len() || scalars.iter().any(|value| !value.is_finite()) {
                 return Err(VoiceError::new(

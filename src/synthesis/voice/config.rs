@@ -26,6 +26,33 @@ pub struct VoiceConfiguration {
 }
 
 impl VoiceConfiguration {
+    pub(super) fn from_flat(manifest: &super::flat::FlatManifest, styles: Vec<String>) -> Self {
+        let mut languages = vec![manifest.language.clone()];
+        for language in &manifest.support_languages {
+            if !languages.contains(language) {
+                languages.push(language.clone());
+            }
+        }
+        Self {
+            family: VoiceFamily::Sv1,
+            model_version: 1,
+            f0_enhancement: Some(1.0),
+            name: manifest.name.clone(),
+            version: manifest.version.clone(),
+            vendor: if manifest.vendor.is_empty() {
+                manifest.author.clone()
+            } else {
+                manifest.vendor.clone()
+            },
+            default_language: manifest.language.clone(),
+            supported_languages: languages,
+            styles,
+            additional_fields: manifest.additional.len(),
+            parser_scope: "Flat NOFS-JSON with native DDS model resources",
+            _uninterpreted: BTreeMap::new(),
+        }
+    }
+
     pub(super) fn parse(bytes: &[u8]) -> Result<Self> {
         let text = std::str::from_utf8(bytes)
             .map_err(|_| VoiceError::new("Voice configuration is not UTF-8"))?;

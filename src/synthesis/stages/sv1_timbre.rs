@@ -21,7 +21,7 @@ use crate::synthesis::{
         f0::PitchResult,
         timbre::{TimbreOutput, TimbreRequest, TimbreStyles},
     },
-    voice::{PreparedTree, Result, VoiceError, embedded::types},
+    voice::{PreparedTree, Result, VoiceError, embedded::types, flat::FlatConditioning},
 };
 use frontend::{Context, Frontend};
 use sampling::Sampler;
@@ -38,7 +38,7 @@ pub struct Sv1TimbreNetwork<'a> {
     frontend: Frontend<'a>,
     context: Context<'a>,
     sampler: Sampler,
-    bank: Vec<f32>,
+    bank: &'a [f32],
     styles: TimbreStyles,
     decoder: [usize; 4],
 }
@@ -49,14 +49,18 @@ impl<'a> Sv1TimbreNetwork<'a> {
     }
 
     pub fn prepare(tree: &'a PreparedTree) -> Result<Self> {
-        Self::prepare_contract(tree, Contract::Compatible)
+        Self::prepare_contract(tree, Contract::Compatible, None)
     }
 
     pub fn prepare_native(tree: &'a PreparedTree) -> Result<Self> {
-        Self::prepare_contract(tree, Contract::Native)
+        Self::prepare_native_conditioned(tree, None)
     }
 
-    fn prepare_contract(tree: &'a PreparedTree, contract: Contract) -> Result<Self> {
+    pub(crate) fn prepare_native_conditioned(tree: &'a PreparedTree, flat: Option<&'a FlatConditioning>) -> Result<Self> {
+        Self::prepare_contract(tree, Contract::Native, flat)
+    }
+
+    fn prepare_contract(tree: &'a PreparedTree, contract: Contract, flat: Option<&'a FlatConditioning>) -> Result<Self> {
         let root = tree.node(tree.root_index())?;
         if root.type_id != types::TIMBRE_TYPE_ID
             || !tree.payload(tree.root_index())?.is_empty()
@@ -76,11 +80,19 @@ impl<'a> Sv1TimbreNetwork<'a> {
             program.children.as_slice().try_into().map_err(|_| {
                 VoiceError::new("Compatible acoustic program requires eight children")
             })?;
-        let bank = tree
+        let stored_bank = tree
             .tensor(nodes[1])?
             .vector()
-            .ok_or_else(|| VoiceError::new("Compatible acoustic bank is not a vector"))?
-            .to_vec();
+            .ok_or_else(|| VoiceError::new("Compatible acoustic bank is not a vector"))?;
+        let stored_styles = TimbreStyles::prepare(tree, root.children[1])?;
+        let (bank, styles) = if let Some(flat) = flat {
+            if flat.base.len() != stored_bank.len() || flat.styles.neutral.len() != stored_styles.neutral.len() {
+                return Err(VoiceError::new("Flat style embeddings differ from the DDS acoustic model"));
+            }
+            (flat.base.as_slice(), flat.styles.clone())
+        } else {
+            (stored_bank, stored_styles)
+        };
         Ok(Self {
             contract,
             tree,
@@ -88,7 +100,7 @@ impl<'a> Sv1TimbreNetwork<'a> {
             context: Context::prepare(tree, nodes[2])?,
             sampler: Sampler::prepare(tree, nodes[3])?,
             bank,
-            styles: TimbreStyles::prepare(tree, root.children[1])?,
+            styles,
             decoder: nodes[4..].try_into().unwrap(),
         })
     }

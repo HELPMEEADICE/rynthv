@@ -6,6 +6,7 @@ use crate::synthesis::{
 };
 
 /// Form each style vector as the neutral row plus weighted style rows.
+#[derive(Clone)]
 pub struct TimbreStyles {
     pub neutral: Arc<[f32]>,
     pub variants: Vec<Arc<[f32]>>,

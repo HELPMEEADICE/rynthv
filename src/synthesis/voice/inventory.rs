@@ -1,4 +1,5 @@
 mod inspect;
+mod flat;
 mod nofs;
 
 use std::{
@@ -33,6 +34,8 @@ pub struct VoiceInventory {
     pub tensor_count: usize,
     pub files: Vec<VoiceFile>,
     pub configuration: Option<VoiceConfiguration>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub flat: Option<super::flat::FlatManifest>,
     #[serde(skip)]
     _models: Vec<LoadedModel>,
     #[serde(skip)]
@@ -142,6 +145,7 @@ impl VoiceInventory {
                     configuration.family,
                     configuration.f0_enhancement,
                     configuration.styles.clone(),
+                    None,
                 )))
             })
             .clone()
@@ -158,6 +162,21 @@ impl VoiceInventory {
     /// Load exactly the selected revision directory. Catalog selection, not
     /// the model loader, resolves a database root and its installed revisions.
     pub fn load(directory: &Path) -> Result<Self> {
+        if super::flat::is_voice_path(directory) {
+            let registry = super::flat::FlatModelRegistry::scan(directory.parent(), None);
+            return flat::load(directory, &registry);
+        }
+        Self::load_original(directory)
+    }
+
+    pub fn load_with_flat(directory: &Path, registry: &super::flat::FlatModelRegistry) -> Result<Self> {
+        if super::flat::is_voice_path(directory) {
+            return flat::load(directory, registry);
+        }
+        Self::load_original(directory)
+    }
+
+    fn load_original(directory: &Path) -> Result<Self> {
         if super::nofs::is_file(directory) {
             return nofs::load(directory);
         }
@@ -212,6 +231,7 @@ impl VoiceInventory {
             directory: directory.to_owned(),
             files: Vec::new(),
             configuration: None,
+            flat: None,
             display_name: String::new(),
             content_hash: String::new(),
             resource_count: 0,

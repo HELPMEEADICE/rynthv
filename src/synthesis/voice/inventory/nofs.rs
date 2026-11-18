@@ -85,6 +85,7 @@ pub(super) fn load(path: &Path) -> Result<VoiceInventory> {
         tensor_count,
         files: vec![file],
         configuration: Some(description.configuration),
+        flat: None,
         _models: vec![LoadedModel::Nofs { trees }],
         preparation: OnceLock::new(),
     })
