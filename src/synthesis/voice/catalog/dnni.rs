@@ -29,6 +29,7 @@ pub(super) fn scan(
             continue;
         };
         let mut entry = VoiceCatalogEntry {
+            flat: None,
             database_id: database_id.to_string(),
             revision: version,
             model_version: None,

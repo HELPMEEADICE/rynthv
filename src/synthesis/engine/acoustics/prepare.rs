@@ -51,8 +51,7 @@ pub fn prepare_acoustics(
                     "SV1 duration does not accept an identity condition",
                 ));
             }
-            let native = voice.native_duration()?
-                .predict_explicit(&phrase.records)?;
+            let native = voice.native_duration()?.predict_explicit(&phrase.records)?;
             if native.record_seconds.len() != prepared_phrase.notes.len() {
                 return Err(VoiceError::new(
                     "SV1 derived note durations differ from the phrase",

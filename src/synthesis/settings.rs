@@ -1,6 +1,6 @@
 //! Portable resource locations and the selected voice relative to its library.
 
-use super::voice::VoiceCatalog;
+use super::voice::{VoiceCatalog, flat::FlatModelRegistry};
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
@@ -20,6 +20,8 @@ pub struct VoiceSelection {
 pub struct SynthesisSettings {
     pub databases: Option<PathBuf>,
     pub sv1_databases: Option<PathBuf>,
+    pub flat_databases: Option<PathBuf>,
+    pub flat_models: Option<PathBuf>,
     pub dictionaries: Option<PathBuf>,
     pub selected_voice: Option<VoiceSelection>,
 }
@@ -35,7 +37,25 @@ impl SynthesisSettings {
     }
 
     pub fn has_databases(&self) -> bool {
-        self.databases.is_some() || self.sv1_databases.is_some()
+        self.databases.is_some()
+            || self.sv1_databases.is_some()
+            || self.flat_databases.is_some()
+            || self.flat_voice_directory().is_ok_and(|path| path.is_dir())
+    }
+
+    pub fn flat_voice_directory(&self) -> Result<PathBuf, String> {
+        match &self.flat_databases {
+            Some(path) => Ok(path.clone()),
+            None => crate::platform::config_directory().map(|path| path.join("flat-voices")),
+        }
+    }
+
+    pub fn flat_registry(&self) -> FlatModelRegistry {
+        let voices = self
+            .flat_voice_directory()
+            .ok()
+            .filter(|path| self.flat_databases.is_some() || path.is_dir());
+        FlatModelRegistry::scan(voices.as_deref(), self.flat_models.as_deref())
     }
 
     pub fn path() -> Result<PathBuf, String> {
@@ -89,6 +109,15 @@ impl SynthesisSettings {
             .ok_or_else(|| "尚未选择声库。".to_owned())?;
         let mut directories = Vec::new();
         let mut errors = Vec::new();
+        if selected.database_id.starts_with("flat:") {
+            let catalog = VoiceCatalog::from_flat(&self.flat_registry());
+            directories.extend(
+                catalog.entries.into_iter().filter_map(|entry| {
+                    (entry.selection() == *selected).then_some(entry.directory)
+                }),
+            );
+            errors.extend(catalog.warnings);
+        }
         for (label, root) in self.database_roots() {
             match VoiceCatalog::scan(root) {
                 Ok(catalog) => {

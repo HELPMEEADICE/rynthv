@@ -3,6 +3,8 @@
 mod args;
 #[path = "synthesis_cli/context.rs"]
 mod context;
+#[path = "synthesis_cli/flat.rs"]
+mod flat;
 #[path = "synthesis_cli/render.rs"]
 mod render;
 
@@ -20,7 +22,15 @@ use std::{
 };
 
 fn main() -> ExitCode {
-    match run() {
+    let mut arguments = std::env::args_os().skip(1);
+    let Some(command) = arguments.next() else {
+        print!("{}", args::HELP);
+        return ExitCode::SUCCESS;
+    };
+    if let Some(command) = flat::Command::parse(&command) {
+        return flat::run(command, arguments);
+    }
+    match run(command, arguments) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("{error}");
@@ -29,13 +39,26 @@ fn main() -> ExitCode {
     }
 }
 
-fn run() -> Result<(), String> {
-    let Some(args) = Args::parse()? else {
+fn run(
+    command: std::ffi::OsString,
+    arguments: impl Iterator<Item = std::ffi::OsString>,
+) -> Result<(), String> {
+    let Some(args) = Args::parse(command, arguments)? else {
         print!("{}", args::HELP);
         return Ok(());
     };
     let start = Instant::now();
-    let inventory = VoiceInventory::load(&args.voice).map_err(|e| e.to_string())?;
+    let inventory = if rynthv::synthesis::voice::flat::is_voice_path(&args.voice) {
+        let registry = flat::registry(
+            args.flat_directory.as_deref(),
+            args.model_directory.as_deref(),
+            Some(&args.voice),
+        )?;
+        VoiceInventory::load_flat(&args.voice, &registry)
+    } else {
+        VoiceInventory::load(&args.voice)
+    }
+    .map_err(|e| e.to_string())?;
     let load_ms = start.elapsed().as_secs_f64() * 1000.0;
     if let Some(import) = args.context {
         return write_report(args.output, &import.run(&inventory)?);

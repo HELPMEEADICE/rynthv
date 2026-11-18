@@ -9,6 +9,7 @@ pub(super) fn entry(path: &Path) -> Result<VoiceCatalogEntry> {
         .map(|directory| directory.join("profile.png"))
         .filter(|path| path.is_file());
     let mut entry = VoiceCatalogEntry {
+        flat: None,
         database_id: nofs::database_id(path)?,
         revision: 0,
         model_version: Some(1),

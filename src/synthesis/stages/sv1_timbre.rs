@@ -56,11 +56,18 @@ impl<'a> Sv1TimbreNetwork<'a> {
         Self::prepare_native_conditioned(tree, None)
     }
 
-    pub(crate) fn prepare_native_conditioned(tree: &'a PreparedTree, flat: Option<&'a FlatConditioning>) -> Result<Self> {
+    pub(crate) fn prepare_native_conditioned(
+        tree: &'a PreparedTree,
+        flat: Option<&'a FlatConditioning>,
+    ) -> Result<Self> {
         Self::prepare_contract(tree, Contract::Native, flat)
     }
 
-    fn prepare_contract(tree: &'a PreparedTree, contract: Contract, flat: Option<&'a FlatConditioning>) -> Result<Self> {
+    fn prepare_contract(
+        tree: &'a PreparedTree,
+        contract: Contract,
+        flat: Option<&'a FlatConditioning>,
+    ) -> Result<Self> {
         let root = tree.node(tree.root_index())?;
         if root.type_id != types::TIMBRE_TYPE_ID
             || !tree.payload(tree.root_index())?.is_empty()
@@ -86,8 +93,12 @@ impl<'a> Sv1TimbreNetwork<'a> {
             .ok_or_else(|| VoiceError::new("Compatible acoustic bank is not a vector"))?;
         let stored_styles = TimbreStyles::prepare(tree, root.children[1])?;
         let (bank, styles) = if let Some(flat) = flat {
-            if flat.base.len() != stored_bank.len() || flat.styles.neutral.len() != stored_styles.neutral.len() {
-                return Err(VoiceError::new("Flat style embeddings differ from the DDS acoustic model"));
+            if flat.base.len() != stored_bank.len()
+                || flat.styles.neutral.len() != stored_styles.neutral.len()
+            {
+                return Err(VoiceError::new(
+                    "Flat style embeddings differ from the DDS acoustic model",
+                ));
             }
             (flat.base.as_slice(), flat.styles.clone())
         } else {

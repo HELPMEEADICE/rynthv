@@ -30,6 +30,29 @@ pub fn settings(app: &mut App, ui: &mut Ui) {
         choose_sv1_databases(app);
     }
     ui.add_space(8.0);
+    text(ui, "SynthV Flat 声库目录");
+    let flat_path = app.synthesis.library.settings.flat_voice_directory().ok();
+    path_label(ui, flat_path.as_deref());
+    ui.add_enabled_ui(!app.synthesis.library.flat_busy(), |ui| {
+        if ui.button("选择 Flat 声库目录…").clicked() {
+            choose_flat_databases(app);
+        }
+        ui.add_space(8.0);
+        text(ui, "SynthV Flat Base Model 目录");
+        let models = app.synthesis.library.settings.flat_models.as_deref();
+        path_label(ui, models);
+        ui.horizontal_wrapped(|ui| {
+            if ui.button("选择 Base Model 目录…").clicked() {
+                choose_flat_models(app);
+            }
+            if app.synthesis.library.settings.flat_models.is_some()
+                && ui.button("清除目录").clicked()
+            {
+                app.synthesis.set_flat_models(None);
+            }
+        });
+    });
+    ui.add_space(8.0);
     text(ui, "发音词典目录（clf-data）");
     path_label(ui, app.synthesis.dictionaries());
     if ui.button("选择词典目录…").clicked() {
@@ -68,6 +91,31 @@ pub(super) fn directory_menu(app: &mut App, ui: &mut Ui) {
     if ui.button("SV1 原生声库目录…").clicked() {
         ui.close();
         choose_sv1_databases(app);
+    }
+    ui.add_enabled_ui(!app.synthesis.library.flat_busy(), |ui| {
+        if ui.button("SynthV Flat 声库目录…").clicked() {
+            ui.close();
+            choose_flat_databases(app);
+        }
+        if ui.button("SynthV Flat Base Model 目录…").clicked() {
+            ui.close();
+            choose_flat_models(app);
+        }
+    });
+}
+
+fn choose_flat_databases(app: &mut App) {
+    let current = app.synthesis.library.settings.flat_voice_directory().ok();
+    if let Some(path) = folder_dialog(current.as_deref()).pick_folder() {
+        app.synthesis.set_flat_databases(path);
+    }
+}
+
+fn choose_flat_models(app: &mut App) {
+    if let Some(path) =
+        folder_dialog(app.synthesis.library.settings.flat_models.as_deref()).pick_folder()
+    {
+        app.synthesis.set_flat_models(Some(path));
     }
 }
 

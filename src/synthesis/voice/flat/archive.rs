@@ -11,7 +11,7 @@ use zip::{CompressionMethod, ZipArchive};
 use super::{FlatManifest, FlatPackage, PackageConfig};
 use crate::synthesis::voice::{Result, VoiceError};
 
-const MAX_ARCHIVE_BYTES: u64 = 4 * 1024 * 1024 * 1024;
+pub(super) const MAX_ARCHIVE_BYTES: u64 = 4 * 1024 * 1024 * 1024;
 const MAX_BATCH_CONTENT: u64 = 4 * 1024 * 1024 * 1024;
 const MAX_VOICE_CONTENT: u64 = 1024 * 1024 * 1024;
 const MAX_ENTRIES: usize = 2048;
@@ -38,9 +38,8 @@ impl FlatArchive {
         if !metadata.is_file() || metadata.len() > MAX_ARCHIVE_BYTES {
             return Err(VoiceError::new("Invalid Flat package file type or size"));
         }
-        Self::read_zip(BufReader::new(file)).map_err(|error| {
-            VoiceError::new(format!("Flat package {}: {error}", path.display()))
-        })
+        Self::read_zip(BufReader::new(file))
+            .map_err(|error| VoiceError::new(format!("Flat package {}: {error}", path.display())))
     }
 }
 
@@ -57,7 +56,9 @@ impl<R: Read + Seek> FlatArchive<R> {
         reader.seek(SeekFrom::Start(0))?;
         let mut zip = ZipArchive::new(reader).map_err(zip_error)?;
         if zip.len() > MAX_ENTRIES || zip.has_duplicate_names() {
-            return Err(VoiceError::new("Flat ZIP contains too many entries or duplicate names"));
+            return Err(VoiceError::new(
+                "Flat ZIP contains too many entries or duplicate names",
+            ));
         }
         let mut files = BTreeMap::new();
         let mut total = 0u64;
@@ -74,15 +75,22 @@ impl<R: Read + Seek> FlatArchive<R> {
             if file.is_dir() {
                 continue;
             }
-            if !matches!(file.compression(), CompressionMethod::Stored | CompressionMethod::Deflated)
-            {
-                return Err(VoiceError::new(format!("Unsupported ZIP compression for {name:?}")));
+            if !matches!(
+                file.compression(),
+                CompressionMethod::Stored | CompressionMethod::Deflated
+            ) {
+                return Err(VoiceError::new(format!(
+                    "Unsupported ZIP compression for {name:?}"
+                )));
             }
-            total = total.checked_add(file.size())
+            total = total
+                .checked_add(file.size())
                 .filter(|&sum| sum <= MAX_BATCH_CONTENT)
                 .ok_or_else(|| VoiceError::new("Flat ZIP exceeds expanded size limit"))?;
             if files.insert(name.to_owned(), file.size()).is_some() {
-                return Err(VoiceError::new(format!("Duplicate Flat ZIP entry {name:?}")));
+                return Err(VoiceError::new(format!(
+                    "Duplicate Flat ZIP entry {name:?}"
+                )));
             }
         }
         let has_voice = files.contains_key("info.nofs") || files.contains_key("voice.nofs");
@@ -91,7 +99,11 @@ impl<R: Read + Seek> FlatArchive<R> {
             (true, false) if total <= MAX_VOICE_CONTENT => PackageKind::Sfpk,
             (true, false) => return Err(VoiceError::new("Expanded SFPK exceeds 1 GiB")),
             (false, true) => PackageKind::Sfpks,
-            _ => return Err(VoiceError::new("Flat ZIP does not identify one voice or an SFPK batch")),
+            _ => {
+                return Err(VoiceError::new(
+                    "Flat ZIP does not identify one voice or an SFPK batch",
+                ));
+            }
         };
         Ok(Self { kind, zip, files })
     }
@@ -105,17 +117,29 @@ impl<R: Read + Seek> FlatArchive<R> {
     }
 
     pub fn read(&mut self, name: &str, limit: usize) -> Result<Vec<u8>> {
-        let length = self.files.get(name).copied()
+        let length = self
+            .files
+            .get(name)
+            .copied()
             .ok_or_else(|| VoiceError::new(format!("Missing Flat ZIP entry {name:?}")))?;
         if length > limit as u64 {
-            return Err(VoiceError::new(format!("Flat ZIP entry {name:?} exceeds size limit")));
+            return Err(VoiceError::new(format!(
+                "Flat ZIP entry {name:?} exceeds size limit"
+            )));
         }
         let mut bytes = Vec::new();
-        self.zip.by_name(name).map_err(zip_error)?
-            .take(length + 1).read_to_end(&mut bytes)
-            .map_err(|error| VoiceError::new(format!("Reading Flat ZIP entry {name:?}: {error}")))?;
+        self.zip
+            .by_name(name)
+            .map_err(zip_error)?
+            .take(length + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|error| {
+                VoiceError::new(format!("Reading Flat ZIP entry {name:?}: {error}"))
+            })?;
         if bytes.len() as u64 != length {
-            return Err(VoiceError::new(format!("Flat ZIP entry {name:?} has an invalid length")));
+            return Err(VoiceError::new(format!(
+                "Flat ZIP entry {name:?} has an invalid length"
+            )));
         }
         Ok(bytes)
     }
@@ -131,18 +155,32 @@ impl<R: Read + Seek> FlatArchive<R> {
         let manifest_name = match (self.contains("info.nofs"), self.contains("voice.nofs")) {
             (true, false) => "info.nofs",
             (false, true) => "voice.nofs",
-            _ => return Err(VoiceError::new("Expected exactly one Flat NOFS-JSON manifest")),
+            _ => {
+                return Err(VoiceError::new(
+                    "Expected exactly one Flat NOFS-JSON manifest",
+                ));
+            }
         };
         let manifest = FlatManifest::parse(&self.read(manifest_name, MAX_METADATA_BYTES)?)?;
-        let config = self.contains("config.json").then(|| {
-            let bytes = self.read("config.json", MAX_METADATA_BYTES)?;
-            let config: PackageConfig = serde_json::from_slice(bytes.strip_prefix(b"\xef\xbb\xbf").unwrap_or(&bytes))
-                .map_err(|error| VoiceError::new(format!("Invalid Flat config.json: {error}")))?;
-            if config.name != manifest.name || config.version.parse::<u32>().ok() != Some(manifest.revision()?) {
-                return Err(VoiceError::new("Flat package and voice name or version disagree"));
-            }
-            Ok(config)
-        }).transpose()?;
+        let config = self
+            .contains("config.json")
+            .then(|| {
+                let bytes = self.read("config.json", MAX_METADATA_BYTES)?;
+                let config: PackageConfig =
+                    serde_json::from_slice(bytes.strip_prefix(b"\xef\xbb\xbf").unwrap_or(&bytes))
+                        .map_err(|error| {
+                        VoiceError::new(format!("Invalid Flat config.json: {error}"))
+                    })?;
+                if config.name != manifest.name
+                    || config.version.parse::<u32>().ok() != Some(manifest.revision()?)
+                {
+                    return Err(VoiceError::new(
+                        "Flat package and voice name or version disagree",
+                    ));
+                }
+                Ok(config)
+            })
+            .transpose()?;
         Ok(FlatPackage {
             manifest,
             config,
@@ -152,31 +190,46 @@ impl<R: Read + Seek> FlatArchive<R> {
 }
 
 impl FlatArchive {
-    pub fn visit_packages<T>(&mut self, mut visit: impl FnMut(Option<&str>, FlatPackage) -> Result<T>) -> Result<Vec<T>> {
+    pub(super) fn visit_packages<T>(
+        &mut self,
+        mut visit: impl FnMut(Option<(&str, &[u8])>, FlatPackage) -> Result<T>,
+    ) -> Result<Vec<T>> {
         if self.kind == PackageKind::Sfpk {
             return Ok(vec![visit(None, self.describe()?)?]);
         }
-        let names = self.files.keys().filter(|name| is_sfpk(Path::new(name))).cloned().collect::<Vec<_>>();
-        names.into_iter().map(|name| {
-            let result = (|| {
-                let bytes = self.read_batch_member(&name)?;
-                let mut child = FlatArchive::read_zip(Cursor::new(bytes))?;
-                if child.kind != PackageKind::Sfpk {
-                    return Err(VoiceError::new("Nested Flat batches are unsupported"));
-                }
-                visit(Some(&name), child.describe()?)
-            })();
-            result.map_err(|error| VoiceError::new(format!("Flat batch member {name:?}: {error}")))
-        }).collect()
+        let names = self
+            .files
+            .keys()
+            .filter(|name| is_sfpk(Path::new(name)))
+            .cloned()
+            .collect::<Vec<_>>();
+        names
+            .into_iter()
+            .map(|name| {
+                let result = (|| {
+                    let bytes = self.read_batch_member(&name)?;
+                    let mut child = FlatArchive::read_zip(Cursor::new(bytes.as_slice()))?;
+                    if child.kind != PackageKind::Sfpk {
+                        return Err(VoiceError::new("Nested Flat batches are unsupported"));
+                    }
+                    visit(Some((&name, &bytes)), child.describe()?)
+                })();
+                result.map_err(|error| {
+                    VoiceError::new(format!("Flat batch member {name:?}: {error}"))
+                })
+            })
+            .collect()
     }
 }
 
 pub(super) fn is_sfpk(path: &Path) -> bool {
-    path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("sfpk"))
+    path.extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("sfpk"))
 }
 
 fn validate_path(name: &str) -> Result<()> {
-    if name.len() > 1024 || name.contains(['\\', ':', '\0'])
+    if name.len() > 1024
+        || name.contains(['\\', ':', '\0'])
         || name.split('/').any(|part| matches!(part, "" | "." | ".."))
     {
         return Err(VoiceError::new(format!("Invalid Flat ZIP path {name:?}")));

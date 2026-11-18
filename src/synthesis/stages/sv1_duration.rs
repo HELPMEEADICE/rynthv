@@ -32,11 +32,16 @@ impl<'a> Sv1DurationStage<'a> {
         Self::prepare_conditioned(tree, None)
     }
 
-    pub(crate) fn prepare_conditioned(tree: &'a PreparedTree, timing: Option<&'a [f32]>) -> Result<Self> {
+    pub(crate) fn prepare_conditioned(
+        tree: &'a PreparedTree,
+        timing: Option<&'a [f32]>,
+    ) -> Result<Self> {
         let (configuration, children, stored) = configuration::validate(tree)?;
         let constant = timing.unwrap_or(stored);
         if constant.len() != stored.len() || constant.iter().any(|value| !value.is_finite()) {
-            return Err(VoiceError::new("Flat timing embedding differs from the DDS duration model"));
+            return Err(VoiceError::new(
+                "Flat timing embedding differs from the DDS duration model",
+            ));
         }
         Ok(Self {
             tree,
@@ -51,8 +56,13 @@ impl<'a> Sv1DurationStage<'a> {
         let scalars = if phones.is_empty() {
             Vec::new()
         } else {
-            let features =
-                encoding::encode(self.tree, &self.children, self.configuration, self.constant, &phones)?;
+            let features = encoding::encode(
+                self.tree,
+                &self.children,
+                self.configuration,
+                self.constant,
+                &phones,
+            )?;
             let scalars = self.tree.execute_node(self.children[1], &features)?;
             if scalars.len() != phones.len() || scalars.iter().any(|value| !value.is_finite()) {
                 return Err(VoiceError::new(

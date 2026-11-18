@@ -1,6 +1,7 @@
 //! Lightweight discovery of installed voice revisions, without loading model weights.
 
 mod dnni;
+mod flat;
 mod metadata;
 mod nofs;
 mod resource;
@@ -13,6 +14,7 @@ use std::{
 use serde::Serialize;
 
 use super::{Result, VoiceFamily};
+pub use flat::FlatCatalogEntry;
 use metadata::MetadataIndex;
 
 #[derive(Clone, Debug, Serialize)]
@@ -41,6 +43,8 @@ pub struct VoiceCatalogEntry {
     pub pitch_range: Option<String>,
     pub languages: Vec<String>,
     pub icon_path: Option<PathBuf>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub flat: Option<FlatCatalogEntry>,
     pub availability: VoiceAvailability,
 }
 
@@ -51,6 +55,10 @@ pub struct VoiceCatalog {
 }
 
 impl VoiceCatalog {
+    pub fn from_flat(registry: &super::flat::FlatModelRegistry) -> Self {
+        flat::catalog(registry)
+    }
+
     /// Discover supported DNNI revisions and original SV1 AI NOFS files without
     /// reading weights. A root can also be one SV1 voice folder or NOFS file.
     pub fn scan(root: &Path) -> Result<Self> {

@@ -53,11 +53,21 @@ impl FlatModelRegistry {
     }
 
     pub fn models(&self) -> impl Iterator<Item = RegisteredModel<'_>> {
-        self.entries.iter().map(|((role, id), sources)| RegisteredModel {
-            role: *role,
-            id,
-            sources,
-        })
+        self.entries
+            .iter()
+            .map(|((role, id), sources)| RegisteredModel {
+                role: *role,
+                id,
+                sources,
+            })
+    }
+
+    pub fn extend(&mut self, other: Self) {
+        for (key, sources) in other.entries {
+            self.entries.entry(key).or_default().extend(sources);
+        }
+        self.packages.extend(other.packages);
+        self.warnings.extend(other.warnings);
     }
 
     pub(super) fn candidates(&self, role: ModelRole, id: &str) -> BTreeSet<ModelSource> {
@@ -70,11 +80,26 @@ impl FlatModelRegistry {
     }
 
     fn scan_voices(&mut self, directory: &Path) {
-        self.scan_package_folder(directory, false);
+        let directory = fs::canonicalize(directory).unwrap_or_else(|_| directory.to_owned());
+        self.scan_package_folder(&directory, false);
+        match super::library::import_directories(&directory) {
+            Ok(folders) => {
+                for folder in folders {
+                    self.scan_package_folder(&folder, false);
+                }
+            }
+            Err(error) => self
+                .warnings
+                .push(format!("{}: {error}", directory.display())),
+        }
     }
 
     fn scan_package_folder(&mut self, directory: &Path, optional: bool) {
-        for path in self.files(directory, optional).into_iter().filter(|path| is_sfpk(path)) {
+        for path in self
+            .files(directory, optional)
+            .into_iter()
+            .filter(|path| is_sfpk(path))
+        {
             let result = (|| -> Result<_> {
                 let package = FlatArchive::open(&path)?.describe()?;
                 for (role, id) in package.manifest.model_ids()? {
@@ -83,13 +108,18 @@ impl FlatModelRegistry {
                         self.entries
                             .entry((Some(role), id.to_owned()))
                             .or_default()
-                            .insert(ModelSource::Package { path: path.clone(), member });
+                            .insert(ModelSource::Package {
+                                path: path.clone(),
+                                member,
+                            });
                     }
                 }
                 Ok(package)
             })();
             match result {
-                Ok(package) => { self.packages.insert(path, package); }
+                Ok(package) => {
+                    self.packages.insert(path, package);
+                }
                 Err(error) => self.warnings.push(format!("{}: {error}", path.display())),
             }
         }
@@ -97,7 +127,10 @@ impl FlatModelRegistry {
 
     fn scan_model_folder(&mut self, directory: &Path, role: Option<ModelRole>, optional: bool) {
         for path in self.files(directory, optional) {
-            if !path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("dnni")) {
+            if !path
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("dnni"))
+            {
                 continue;
             }
             let Some(id) = path.file_stem().and_then(|id| id.to_str()) else {
@@ -107,7 +140,9 @@ impl FlatModelRegistry {
                 self.warnings.push(format!("{}: {error}", path.display()));
                 continue;
             }
-            self.entries.entry((role, id.to_owned())).or_default()
+            self.entries
+                .entry((role, id.to_owned()))
+                .or_default()
                 .insert(ModelSource::File { path });
         }
     }
@@ -117,22 +152,26 @@ impl FlatModelRegistry {
             Ok(entries) => entries,
             Err(error) => {
                 if !(optional && error.kind() == std::io::ErrorKind::NotFound) {
-                    self.warnings.push(format!("{}: {error}", directory.display()));
+                    self.warnings
+                        .push(format!("{}: {error}", directory.display()));
                 }
                 return Vec::new();
             }
         };
-        entries.filter_map(|entry| {
-            let result = entry.and_then(|entry| Ok((entry.file_type()?, entry.path())));
-            match result {
-                Ok((kind, path)) if kind.is_file() => Some(path),
-                Ok(_) => None,
-                Err(error) => {
-                    self.warnings.push(format!("{}: {error}", directory.display()));
-                    None
+        entries
+            .filter_map(|entry| {
+                let result = entry.and_then(|entry| Ok((entry.file_type()?, entry.path())));
+                match result {
+                    Ok((kind, path)) if kind.is_file() => Some(path),
+                    Ok(_) => None,
+                    Err(error) => {
+                        self.warnings
+                            .push(format!("{}: {error}", directory.display()));
+                        None
+                    }
                 }
-            }
-        }).collect()
+            })
+            .collect()
     }
 }
 

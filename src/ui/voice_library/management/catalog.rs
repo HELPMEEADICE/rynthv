@@ -28,7 +28,8 @@ pub(super) fn entries(app: &App, state: &State) -> Vec<VoiceCatalogEntry> {
             )
         };
         for entry in &catalog.entries {
-            if !state.language.is_empty() && !entry.languages.contains(&state.language)
+            if state.flat_only && entry.flat.is_none()
+                || !state.language.is_empty() && !entry.languages.contains(&state.language)
                 || !state.vendor.is_empty() && entry.vendor != state.vendor
             {
                 continue;

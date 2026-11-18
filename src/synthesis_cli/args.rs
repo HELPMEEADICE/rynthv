@@ -15,11 +15,19 @@ pub const HELP: &str = r#"RynthV synthesis tools
   rynthv-synth plan-project --project SVP [OPTIONS]
   rynthv-synth run-module --file INDEX --tree INDEX --node INDEX --input JSON [OPTIONS]
   rynthv-synth resolve-phone --file INDEX --tree INDEX --language NAME --phone TOKEN [OPTIONS]
+  rynthv-synth inspect-flat --input PACKAGE.sfpk|BATCH.sfpks [OPTIONS]
+  rynthv-synth validate-flat --input PACKAGE.sfpk [OPTIONS]
+  rynthv-synth import-flat --input PACKAGE.sfpk|BATCH.sfpks [OPTIONS]
+  rynthv-synth list-flat-models [OPTIONS]
 
 OPTIONS: --voice PATH --output REPORT.json
 Omitting --voice uses the voice selected in the saved RynthV synthesis settings.
---voice names an exact SV2 revision directory or an original SV1 .nofs file.
+--voice names an exact SV2 revision directory, an original SV1 .nofs file or a Flat .sfpk.
 A native SV1 voice directory with a single .nofs file is also accepted.
+Flat options: --flat-dir PATH --model-dir PATH --output REPORT.json
+Flat commands use saved directories when omitted. Import defaults to the RynthV
+configuration directory's flat-voices folder. Exit codes: 0 success, 1 operation
+failed, 2 invalid arguments.
 import-context saves a model condition for the selected SV2 or SV2-compatible
 voice. Provide exactly one source: --context-file reads a RynthV context file;
 --identity accepts a decimal or 0x-prefixed hexadecimal U64. Both work on all
@@ -62,6 +70,8 @@ pub struct Args {
     pub phone: Option<PhoneArgs>,
     pub render: Option<RenderArgs>,
     pub context: Option<ContextImport>,
+    pub flat_directory: Option<PathBuf>,
+    pub model_directory: Option<PathBuf>,
 }
 
 pub struct RenderArgs {
@@ -87,11 +97,10 @@ pub struct ModuleArgs {
 }
 
 impl Args {
-    pub fn parse() -> Result<Option<Self>, String> {
-        let mut args = std::env::args_os().skip(1);
-        let Some(command) = args.next() else {
-            return Ok(None);
-        };
+    pub fn parse(
+        command: OsString,
+        mut args: impl Iterator<Item = OsString>,
+    ) -> Result<Option<Self>, String> {
         let command = match command.to_str() {
             Some("--help" | "-h") => return Ok(None),
             Some("inspect-voice") => Command::Inspect,
@@ -130,6 +139,8 @@ impl Args {
                         "--wav",
                         "--duration-identity",
                         "--profile",
+                        "--flat-dir",
+                        "--model-dir",
                     ]
                     .contains(key)
                 })
@@ -153,6 +164,13 @@ impl Args {
             None => SynthesisSettings::load()?.selected_directory()?,
         };
         let output = values.remove("--output").map(PathBuf::from);
+        let flat_directory = values.remove("--flat-dir").map(PathBuf::from);
+        let model_directory = values.remove("--model-dir").map(PathBuf::from);
+        if (flat_directory.is_some() || model_directory.is_some())
+            && !rynthv::synthesis::voice::flat::is_voice_path(&voice)
+        {
+            return Err("--flat-dir and --model-dir require a Flat .sfpk voice".into());
+        }
         let project = if command == Command::Plan {
             Some(PathBuf::from(
                 values
@@ -236,6 +254,8 @@ impl Args {
             phone,
             render,
             context,
+            flat_directory,
+            model_directory,
         }))
     }
 }

@@ -2,6 +2,7 @@ mod cards;
 mod catalog;
 mod details;
 mod feedback;
+mod flat;
 mod header;
 mod toolbar;
 
@@ -42,10 +43,12 @@ struct State {
     sort: Sort,
     language: String,
     vendor: String,
+    flat_only: bool,
     versions: BTreeMap<String, u32>,
     expanded: Option<String>,
     root: Option<PathBuf>,
     sv1_root: Option<PathBuf>,
+    flat_root: Option<PathBuf>,
 }
 
 pub fn dialogs(app: &mut App, ctx: &Context) {
@@ -56,10 +59,12 @@ pub fn dialogs(app: &mut App, ctx: &Context) {
             .unwrap_or_default();
         if state.root != app.synthesis.library.settings.databases
             || state.sv1_root != app.synthesis.library.settings.sv1_databases
+            || state.flat_root != app.synthesis.library.settings.flat_databases
         {
             state = State {
                 root: app.synthesis.library.settings.databases.clone(),
                 sv1_root: app.synthesis.library.settings.sv1_databases.clone(),
+                flat_root: app.synthesis.library.settings.flat_databases.clone(),
                 ..Default::default()
             };
         }
@@ -105,6 +110,7 @@ fn show(app: &mut App, ctx: &Context, state: &mut State) {
                 .show(&mut content, |ui| {
                     ui.set_width(ui.available_width());
                     toolbar::show(app, ui, state);
+                    flat::operation_status(app, ui);
                     ui.add_space(28.0);
                     let entries = catalog::entries(app, state);
                     if app.synthesis.library.is_scanning() {
@@ -165,7 +171,11 @@ fn empty(app: &mut App, ui: &mut Ui, state: &mut State) {
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
             ui.set_min_height(100.0);
-            if !state.query.is_empty() || !state.language.is_empty() || !state.vendor.is_empty() {
+            if !state.query.is_empty()
+                || !state.language.is_empty()
+                || !state.vendor.is_empty()
+                || state.flat_only
+            {
                 text(
                     ui,
                     RichText::new("没有匹配的歌声")
@@ -177,6 +187,7 @@ fn empty(app: &mut App, ui: &mut Ui, state: &mut State) {
                     state.query.clear();
                     state.language.clear();
                     state.vendor.clear();
+                    state.flat_only = false;
                 }
             } else {
                 text(
@@ -185,8 +196,17 @@ fn empty(app: &mut App, ui: &mut Ui, state: &mut State) {
                         .font(section_title_font())
                         .size(16.0),
                 );
-                weak(ui, "选择本机 databases 目录，扫描已安装的歌声。");
+                weak(ui, "选择声库目录，或导入 .sfpk / .sfpks 文件。");
                 ui.menu_button("选择声库目录…", |ui| paths::directory_menu(app, ui));
+            }
+            if let Some(catalog) = app.synthesis.library.catalog()
+                && !catalog.warnings.is_empty()
+            {
+                ui.collapsing("扫描提示", |ui| {
+                    for warning in &catalog.warnings {
+                        weak(ui, warning);
+                    }
+                });
             }
         });
 }

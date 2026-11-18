@@ -92,6 +92,7 @@ impl Runtime {
                 worker::Worker::spawn(
                     entry.directory.clone(),
                     dictionaries.to_owned(),
+                    std::sync::Arc::clone(&self.library.flat_registry),
                     self.repaint.clone(),
                 )
             })();

@@ -25,6 +25,7 @@ use std::{
 pub(super) fn run(
     path: PathBuf,
     dictionaries: PathBuf,
+    flat_registry: Arc<voice::flat::FlatModelRegistry>,
     commands: Receiver<Command>,
     events: Events,
     alive: Arc<AtomicBool>,
@@ -41,7 +42,7 @@ pub(super) fn run(
         }
     };
     let started = Instant::now();
-    let loaded = VoiceInventory::load(&path).and_then(|inventory| {
+    let loaded = VoiceInventory::load_with_flat(&path, &flat_registry).and_then(|inventory| {
         loading_checkpoint()?;
         let prepared = inventory.prepare()?;
         loading_checkpoint()?;

@@ -1,11 +1,17 @@
-use std::{collections::BTreeMap, path::Path, sync::{Arc, OnceLock}};
+use std::{
+    collections::BTreeMap,
+    path::Path,
+    sync::{Arc, OnceLock},
+};
 
 use sha2::{Digest, Sha256};
 
 use super::{GraphSummary, TensorSummary, VoiceFile, VoiceInventory};
 use crate::synthesis::voice::{
-    PreparedModule, Result, VoiceError, config::VoiceConfiguration,
-    flat::{FlatConditioning, FlatModel, FlatModelRegistry}, hex,
+    PreparedModule, Result, VoiceError,
+    config::VoiceConfiguration,
+    flat::{FlatConditioning, FlatModel, FlatModelRegistry},
+    hex,
     preparation::{PreparedFile, PreparedModel, PreparedVoice},
 };
 
@@ -16,7 +22,8 @@ pub(super) fn load(path: &Path, registry: &FlatModelRegistry) -> Result<VoiceInv
     let configuration = VoiceConfiguration::from_flat(&manifest, styles);
     let mut digest = Sha256::new();
     digest.update(b"RynthV Flat voice manifest and DDS models\0");
-    digest.update(serde_json::to_vec(&manifest).map_err(|error| VoiceError::new(error.to_string()))?);
+    digest
+        .update(serde_json::to_vec(&manifest).map_err(|error| VoiceError::new(error.to_string()))?);
     let mut files = Vec::new();
     let mut prepared_files = Vec::new();
     for model in resolved.models {
@@ -25,7 +32,10 @@ pub(super) fn load(path: &Path, registry: &FlatModelRegistry) -> Result<VoiceInv
         let file = describe(&model)?;
         prepared_files.push(PreparedFile {
             name: file.name.clone(),
-            trees: vec![PreparedModel { role: model.role.stage(), tree: model.tree }],
+            trees: vec![PreparedModel {
+                role: model.role.stage(),
+                tree: model.tree,
+            }],
         });
         files.push(file);
     }
@@ -37,7 +47,9 @@ pub(super) fn load(path: &Path, registry: &FlatModelRegistry) -> Result<VoiceInv
         Some(conditioning),
     ));
     if let Some(error) = &prepared.summary().stage_preparation_error {
-        return Err(VoiceError::new(format!("Incompatible Flat native stages: {error}")));
+        return Err(VoiceError::new(format!(
+            "Incompatible Flat native stages: {error}"
+        )));
     }
     Ok(VoiceInventory {
         database_id: manifest.database_id(),
@@ -46,7 +58,11 @@ pub(super) fn load(path: &Path, registry: &FlatModelRegistry) -> Result<VoiceInv
         content_hash: hex(&digest.finalize()),
         resource_count: files.iter().map(|file| file.resources).sum(),
         graph_count: files.len(),
-        tensor_count: files.iter().flat_map(|file| file.tensors.values()).map(|tensor| tensor.resources).sum(),
+        tensor_count: files
+            .iter()
+            .flat_map(|file| file.tensors.values())
+            .map(|tensor| tensor.resources)
+            .sum(),
         files,
         configuration: Some(configuration),
         flat: Some(manifest),
@@ -61,7 +77,12 @@ fn describe(model: &FlatModel) -> Result<VoiceFile> {
     let mut depths = Vec::<usize>::with_capacity(tree.nodes().len());
     let mut tensors = BTreeMap::<_, TensorSummary>::new();
     for node in tree.nodes() {
-        let depth = node.children.iter().map(|&child| depths[child] + 1).max().unwrap_or(0);
+        let depth = node
+            .children
+            .iter()
+            .map(|&child| depths[child] + 1)
+            .max()
+            .unwrap_or(0);
         depths.push(depth);
         if let PreparedModule::Tensor(tensor) = &node.module {
             let layout = tensor.layout();

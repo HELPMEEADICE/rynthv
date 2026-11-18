@@ -1,4 +1,4 @@
-use super::{super::language_name, CARD, INK, Sort, State};
+use super::{super::language_name, CARD, INK, Sort, State, flat};
 use crate::{
     app::App,
     ui::{
@@ -15,7 +15,7 @@ pub(super) fn show(app: &mut App, ui: &mut Ui, state: &mut State) {
     ui.visuals_mut().widgets.inactive.bg_fill = CARD;
     ui.visuals_mut().widgets.inactive.weak_bg_fill = CARD;
     ui.visuals_mut().widgets.inactive.corner_radius = CornerRadius::same(12);
-    let wide = ui.available_width() >= 670.0;
+    let wide = ui.available_width() >= 770.0;
     if wide {
         ui.horizontal(|ui| {
             search(ui, &mut state.query, 230.0);
@@ -79,7 +79,9 @@ fn search(ui: &mut Ui, query: &mut String, width: f32) {
 }
 
 fn filters(app: &App, ui: &mut Ui, state: &mut State) {
-    let count = usize::from(!state.language.is_empty()) + usize::from(!state.vendor.is_empty());
+    let count = usize::from(!state.language.is_empty())
+        + usize::from(!state.vendor.is_empty())
+        + usize::from(state.flat_only);
     let filter = ui.add(
         Button::new(if count == 0 {
             "筛选".into()
@@ -106,6 +108,7 @@ fn filters(app: &App, ui: &mut Ui, state: &mut State) {
                     }
                 }
                 ui.label(RichText::new("筛选歌声").strong().color(INK));
+                ui.checkbox(&mut state.flat_only, "仅显示 SynthV Flat");
                 ui.weak("声库语言");
                 ComboBox::from_id_salt("manager-language-filter")
                     .width(ui.available_width())
@@ -138,6 +141,7 @@ fn filters(app: &App, ui: &mut Ui, state: &mut State) {
                 if ui.button("清除筛选").clicked() {
                     state.language.clear();
                     state.vendor.clear();
+                    state.flat_only = false;
                 }
             });
         });
@@ -152,7 +156,9 @@ fn actions(app: &mut App, ui: &mut Ui, state: &mut State) {
         filters(app, ui, state);
         sorting(ui, state, true);
         refresh(app, ui);
+        flat::import_button(app, ui);
     } else {
+        flat::import_button(app, ui);
         refresh(app, ui);
         sorting(ui, state, false);
         filters(app, ui, state);
@@ -179,7 +185,9 @@ fn sorting(ui: &mut Ui, state: &mut State, reverse: bool) {
 fn refresh(app: &mut App, ui: &mut Ui) {
     if ui
         .add_enabled(
-            !app.synthesis.library.is_scanning() && app.synthesis.library.settings.has_databases(),
+            !app.synthesis.library.is_scanning()
+                && !app.synthesis.library.flat_busy()
+                && app.synthesis.library.settings.has_databases(),
             Button::new("刷新").min_size(vec2(52.0, 36.0)),
         )
         .clicked()

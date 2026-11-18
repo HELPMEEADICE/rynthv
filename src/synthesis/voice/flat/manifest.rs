@@ -4,7 +4,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-use super::{super::{Result, VoiceError, hex}, embedding};
+use super::{
+    super::{Result, VoiceError, hex},
+    embedding,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -114,9 +117,15 @@ impl FlatManifest {
 
     pub fn model_ids(&self) -> Result<BTreeMap<ModelRole, &str>> {
         [
-            (ModelRole::Acoustic, alias(&self.acoustic, &self.base_model)?),
+            (
+                ModelRole::Acoustic,
+                alias(&self.acoustic, &self.base_model)?,
+            ),
             (ModelRole::Vocoder, self.vocoder.as_deref()),
-            (ModelRole::Duration, alias(&self.duration, &self.timing_model)?),
+            (
+                ModelRole::Duration,
+                alias(&self.duration, &self.timing_model)?,
+            ),
             (ModelRole::F0, alias(&self.f0, &self.f0_model)?),
             (ModelRole::SingingAssistant, self.sing_model.as_deref()),
         ]
@@ -130,11 +139,15 @@ impl FlatManifest {
     }
 
     pub fn pitch_embedding(&self) -> Result<Option<[f32; 32]>> {
-        alias(&self.f0_style, &self.pitch)?.map(embedding::decode).transpose()
+        alias(&self.f0_style, &self.pitch)?
+            .map(embedding::decode)
+            .transpose()
     }
 
     pub fn timing_embedding(&self) -> Result<Option<[f32; 128]>> {
-        alias(&self.duration_style, &self.timing)?.map(embedding::decode).transpose()
+        alias(&self.duration_style, &self.timing)?
+            .map(embedding::decode)
+            .transpose()
     }
 
     fn validate(&self) -> Result<()> {
@@ -183,9 +196,13 @@ impl FlatStyle {
 pub(super) fn validate_id(id: &str) -> Result<()> {
     if id.is_empty()
         || id.len() > 128
-        || !id.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+        || !id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
     {
-        return Err(VoiceError::new(format!("Invalid Flat model identifier {id:?}")));
+        return Err(VoiceError::new(format!(
+            "Invalid Flat model identifier {id:?}"
+        )));
     }
     Ok(())
 }

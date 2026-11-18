@@ -127,6 +127,17 @@ pub(super) fn menu(
             app.synthesis.open_context_import(entry.selection());
             ui.close();
         }
+        if entry.flat.as_ref().is_some_and(|flat| flat.managed)
+            && ui
+                .add_enabled(
+                    !app.synthesis.library.flat_busy(),
+                    Button::new("移除 Flat 导入副本"),
+                )
+                .clicked()
+        {
+            app.synthesis.remove_flat_voice(entry.directory.clone());
+            ui.close();
+        }
         if !matches!(
             app.synthesis.voice_state(&entry.selection()),
             VoiceState::Unloaded

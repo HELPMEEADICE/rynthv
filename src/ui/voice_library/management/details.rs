@@ -1,6 +1,6 @@
 use super::{
     super::{context, family_name, language_name, text, weak},
-    feedback,
+    feedback, flat,
 };
 use crate::{
     app::App,
@@ -51,6 +51,9 @@ pub(super) fn show(app: &mut App, ui: &mut Ui, entry: &VoiceCatalogEntry) {
     }
     if let VoiceAvailability::Unsupported(reason) = &entry.availability {
         super::super::error_label(ui, reason);
+    }
+    if entry.flat.is_some() {
+        flat::details(app, ui, entry);
     }
     if app.synthesis.inventory(&selection).is_some()
         || app.synthesis.voice_error(&selection).is_some()

@@ -1,11 +1,16 @@
+mod flat;
+
 use super::{Runtime, events::WakeOnExit};
 use crate::synthesis::{
     settings::{SynthesisSettings, VoiceSelection},
-    voice::{VoiceAvailability, VoiceCatalog, VoiceCatalogEntry},
+    voice::{VoiceAvailability, VoiceCatalog, VoiceCatalogEntry, flat::FlatModelRegistry},
 };
 use std::{
     path::{Path, PathBuf},
-    sync::mpsc::{self, Receiver, TryRecvError},
+    sync::{
+        Arc,
+        mpsc::{self, Receiver, TryRecvError},
+    },
     thread,
 };
 
@@ -16,15 +21,20 @@ pub struct VoiceLibrary {
     catalog_error: Option<String>,
     settings_error: Option<String>,
     invalid_settings: bool,
+    pub(super) flat_registry: Arc<FlatModelRegistry>,
+    flat_operation: Option<Receiver<flat::OperationResult>>,
+    flat_feedback: Option<Result<String, String>>,
 }
 
 struct LibraryScan {
     catalog: VoiceCatalog,
     error: Option<String>,
+    flat_registry: Arc<FlatModelRegistry>,
 }
 
 fn scan_roots(settings: &SynthesisSettings) -> LibraryScan {
-    let mut catalog = VoiceCatalog::default();
+    let flat_registry = Arc::new(settings.flat_registry());
+    let mut catalog = VoiceCatalog::from_flat(&flat_registry);
     let mut errors = Vec::new();
     for (label, root) in settings.database_roots() {
         match VoiceCatalog::scan(root) {
@@ -77,6 +87,7 @@ fn scan_roots(settings: &SynthesisSettings) -> LibraryScan {
     LibraryScan {
         catalog,
         error: (!errors.is_empty()).then(|| errors.join("\n")),
+        flat_registry,
     }
 }
 
@@ -94,6 +105,9 @@ impl VoiceLibrary {
             catalog_error: None,
             settings_error,
             invalid_settings,
+            flat_registry: Arc::default(),
+            flat_operation: None,
+            flat_feedback: None,
         };
         if !invalid_settings {
             library.rescan(repaint);
@@ -142,6 +156,7 @@ impl VoiceLibrary {
         // replacing the catalog after the user changes paths again.
         self.scan = None;
         self.catalog = None;
+        self.flat_registry = Arc::default();
         self.catalog_error = None;
         if self.invalid_settings {
             return;
@@ -173,6 +188,7 @@ impl VoiceLibrary {
                 self.scan = None;
                 self.catalog = Some(result.catalog);
                 self.catalog_error = result.error;
+                self.flat_registry = result.flat_registry;
                 true
             }
             Err(TryRecvError::Disconnected) => {
@@ -215,6 +231,9 @@ impl Runtime {
         self.library.rescan(self.repaint.clone());
     }
     pub(super) fn poll_library(&mut self) {
+        if self.library.poll_flat_operation() {
+            self.rescan_voices();
+        }
         if self.library.poll() {
             self.last_revision = None;
         }

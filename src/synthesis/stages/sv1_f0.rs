@@ -60,7 +60,11 @@ impl<'a> Sv1F0Stage<'a> {
         )
     }
 
-    fn prepare_contract(tree: &'a PreparedTree, contract: Contract, pitch: Option<&[f32]>) -> Result<Self> {
+    fn prepare_contract(
+        tree: &'a PreparedTree,
+        contract: Contract,
+        pitch: Option<&[f32]>,
+    ) -> Result<Self> {
         let wrapper = tree.node(tree.root_index())?;
         let payload = tree.payload(tree.root_index())?;
         if wrapper.type_id != F0_WRAPPER_TYPE_ID
@@ -95,7 +99,9 @@ impl<'a> Sv1F0Stage<'a> {
             .ok_or_else(|| VoiceError::new("Compatible F0 style is not a float vector"))?;
         let mut style = pitch.unwrap_or(stored).to_vec();
         if style.len() != stored.len() || style.iter().any(|value| !value.is_finite()) {
-            return Err(VoiceError::new("Flat pitch embedding differs from the DDS F0 model"));
+            return Err(VoiceError::new(
+                "Flat pitch embedding differs from the DDS F0 model",
+            ));
         }
         // Enable the default scalar style flag. Add its learned contribution
         // to the stored style independently of position C.

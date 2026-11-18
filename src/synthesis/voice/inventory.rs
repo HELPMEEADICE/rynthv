@@ -1,5 +1,5 @@
-mod inspect;
 mod flat;
+mod inspect;
 mod nofs;
 
 use std::{
@@ -169,11 +169,19 @@ impl VoiceInventory {
         Self::load_original(directory)
     }
 
-    pub fn load_with_flat(directory: &Path, registry: &super::flat::FlatModelRegistry) -> Result<Self> {
+    pub fn load_with_flat(
+        directory: &Path,
+        registry: &super::flat::FlatModelRegistry,
+    ) -> Result<Self> {
         if super::flat::is_voice_path(directory) {
             return flat::load(directory, registry);
         }
         Self::load_original(directory)
+    }
+
+    /// Load a single Flat voice regardless of its file extension.
+    pub fn load_flat(path: &Path, registry: &super::flat::FlatModelRegistry) -> Result<Self> {
+        flat::load(path, registry)
     }
 
     fn load_original(directory: &Path) -> Result<Self> {

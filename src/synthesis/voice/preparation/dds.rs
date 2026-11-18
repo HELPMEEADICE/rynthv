@@ -6,7 +6,10 @@ use crate::synthesis::stages::{
 impl PreparedVoice {
     pub(crate) fn native_duration(&self) -> Result<Sv1DurationStage<'_>> {
         let timing = self.flat.as_ref().and_then(|flat| flat.timing.as_ref());
-        Sv1DurationStage::prepare_conditioned(self.model("duration")?, timing.map(|row| row.as_slice()))
+        Sv1DurationStage::prepare_conditioned(
+            self.model("duration")?,
+            timing.map(|row| row.as_slice()),
+        )
     }
 
     pub(crate) fn native_pitch(&self) -> Result<Sv1F0Stage<'_>> {

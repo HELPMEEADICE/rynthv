@@ -21,7 +21,7 @@ mod stream;
 mod tensor;
 mod tree;
 
-pub use catalog::{VoiceAvailability, VoiceCatalog, VoiceCatalogEntry};
+pub use catalog::{FlatCatalogEntry, VoiceAvailability, VoiceCatalog, VoiceCatalogEntry};
 pub use duration_frontend::{DURATION_ROOT_TYPE_ID, DurationConfiguration};
 pub use family::VoiceFamily;
 pub use inventory::VoiceInventory;

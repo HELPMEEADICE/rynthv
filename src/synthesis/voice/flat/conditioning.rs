@@ -43,11 +43,16 @@ impl FlatConditioning {
                 }
             }
         }
-        Ok((Self {
-            base: base.ok_or_else(|| VoiceError::new("Flat voice does not declare a (base) embedding"))?,
-            styles: TimbreStyles { neutral, variants },
-            pitch: manifest.pitch_embedding()?,
-            timing: manifest.timing_embedding()?,
-        }, names))
+        Ok((
+            Self {
+                base: base.ok_or_else(|| {
+                    VoiceError::new("Flat voice does not declare a (base) embedding")
+                })?,
+                styles: TimbreStyles { neutral, variants },
+                pitch: manifest.pitch_embedding()?,
+                timing: manifest.timing_embedding()?,
+            },
+            names,
+        ))
     }
 }
