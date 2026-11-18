@@ -1,0 +1,189 @@
+name: Build
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Package ${{ matrix.platform }} ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2022
+            platform: windows
+            arch: x86_64
+            rust_target: x86_64-pc-windows-msvc
+            wix_arch: x64
+          - runner: windows-11-arm
+            platform: windows
+            arch: aarch64
+            rust_target: aarch64-pc-windows-msvc
+            wix_arch: arm64
+          - runner: ubuntu-24.04
+            platform: linux
+            arch: x86_64
+            rust_target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            platform: linux
+            arch: aarch64
+            rust_target: aarch64-unknown-linux-gnu
+
+    env:
+      CARGO_PROFILE_RELEASE_OPT_LEVEL: z
+      CARGO_PROFILE_RELEASE_LTO: fat
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
+      CARGO_PROFILE_RELEASE_PANIC: abort
+      CARGO_PROFILE_RELEASE_STRIP: debuginfo
+      CARGO_PROFILE_RELEASE_DEBUG: "false"
+      CARGO_PROFILE_RELEASE_INCREMENTAL: "false"
+      CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS: "false"
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Install Linux build dependencies
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential pkg-config libasound2-dev libwayland-dev \
+            libxkbcommon-dev libx11-dev libxcursor-dev libxi-dev \
+            libxrandr-dev libxinerama-dev libgl1-mesa-dev libvulkan-dev \
+            libfontconfig1-dev
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: ${{ matrix.rust_target }}
+          cache: false
+      - name: Cache Rust builds
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.platform }}-${{ matrix.arch }}-full-lto
+      - name: Build both release executables
+        run: cargo build --release --locked --bins
+
+      - name: Set up .NET for WiX
+        if: matrix.platform == 'windows'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Package Windows MSI and ZIP
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $stage = Join-Path $env:RUNNER_TEMP "rynthv-windows-${{ matrix.arch }}"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Copy-Item target/release/rynthv.exe, target/release/rynthv-synth.exe, README.md, LICENSE -Destination $stage
+          Compress-Archive -Path "$stage/*" -DestinationPath "dist/rynthv-windows-${{ matrix.arch }}.zip" -CompressionLevel Optimal -Force
+
+          dotnet tool install --global wix --version 6.0.2
+          $wix = Join-Path $env:USERPROFILE '.dotnet\tools\wix.exe'
+          $manifest = Get-Content Cargo.toml -Raw
+          $version = [regex]::Match($manifest, '(?m)^version\s*=\s*"([^"]+)"').Groups[1].Value
+          if (-not $version) { throw 'Could not read the package version from Cargo.toml' }
+          $upgradeCode = if ('${{ matrix.arch }}' -eq 'aarch64') {
+            'A5EF34B4-1A58-4E25-A730-10A93F12774E'
+          } else {
+            '57568D70-146F-4CBD-96F8-255A6FF3B14D'
+          }
+          $binDir = Join-Path (Get-Location).Path 'target\release'
+          & $wix build packaging/windows/RynthV.wxs -arch '${{ matrix.wix_arch }}' -d "ProductVersion=$version" -d "ProductUpgradeCode=$upgradeCode" -d "BinaryDir=$binDir" -o "dist/rynthv-windows-${{ matrix.arch }}.msi"
+          if ($LASTEXITCODE -ne 0) { throw 'WiX MSI packaging failed' }
+
+      - name: Package Linux AppImage
+        if: matrix.platform == 'linux'
+        shell: bash
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist AppDir/usr/bin AppDir/usr/share/applications \
+            AppDir/usr/share/icons/hicolor/256x256/apps
+          install -m 755 target/release/rynthv AppDir/usr/bin/rynthv
+          install -m 755 target/release/rynthv-synth AppDir/usr/bin/rynthv-synth
+          install -m 644 assets/branding/app-icon.png \
+            AppDir/usr/share/icons/hicolor/256x256/apps/rynthv.png
+          cat > AppDir/usr/share/applications/rynthv.desktop <<'DESKTOP'
+          [Desktop Entry]
+          Type=Application
+          Name=RynthV
+          Comment=Vocal synthesis editor
+          Exec=rynthv
+          Icon=rynthv
+          Categories=AudioVideo;Audio;Music;
+          Terminal=false
+          DESKTOP
+
+          curl --fail --location --retry 3 \
+            "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-$ARCH.AppImage" \
+            -o linuxdeploy.AppImage
+          chmod +x linuxdeploy.AppImage
+          export APPIMAGE_EXTRACT_AND_RUN=1
+          export LDAI_OUTPUT="$GITHUB_WORKSPACE/dist/rynthv-linux-$ARCH.AppImage"
+          ./linuxdeploy.AppImage \
+            --appdir AppDir \
+            --executable AppDir/usr/bin/rynthv \
+            --executable AppDir/usr/bin/rynthv-synth \
+            --desktop-file AppDir/usr/share/applications/rynthv.desktop \
+            --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/rynthv.png \
+            --output appimage
+          test -s "$LDAI_OUTPUT"
+
+      - name: Upload standalone Windows MSI
+        if: matrix.platform == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rynthv-windows-${{ matrix.arch }}-msi
+          path: dist/rynthv-windows-${{ matrix.arch }}.msi
+          if-no-files-found: error
+          compression-level: 0
+      - name: Upload standalone Windows ZIP
+        if: matrix.platform == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rynthv-windows-${{ matrix.arch }}-zip
+          path: dist/rynthv-windows-${{ matrix.arch }}.zip
+          if-no-files-found: error
+          compression-level: 0
+      - name: Upload standalone Linux AppImage
+        if: matrix.platform == 'linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rynthv-linux-${{ matrix.arch }}-appimage
+          path: dist/rynthv-linux-${{ matrix.arch }}.AppImage
+          if-no-files-found: error
+          compression-level: 0
+
+  publish:
+    name: Attach individual assets to GitHub Release
+    if: github.event_name == 'release'
+    needs: package
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download every standalone artifact
+        uses: actions/download-artifact@v4
+        with:
+          pattern: rynthv-*
+          merge-multiple: true
+          path: dist
+      - name: Attach assets to the published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 6
+          gh release upload "$RELEASE_TAG" dist/* --repo "$GITHUB_REPOSITORY" --clobber
