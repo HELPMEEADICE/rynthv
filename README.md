@@ -10,17 +10,19 @@
 
 需要 Rust 1.99.0，版本由 `rust-toolchain.toml` 指定。
 
+Windows 和 Linux 均支持原生 x86-64 与 ARM64 构建。GitHub Actions 的 Build 工作流为 Windows 提供 MSI 和 ZIP，为 Linux 提供 AppImage，每种架构独立打包。
+
 ### Windows
 
-需要支持 DX12 的显卡。MSVC 目标使用 Windows SDK 的 `rc.exe`，GNU 目标可使用 MSYS2 工具链，其 `windres` 需在 `PATH` 中。
+需要支持 DX12 的显卡。MSVC 目标为 `x86_64-pc-windows-msvc` 和 `aarch64-pc-windows-msvc`，需要为目标架构安装 MSVC 工具和含 `rc.exe` 的 Windows SDK。Windows x86-64 也可以使用 MSYS2 GNU 工具链，其 `windres` 需在 `PATH` 中。
 
 ```powershell
-cargo run --release
+cargo build --release --locked --bins
 ```
 
 ### Linux
 
-支持 X11 / Wayland，使用 Vulkan 或 OpenGL。Ubuntu 24.04 构建示例：
+Linux 目标为 `x86_64-unknown-linux-gnu` 和 `aarch64-unknown-linux-gnu`，支持 X11 / Wayland，使用 Vulkan 或 OpenGL。Ubuntu 24.04 构建示例：
 
 ```sh
 sudo apt install build-essential pkg-config libasound2-dev libwayland-dev libxkbcommon-dev \
@@ -29,7 +31,7 @@ cargo build --release --locked --bins
 ./target/release/rynthv
 ```
 
-需要可用的图形驱动、ALSA 音频设备和桌面对应的 XDG 门户后端（KDE 使用 `xdg-desktop-portal-kde`）。
+AppImage 在 Ubuntu 24.04 上构建。运行依赖系统的 glibc、图形驱动、ALSA 音频设备和桌面对应的 XDG 门户后端（KDE 使用 `xdg-desktop-portal-kde`）。可用 `--appimage-extract` 解包，CLI 位于解包目录中的 `usr/bin/rynthv-synth`。
 
 ## 声库与配置
 
@@ -39,6 +41,8 @@ cargo build --release --locked --bins
 | --- | --- | --- |
 | 一代声库 | 支持 | 支持 |
 | 二代声库 | 需要导入模型上下文 | 需要导入模型上下文 |
+
+Windows ARM64 和 Linux 可通过上下文文件或手动输入导入二代声库所需的模型上下文。直接从原编辑器的本机会话文件或在线进程导入需要 Windows x64 的 CPUID 身份格式。
 
 配置目录：Windows 为 `%LOCALAPPDATA%/RynthV`，Linux 为 `$XDG_CONFIG_HOME/RynthV`（未设置时为 `$HOME/.config/RynthV`）。模型上下文在 Windows 保存在 `%APPDATA%/RynthV/context.json`，Linux 保存在上述配置目录的 `context.json`。
 
