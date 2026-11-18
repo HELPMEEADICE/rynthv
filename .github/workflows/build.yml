@@ -21,12 +21,10 @@ jobs:
             platform: windows
             arch: x86_64
             rust_target: x86_64-pc-windows-msvc
-            wix_arch: x64
           - runner: windows-11-arm
             platform: windows
             arch: aarch64
             rust_target: aarch64-pc-windows-msvc
-            wix_arch: arm64
           - runner: ubuntu-24.04
             platform: linux
             arch: x86_64
@@ -69,7 +67,7 @@ jobs:
         with:
           key: ${{ matrix.platform }}-${{ matrix.arch }}-full-lto
       - name: Build both release executables
-        run: cargo build --release --locked --bins
+        run: cargo build --release --locked --target ${{ matrix.rust_target }} --bins
 
       - name: Set up .NET for WiX
         if: matrix.platform == 'windows'
@@ -80,65 +78,17 @@ jobs:
         if: matrix.platform == 'windows'
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
-          New-Item -ItemType Directory -Force -Path dist | Out-Null
-          $stage = Join-Path $env:RUNNER_TEMP "rynthv-windows-${{ matrix.arch }}"
-          New-Item -ItemType Directory -Force -Path $stage | Out-Null
-          Copy-Item target/release/rynthv.exe, target/release/rynthv-synth.exe, README.md, LICENSE -Destination $stage
-          Compress-Archive -Path "$stage/*" -DestinationPath "dist/rynthv-windows-${{ matrix.arch }}.zip" -CompressionLevel Optimal -Force
-
-          dotnet tool install --global wix --version 6.0.2
-          $wix = Join-Path $env:USERPROFILE '.dotnet\tools\wix.exe'
-          $manifest = Get-Content Cargo.toml -Raw
-          $version = [regex]::Match($manifest, '(?m)^version\s*=\s*"([^"]+)"').Groups[1].Value
-          if (-not $version) { throw 'Could not read the package version from Cargo.toml' }
-          $upgradeCode = if ('${{ matrix.arch }}' -eq 'aarch64') {
-            'A5EF34B4-1A58-4E25-A730-10A93F12774E'
-          } else {
-            '57568D70-146F-4CBD-96F8-255A6FF3B14D'
-          }
-          $binDir = Join-Path (Get-Location).Path 'target\release'
-          & $wix build packaging/windows/RynthV.wxs -arch '${{ matrix.wix_arch }}' -d "ProductVersion=$version" -d "ProductUpgradeCode=$upgradeCode" -d "BinaryDir=$binDir" -o "dist/rynthv-windows-${{ matrix.arch }}.msi"
-          if ($LASTEXITCODE -ne 0) { throw 'WiX MSI packaging failed' }
+          $wixDir = Join-Path $env:RUNNER_TEMP 'wix'
+          dotnet tool install wix --version 6.0.2 --tool-path $wixDir
+          if ($LASTEXITCODE -ne 0) { throw 'WiX installation failed' }
+          ./packaging/windows/package.ps1 -Arch '${{ matrix.arch }}' `
+            -BinaryDir 'target/${{ matrix.rust_target }}/release' -Wix (Join-Path $wixDir 'wix.exe')
 
       - name: Package Linux AppImage
         if: matrix.platform == 'linux'
         shell: bash
-        env:
-          ARCH: ${{ matrix.arch }}
         run: |
-          set -euo pipefail
-          mkdir -p dist AppDir/usr/bin AppDir/usr/share/applications \
-            AppDir/usr/share/icons/hicolor/256x256/apps
-          install -m 755 target/release/rynthv AppDir/usr/bin/rynthv
-          install -m 755 target/release/rynthv-synth AppDir/usr/bin/rynthv-synth
-          install -m 644 assets/branding/app-icon.png \
-            AppDir/usr/share/icons/hicolor/256x256/apps/rynthv.png
-          cat > AppDir/usr/share/applications/rynthv.desktop <<'DESKTOP'
-          [Desktop Entry]
-          Type=Application
-          Name=RynthV
-          Comment=Vocal synthesis editor
-          Exec=rynthv
-          Icon=rynthv
-          Categories=AudioVideo;Audio;Music;
-          Terminal=false
-          DESKTOP
-
-          curl --fail --location --retry 3 \
-            "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-$ARCH.AppImage" \
-            -o linuxdeploy.AppImage
-          chmod +x linuxdeploy.AppImage
-          export APPIMAGE_EXTRACT_AND_RUN=1
-          export LDAI_OUTPUT="$GITHUB_WORKSPACE/dist/rynthv-linux-$ARCH.AppImage"
-          ./linuxdeploy.AppImage \
-            --appdir AppDir \
-            --executable AppDir/usr/bin/rynthv \
-            --executable AppDir/usr/bin/rynthv-synth \
-            --desktop-file AppDir/usr/share/applications/rynthv.desktop \
-            --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/rynthv.png \
-            --output appimage
-          test -s "$LDAI_OUTPUT"
+          bash packaging/linux/package.sh '${{ matrix.arch }}' 'target/${{ matrix.rust_target }}/release'
 
       - name: Upload standalone Windows MSI
         if: matrix.platform == 'windows'
