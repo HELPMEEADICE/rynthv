@@ -250,7 +250,8 @@ fn validate_voice(value: &Value, scope: &str) -> Result<()> {
         }
         let supported = match key.as_str() {
             "vocalModeInherited" => value.is_boolean(),
-            "vocalModePreset" => value.as_str() == Some(""),
+            // The preset names the selection; vocalModeParams stores the weights used for synthesis.
+            "vocalModePreset" => value.is_string(),
             "vocalModeParams" => {
                 validate_vocal_modes(value, scope)?;
                 true
