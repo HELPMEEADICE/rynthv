@@ -1,8 +1,5 @@
-//! SSE2 is part of the Windows x86-64 baseline. Output lanes are independent;
+//! SSE2 is part of the x86-64 baseline. Output lanes are independent;
 //! separate MULPS/ADDPS preserve each lane's established scalar reduction order.
-
-#[cfg(not(target_arch = "x86_64"))]
-compile_error!("The packed synthesis convolution backend requires x86-64 SSE2");
 
 use std::arch::x86_64::{
     __m128, _mm_add_ps, _mm_loadu_ps, _mm_mul_ps, _mm_set1_ps, _mm_setzero_ps, _mm_storeu_ps,
