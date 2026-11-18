@@ -102,11 +102,19 @@ impl FlatManifest {
 
     pub fn database_id(&self) -> String {
         let mut digest = Sha256::new();
-        for field in [&self.vendor, &self.name] {
+        for field in [self.publisher(), &self.name] {
             digest.update((field.len() as u64).to_le_bytes());
             digest.update(field.as_bytes());
         }
         format!("flat:{}", hex(&digest.finalize()))
+    }
+
+    pub fn publisher(&self) -> &str {
+        if self.vendor.is_empty() {
+            &self.author
+        } else {
+            &self.vendor
+        }
     }
 
     pub fn revision(&self) -> Result<u32> {

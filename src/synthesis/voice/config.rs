@@ -39,11 +39,7 @@ impl VoiceConfiguration {
             f0_enhancement: Some(1.0),
             name: manifest.name.clone(),
             version: manifest.version.clone(),
-            vendor: if manifest.vendor.is_empty() {
-                manifest.author.clone()
-            } else {
-                manifest.vendor.clone()
-            },
+            vendor: manifest.publisher().to_owned(),
             default_language: manifest.language.clone(),
             supported_languages: languages,
             styles,
