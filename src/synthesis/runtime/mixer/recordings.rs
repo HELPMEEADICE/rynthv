@@ -1,4 +1,4 @@
-use super::Controls;
+use super::{Controls, NATIVE_SAMPLE_RATE};
 use crate::{
     model::Project,
     synthesis::{audio::AudioLayer, instrumental::AudioLibrary},
@@ -18,18 +18,28 @@ pub(crate) fn recordings(
     solo: &BTreeSet<u64>,
 ) -> Result<RecordingMix, String> {
     let mut mix = RecordingMix::default();
+    let sample_rate = f64::from(NATIVE_SAMPLE_RATE);
     for track in &project.tracks {
         let Some(clip) = track.audio_clip() else {
             continue;
         };
-        let start = (clip.onset_seconds * 48_000.0).round() as usize;
-        let end = (clip.end_seconds() * 48_000.0).ceil() as usize;
+        let start = (clip.onset_seconds * sample_rate).round() as usize;
+        let end = (clip.end_seconds() * sample_rate).ceil() as usize;
         mix.end = mix.end.max(end);
         let controls = Controls::read(&track.mixer)?;
         if controls.mute || (!solo.is_empty() && !solo.contains(&track.id)) {
             continue;
         }
         if let Some(asset) = library.asset(&clip.path) {
+            let source_start = (clip.source_offset_seconds * sample_rate).round() as usize;
+            let frames = asset
+                .audio
+                .frames()
+                .saturating_sub(source_start)
+                .min((clip.duration_seconds * sample_rate).round() as usize);
+            if frames == 0 {
+                continue;
+            }
             let (left, right) = controls.gains(asset.audio.layout());
             let gains = [left as f32, right as f32];
             if gains.iter().any(|gain| !gain.is_finite()) {
@@ -39,10 +49,8 @@ pub(crate) fn recordings(
                 track_id: track.id,
                 audio: Arc::clone(&asset.audio),
                 start_frame: start,
-                frames: asset
-                    .audio
-                    .frames()
-                    .min((clip.duration_seconds * 48_000.0).round() as usize),
+                source_start,
+                frames,
                 gains,
             });
         } else {

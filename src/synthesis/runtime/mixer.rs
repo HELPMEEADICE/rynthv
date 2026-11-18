@@ -91,7 +91,7 @@ pub(super) fn mix_with_recordings(
         spans.push(Span {
             audio: &layer.audio,
             output_start: layer.start_frame,
-            source_start: 0,
+            source_start: layer.source_start,
             frames: layer.frames,
             left: f64::from(layer.gains[0]),
             right: f64::from(layer.gains[1]),

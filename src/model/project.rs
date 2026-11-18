@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 pub struct Note {
     #[serde(skip, default = "new_id")]
     pub id: EntityId,
+    #[serde(default)]
     pub uuid: String,
     pub onset: i64,
     pub duration: i64,
@@ -65,6 +66,7 @@ pub struct Group {
     pub notes: Vec<Note>,
     pub parameters: BTreeMap<String, Automation>,
     pub vocal_modes: BTreeMap<String, Automation>,
+    #[serde(default)]
     pub pitch_controls: Vec<PitchControl>,
     #[serde(flatten)]
     pub extra: Extra,
@@ -90,6 +92,7 @@ impl Group {
 pub struct GroupRef {
     #[serde(skip, default = "new_id")]
     pub id: EntityId,
+    #[serde(default)]
     pub uuid: String,
     #[serde(rename = "groupID")]
     pub group_id: String,
@@ -97,6 +100,7 @@ pub struct GroupRef {
     pub blick_absolute_end: i64,
     pub blick_offset: i64,
     pub pitch_offset: i32,
+    #[serde(default)]
     pub mute: bool,
     pub database: Value,
     #[serde(flatten)]
@@ -208,6 +212,7 @@ impl Track {
 #[serde(rename_all = "camelCase")]
 pub struct Project {
     pub version: i32,
+    #[serde(default)]
     pub uuid: String,
     pub time: TimeAxis,
     pub library: Vec<Group>,

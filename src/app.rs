@@ -154,10 +154,15 @@ impl App {
         ui::piano::cancel_audition(self);
         self.midi_import = None;
         match storage::load(&path) {
-            Ok(project) => {
+            Ok(storage::LoadedProject { project, imported }) => {
                 self.editor = Editor::new(project);
                 self.synthesis.reset_project();
-                self.path = Some(path);
+                self.path = (!imported).then_some(path);
+                self.status = if imported {
+                    "已导入 Synthesizer V Studio 1 工程，请另存为新文件".into()
+                } else {
+                    String::new()
+                };
                 self.gesture = None;
                 self.piano_anchor = ui::piano::AnchorSelection::default();
                 self.parameter_lane = ui::lanes::ParameterSelection::default();

@@ -14,6 +14,9 @@ pub struct AudioClip {
     pub path: PathBuf,
     pub onset_seconds: f64,
     pub duration_seconds: f64,
+    /// Position in the source audio that plays at the clip onset.
+    #[serde(default)]
+    pub source_offset_seconds: f64,
 }
 
 impl AudioClip {
@@ -34,6 +37,9 @@ impl AudioClip {
             && self.onset_seconds >= 0.0
             && self.duration_seconds.is_finite()
             && self.duration_seconds > 0.0
+            && self.source_offset_seconds.is_finite()
+            && self.source_offset_seconds >= 0.0
+            && self.source_offset_seconds + self.duration_seconds < i64::MAX as f64 / 48_000.0
             && self.end_seconds() < i64::MAX as f64 / 48_000.0
     }
 }

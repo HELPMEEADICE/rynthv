@@ -88,7 +88,7 @@ fn run(
         None
     };
     let plan = if let Some(path) = args.project {
-        let project = storage::load(&path)?;
+        let project = storage::load(&path)?.project;
         let mut planner = Planner::default();
         planner.update(&project, 0, |_| Some(inventory.identity().to_owned()));
         Some(planner.summary())

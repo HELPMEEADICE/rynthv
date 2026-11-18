@@ -91,6 +91,7 @@ pub fn show(app: &mut App, ui: &mut Ui, body: Rect, track: &Track) {
                 let seconds = |x| {
                     time.seconds_at(ticks(beat_at(body, &app.view.arrangement, x)))
                         - clip.onset_seconds
+                        + clip.source_offset_seconds
                 };
                 if let Some((min, max)) = wave.peak_range(seconds(left), seconds(right)) {
                     let top = center - max.clamp(-1.0, 1.0) * height * 0.46;

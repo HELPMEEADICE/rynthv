@@ -2,15 +2,35 @@ use crate::model::*;
 use std::{collections::HashSet, fs, io::Write, path::Path};
 
 mod identity;
+mod svp_v153;
 
-pub fn load(path: &Path) -> Result<Project, String> {
+pub struct LoadedProject {
+    pub project: Project,
+    pub imported: bool,
+}
+
+pub fn load(path: &Path) -> Result<LoadedProject, String> {
     if fs::metadata(path).map_err(|e| e.to_string())?.len() > 64 * 1024 * 1024 {
         return Err("工程超过 64 MiB 读取上限".into());
     }
     let bytes = fs::read(path).map_err(|e| e.to_string())?;
     let mut project: Project =
         serde_json::from_slice(&bytes).map_err(|e| format!("SVP 解析失败：{e}"))?;
-    validate(&project)?;
+    let imported = match project.version {
+        SVP_VERSION => false,
+        svp_v153::VERSION => true,
+        version => {
+            return Err(format!(
+                "不支持 SVP 版本 {version}，可打开 {SVP_VERSION} 或导入 {}",
+                svp_v153::VERSION
+            ));
+        }
+    };
+    validate_time(&project.time)?;
+    if imported {
+        svp_v153::import(&mut project)?;
+    }
+    validate_content(&project)?;
     let base = std::path::absolute(path).map_err(|e| e.to_string())?;
     for track in &mut project.tracks {
         if let Some(clip) = track.instrumental.as_mut().and_then(|t| t.clip.as_mut())
@@ -27,11 +47,15 @@ pub fn load(path: &Path) -> Result<Project, String> {
     {
         group.notes.sort_by_key(|n| n.onset);
     }
-    Ok(project)
+    Ok(LoadedProject { project, imported })
 }
 
 pub fn save(path: &Path, project: &Project) -> Result<(), String> {
-    validate(project)?;
+    if project.version != SVP_VERSION {
+        return Err(format!("只能保存为 SVP {SVP_VERSION} 工程"));
+    }
+    validate_time(&project.time)?;
+    validate_content(project)?;
     let mut ordered = project.clone();
     let base = std::path::absolute(path).map_err(|e| e.to_string())?;
     for track in &mut ordered.tracks {
@@ -70,14 +94,40 @@ pub fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), String> {
     result.map_err(|e| format!("写入 {} 失败：{e}", path.display()))
 }
 
-fn validate(p: &Project) -> Result<(), String> {
+fn validate_time(time: &TimeAxis) -> Result<(), String> {
     let bad = |s: &str| Err(format!("工程校验失败：{s}"));
-    if p.version != SVP_VERSION {
-        return bad(&format!(
-            "当前支持 SVP version {SVP_VERSION}，文件版本为 {}",
-            p.version
-        ));
+    if time.tempo.first().is_none_or(|t| t.position != 0)
+        || time.meter.first().is_none_or(|m| m.index != 0)
+    {
+        return bad("时间轴必须从 0 开始");
     }
+    if !time.start_time_seconds.is_finite()
+        || time
+            .tempo
+            .iter()
+            .any(|t| !t.bpm.is_finite() || t.bpm <= 0.0 || t.position < 0)
+        || time
+            .tempo
+            .windows(2)
+            .any(|a| a[0].position >= a[1].position)
+    {
+        return bad("曲速必须为正数，标记按时间严格递增");
+    }
+    if time.meter.iter().any(|m| {
+        m.index < 0
+            || m.numerator == 0
+            || m.numerator > 64
+            || !m.denominator.is_power_of_two()
+            || m.denominator > 64
+    }) || time.meter.windows(2).any(|a| a[0].index >= a[1].index)
+    {
+        return bad("拍号或拍号位置无效");
+    }
+    Ok(())
+}
+
+fn validate_content(p: &Project) -> Result<(), String> {
+    let bad = |s: &str| Err(format!("工程校验失败：{s}"));
     identity::validate(p)?;
     if p.tracks.is_empty() {
         return bad("至少需要一条音轨");
@@ -93,33 +143,6 @@ fn validate(p: &Project) -> Result<(), String> {
         }) {
             return bad("发音词典的字词或音素无效");
         }
-    }
-    if p.time.tempo.first().is_none_or(|t| t.position != 0)
-        || p.time.meter.first().is_none_or(|m| m.index != 0)
-    {
-        return bad("时间轴必须从 0 开始");
-    }
-    if !p.time.start_time_seconds.is_finite()
-        || p.time
-            .tempo
-            .iter()
-            .any(|t| !t.bpm.is_finite() || t.bpm <= 0.0 || t.position < 0)
-        || p.time
-            .tempo
-            .windows(2)
-            .any(|a| a[0].position >= a[1].position)
-    {
-        return bad("曲速必须为正数，标记按时间严格递增");
-    }
-    if p.time.meter.iter().any(|m| {
-        m.index < 0
-            || m.numerator == 0
-            || m.numerator > 64
-            || !m.denominator.is_power_of_two()
-            || m.denominator > 64
-    }) || p.time.meter.windows(2).any(|a| a[0].index >= a[1].index)
-    {
-        return bad("拍号或拍号位置无效");
     }
     let mut ids = HashSet::new();
     for g in p

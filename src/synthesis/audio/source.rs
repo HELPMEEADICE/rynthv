@@ -8,6 +8,7 @@ pub struct AudioLayer {
     pub track_id: u64,
     pub audio: Arc<RenderedAudio>,
     pub start_frame: usize,
+    pub source_start: usize,
     pub frames: usize,
     pub gains: [f32; 2],
 }
@@ -22,8 +23,9 @@ impl AudioLayer {
             return [0.0; 2];
         }
         let local = position - self.start_frame as f64;
-        let a = local.floor() as usize;
-        let b = (a + 1).min(self.frames - 1);
+        let offset = local.floor() as usize;
+        let a = self.source_start + offset;
+        let b = self.source_start + (offset + 1).min(self.frames - 1);
         let channels = self.audio.layout().channels();
         let fraction = local.fract() as f32;
         std::array::from_fn(|c| {

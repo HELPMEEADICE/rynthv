@@ -35,7 +35,7 @@ impl App {
             .and_then(|t| t.audio_clip())
             .map(|c| c.path.clone())
         {
-            self.begin_audio_import(track, path, ctx);
+            self.synthesis.instrumentals.retry(&path, ctx);
         }
     }
 
@@ -91,6 +91,7 @@ impl App {
                 path: import.path,
                 onset_seconds: import.onset,
                 duration_seconds: duration,
+                source_offset_seconds: 0.0,
             }),
         );
         self.synthesis.instrumentals.finish_import();
