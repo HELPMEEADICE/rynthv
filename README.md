@@ -43,3 +43,5 @@ cargo build --release --locked --bins
 配置目录：Windows 为 `%LOCALAPPDATA%/RynthV`，Linux 为 `$XDG_CONFIG_HOME/RynthV`（未设置时为 `$HOME/.config/RynthV`）。模型上下文在 Windows 保存在 `%APPDATA%/RynthV/context.json`，Linux 保存在上述配置目录的 `context.json`。
 
 命令行合成与诊断工具的用法可通过 `cargo run --release --locked --bin rynthv-synth -- --help` 查看。
+
+SynthV Flat 明文声库的导入、模型目录配置、原生合成和兼容范围见 [SynthV Flat 指南](docs/synthv-flat.md)。
