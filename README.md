@@ -16,6 +16,8 @@ Windows 和 Linux 均支持原生 x86-64 与 ARM64 构建。GitHub Actions 的 B
 
 需要支持 DX12 的显卡。MSVC 目标为 `x86_64-pc-windows-msvc` 和 `aarch64-pc-windows-msvc`，需要为目标架构安装 MSVC 工具和含 `rc.exe` 的 Windows SDK。Windows x86-64 也可以使用 MSYS2 GNU 工具链，其 `windres` 需在 `PATH` 中。
 
+GitHub Actions 生成的 MSI 和 ZIP 静态链接 Visual C++ 运行库。
+
 ```powershell
 cargo build --release --locked --bins
 ```
@@ -31,7 +33,7 @@ cargo build --release --locked --bins
 ./target/release/rynthv
 ```
 
-AppImage 在 Ubuntu 24.04 上构建。运行依赖系统的 glibc、图形驱动、ALSA 音频设备和桌面对应的 XDG 门户后端（KDE 使用 `xdg-desktop-portal-kde`）。可用 `--appimage-extract` 解包，CLI 位于解包目录中的 `usr/bin/rynthv-synth`。
+AppImage 在 Ubuntu 24.04 上构建。运行依赖系统的 glibc 和 `libgcc_s.so.1`。编辑器还需要图形驱动、`libasound.so.2`（Ubuntu 上为 `libasound2t64`）、ALSA 音频设备和桌面对应的 XDG 门户后端（KDE 使用 `xdg-desktop-portal-kde`）。可用 `--appimage-extract` 解包，CLI 位于解包目录中的 `usr/bin/rynthv-synth`。
 
 ## 声库与配置
 

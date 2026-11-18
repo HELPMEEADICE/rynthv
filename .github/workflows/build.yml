@@ -61,6 +61,8 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           target: ${{ matrix.rust_target }}
+          # Windows packages carry the VC runtime in both executables.
+          rustflags: ${{ matrix.platform == 'windows' && '-Ctarget-feature=+crt-static -Clink-arg=/DEBUG:NONE' || '' }}
           cache: false
       - name: Cache Rust builds
         uses: Swatinem/rust-cache@v2
