@@ -148,9 +148,14 @@ impl ExplicitScore {
                     VoiceError::new(format!("Note {} pitch is outside MIDI range", note.id))
                 })? as f32;
             let note_language = lexicon.note_language(note, language)?;
-            let syllables = super::pronunciation::resolve_note(
+            let previous = score
+                .notes
+                .last()
+                .filter(|note| note.source_note_id.is_some());
+            let (note_language, syllables) = super::pronunciation::resolve_note(
                 note,
                 note_language,
+                previous,
                 lexicon,
                 input.voice.dictionary.as_ref(),
                 phones,

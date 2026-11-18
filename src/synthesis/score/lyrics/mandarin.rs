@@ -1,8 +1,7 @@
 //! Mandarin lookup from the configured pronunciation resources.
 //!
-//! Exact lexical lookup does not disambiguate pronunciation from context.
-//! Different phoneme readings require explicit phonemes; tone-only
-//! alternatives share the score's sung pitch.
+//! Use the installed dictionary's first reading when a lyric has multiple
+//! pronunciations. Explicit phonemes and pinyin can specify another reading.
 
 use std::{collections::HashMap, fs, path::Path};
 
@@ -13,7 +12,7 @@ mod pinyin;
 #[derive(Debug)]
 pub struct MandarinLexicon {
     pinyin: pinyin::Pinyin,
-    words: HashMap<String, Vec<Vec<String>>>,
+    words: HashMap<String, Vec<String>>,
     longest_word: usize,
 }
 
@@ -22,7 +21,7 @@ impl MandarinLexicon {
         let directory = directory.as_ref();
         let pinyin = pinyin::Pinyin::load(&directory.join("mandarin-xsampa-dict.txt"))?;
         let word_path = directory.join("cedict.txt");
-        let mut words: HashMap<String, Vec<Vec<String>>> = HashMap::new();
+        let mut words = HashMap::new();
         let mut longest_word = 0;
         for (index, line) in fs::read_to_string(&word_path)?.lines().enumerate() {
             let line = line.trim().trim_start_matches('\u{feff}');
@@ -45,10 +44,9 @@ impl MandarinLexicon {
             }
             for spelling in spellings {
                 longest_word = longest_word.max(spelling.chars().count());
-                let alternatives = words.entry(spelling.to_owned()).or_default();
-                if !alternatives.contains(&pronunciation) {
-                    alternatives.push(pronunciation.clone());
-                }
+                words
+                    .entry(spelling.to_owned())
+                    .or_insert_with(|| pronunciation.clone());
             }
         }
         if words.is_empty() {
@@ -92,28 +90,12 @@ impl MandarinLexicon {
     }
 
     fn resolve_word(&self, word: &str) -> Result<Vec<Vec<String>>> {
-        let alternatives = self.words.get(word).ok_or_else(|| unknown(word))?;
-        let mut phoneme_readings = Vec::new();
-        for alternative in alternatives {
-            let phones = alternative
-                .iter()
-                .map(|syllable| self.pinyin.syllable(syllable))
-                .collect::<Result<Vec<_>>>()?;
-            if !phoneme_readings.contains(&phones) {
-                phoneme_readings.push(phones);
-            }
-        }
-        if phoneme_readings.len() > 1 {
-            let readings = alternatives
-                .iter()
-                .map(|entry| entry.join(" "))
-                .collect::<Vec<_>>();
-            return Err(VoiceError::new(format!(
-                "Ambiguous Mandarin word {word:?}: {}; provide explicit phonemes or pinyin",
-                readings.join(" / ")
-            )));
-        }
-        phoneme_readings.pop().ok_or_else(|| unknown(word))
+        self.words
+            .get(word)
+            .ok_or_else(|| unknown(word))?
+            .iter()
+            .map(|syllable| self.pinyin.syllable(syllable))
+            .collect()
     }
 
     fn resolve_phrase(&self, phrase: &str) -> Result<Vec<Vec<String>>> {

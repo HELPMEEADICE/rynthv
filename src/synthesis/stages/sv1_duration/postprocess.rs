@@ -36,8 +36,11 @@ pub(super) fn execute(
         }
         // Evaluate the exponential and sum in f32, then scale by f64 record
         // seconds. Round the duration to f32 before storing it as f64.
-        for value in predictions.iter_mut() {
+        for (value, phone) in predictions.iter_mut().zip(&record.phones) {
             *value = value.exp();
+            if let Some(scale) = phone.attributes.duration_scale {
+                *value *= scale as f32;
+            }
         }
         let sum = predictions.iter().fold(0.0_f32, |sum, value| sum + value);
         if !sum.is_finite() || sum <= 0.0 {

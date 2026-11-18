@@ -1,10 +1,9 @@
-use crate::model::{
-    AudioClip, Extra, GroupRef, InstrumentalTrack, Project, SVP_VERSION, TimeAxis,
-    VocalModeComponent, beats,
-};
+use crate::model::{AudioClip, GroupRef, InstrumentalTrack, Project, SVP_VERSION, TimeAxis, beats};
 use serde::Deserialize;
 use serde_json::Value;
 use std::path::PathBuf;
+
+mod synthesis;
 
 pub(super) const VERSION: i32 = 153;
 
@@ -21,6 +20,8 @@ pub(super) fn import(project: &mut Project) -> Result<(), String> {
             if note.uuid.is_empty() {
                 note.renew_identity();
             }
+            synthesis::import_note(note)
+                .map_err(|error| format!("SVP 音符组 {} · {}：{error}", group.name, note.lyrics))?;
         }
     }
     for track in &mut project.tracks {
@@ -36,32 +37,11 @@ pub(super) fn import(project: &mut Project) -> Result<(), String> {
             if reference.uuid.is_empty() {
                 reference.renew_identity();
             }
-            import_vocal_modes(&mut reference.extra);
+            synthesis::import_reference(reference);
         }
     }
     project.version = SVP_VERSION;
     Ok(())
-}
-
-fn import_vocal_modes(extra: &mut Extra) {
-    let Some(modes) = extra
-        .get_mut("voice")
-        .and_then(Value::as_object_mut)
-        .and_then(|voice| voice.get_mut("vocalModeParams"))
-        .and_then(Value::as_object_mut)
-    else {
-        return;
-    };
-    for value in modes.values_mut() {
-        if let Value::Number(weight) = value {
-            *value = Value::Object(
-                VocalModeComponent::ALL
-                    .into_iter()
-                    .map(|component| (component.key().into(), Value::Number(weight.clone())))
-                    .collect(),
-            );
-        }
-    }
 }
 
 #[derive(Deserialize)]

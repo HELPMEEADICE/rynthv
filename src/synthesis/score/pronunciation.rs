@@ -1,4 +1,4 @@
-use super::LyricFrontend;
+use super::{LyricFrontend, ScoreNote};
 use crate::{
     model::{Language, PronunciationDictionary},
     synthesis::{
@@ -10,23 +10,42 @@ use crate::{
 pub(super) fn resolve_note(
     note: &NoteInput,
     language: Language,
+    previous: Option<&ScoreNote>,
     frontend: &LyricFrontend,
     dictionary: Option<&PronunciationDictionary>,
     resolver: &PhoneResolver<'_>,
-) -> Result<Vec<Vec<String>>> {
+) -> Result<(Language, Vec<Vec<String>>)> {
+    let lyrics = note.lyrics.trim();
     let explicit = (!note.phonemes.trim().is_empty())
         .then_some(note.phonemes.as_str())
         .or_else(|| {
             dictionary
                 .filter(|dict| dict.language == language)
-                .and_then(|dict| dict.entries.get(note.lyrics.trim()).map(String::as_str))
+                .and_then(|dict| dict.entries.get(lyrics).map(String::as_str))
         });
-    let syllables = if let Some(phones) = explicit {
-        split_syllables(phones, language, resolver)?
+    let (language, syllables) = if let Some(phones) = explicit {
+        (language, split_syllables(phones, language, resolver)?)
     } else {
-        frontend.resolve(language, &note.lyrics).map_err(|error| {
-            VoiceError::new(format!("音符 {} · {}：{error}", note.id, language.label()))
-        })?
+        let text = lyric_text(lyrics);
+        let (language, mut syllables) = match text {
+            "-" | "ー" => {
+                let (language, vowel) = continuation(previous, resolver)?;
+                (language, vec![vec![vowel]])
+            }
+            "br" => (language, vec![vec!["br".into()]]),
+            _ => (
+                language,
+                frontend.resolve(language, text).map_err(|error| {
+                    VoiceError::new(format!("音符 {} · {}：{error}", note.id, language.label()))
+                })?,
+            ),
+        };
+        if text != lyrics
+            && let Some(first) = syllables.first_mut()
+        {
+            first.insert(0, "cl".into());
+        }
+        (language, syllables)
     };
     if note
         .attributes
@@ -34,10 +53,37 @@ pub(super) fn resolve_note(
         .and_then(serde_json::Value::as_bool)
         == Some(false)
     {
-        Ok(vec![syllables.into_iter().flatten().collect()])
+        Ok((language, vec![syllables.into_iter().flatten().collect()]))
     } else {
-        Ok(syllables)
+        Ok((language, syllables))
     }
+}
+
+fn lyric_text(lyrics: &str) -> &str {
+    lyrics.trim_start_matches(['\'', '‘', '’'])
+}
+
+pub(crate) fn is_continuation(lyrics: &str) -> bool {
+    matches!(lyric_text(lyrics.trim()), "-" | "ー")
+}
+
+fn continuation(
+    previous: Option<&ScoreNote>,
+    resolver: &PhoneResolver<'_>,
+) -> Result<(Language, String)> {
+    if let Some(previous) = previous {
+        for phone in previous.phones.iter().rev() {
+            let resolved = resolver.resolve(&phone.language, &phone.token)?;
+            if matches!(resolved.source_class, Some("vowel" | "diphthong"))
+                && let Some(language) = Language::parse(&phone.language)
+            {
+                return Ok((language, phone.token.clone()));
+            }
+        }
+    }
+    Err(VoiceError::new(
+        "延音前缺少相连的元音，请填写歌词或显式音素。",
+    ))
 }
 
 fn split_syllables(

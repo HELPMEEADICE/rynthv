@@ -268,6 +268,19 @@ pub(crate) fn postprocess_typed(
         let total_frames = seconds / step;
         let mut weights = scalars.to_vec();
         softmax::execute(&mut weights).map_err(|error| VoiceError::new(error.to_string()))?;
+        if record
+            .phones
+            .iter()
+            .any(|phone| phone.attributes.duration_scale.is_some())
+        {
+            for (weight, phone) in weights.iter_mut().zip(&record.phones) {
+                *weight *= phone.attributes.duration_scale.unwrap_or(1.0) as f32;
+            }
+            let total: f32 = weights.iter().sum();
+            for weight in &mut weights {
+                *weight /= total;
+            }
+        }
         let mut accumulated = 0.0;
         let mut previous = 0_usize;
         for (phone_index, weight) in weights.iter().enumerate() {

@@ -24,6 +24,7 @@ pub use lyrics::LyricFrontend;
 pub use owner::prepare_owner;
 pub use performance::PreparedPerformanceControls;
 pub use pitch::PreparedPitchControls;
+pub(crate) use pronunciation::is_continuation;
 pub use types::{ExplicitScore, PreparedPhrase, ScoreNote, ScorePhone};
 pub use voice_binding::validate_voice;
 pub use voice_controls::PreparedVoiceControls;

@@ -6,7 +6,7 @@ use crate::{
     model::QUARTER,
     synthesis::{
         plan::{GlobalBlick, OwnerInput},
-        score::PreparedPhrase,
+        score::{PreparedPhrase, is_continuation},
         voice::Result,
     },
 };
@@ -61,7 +61,11 @@ impl IncrementalEdit {
         }
         let mut last = changed.end - 1;
         let mut right_time = end;
-        while last + 1 < notes.len() && right_time <= end.saturating_add(2 * QUARTER) {
+        while last + 1 < notes.len()
+            && (right_time <= end.saturating_add(2 * QUARTER)
+                || is_continuation(&notes[last + 1].lyrics)
+                || is_continuation(&old.notes[last + 1].lyrics))
+        {
             last += 1;
             right_time = notes[last].onset.0.saturating_add(notes[last].duration);
         }
@@ -72,7 +76,8 @@ impl IncrementalEdit {
         while input_first > 0 {
             input_first -= 1;
             let note = &notes[input_first];
-            if !matches!(note.lyrics.as_str(), "-" | "+")
+            if !is_continuation(&note.lyrics)
+                && note.lyrics != "+"
                 && note.onset.0.saturating_add(note.duration)
                     < core_begin.saturating_sub(2 * QUARTER)
             {
@@ -83,7 +88,8 @@ impl IncrementalEdit {
         while input_last + 1 < notes.len() {
             input_last += 1;
             let note = &notes[input_last];
-            if !matches!(note.lyrics.as_str(), "-" | "+")
+            if !is_continuation(&note.lyrics)
+                && note.lyrics != "+"
                 && note.onset.0 > core_end.saturating_add(2 * QUARTER)
             {
                 break;

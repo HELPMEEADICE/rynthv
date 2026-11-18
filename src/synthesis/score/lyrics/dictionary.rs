@@ -1,5 +1,4 @@
-//! Exact installed dictionary lookups. This does not implement the editor's
-//! statistical pronunciation models or choose between ambiguous word readings.
+//! Pronunciation lookup in the installed language dictionaries.
 
 use crate::{
     model::Language,
@@ -158,7 +157,15 @@ impl Dictionary {
     fn romanized(&self, token: &str) -> Result<Vec<Phones>> {
         let token = token.to_lowercase();
         match self.language {
-            Language::English => Ok(split_nuclei(self.phones.get(&token)?, &self.nuclei)),
+            Language::English => {
+                let phones = self
+                    .phones
+                    .entries
+                    .get(&token)
+                    .and_then(|readings| readings.first())
+                    .ok_or_else(|| unknown(&token))?;
+                Ok(split_nuclei(phones.clone(), &self.nuclei))
+            }
             Language::Cantonese => {
                 Ok(vec![self.phones.get(
                     token.trim_end_matches(['1', '2', '3', '4', '5', '6']),

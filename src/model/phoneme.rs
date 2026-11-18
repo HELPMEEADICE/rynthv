@@ -15,14 +15,16 @@ pub enum PhonemeParameter {
     Position,
     Activity,
     Strength,
+    DurationScale,
 }
 
 impl PhonemeParameter {
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 5] = [
         Self::LeftOffset,
         Self::Position,
         Self::Activity,
         Self::Strength,
+        Self::DurationScale,
     ];
 
     pub fn key(self) -> &'static str {
@@ -31,6 +33,7 @@ impl PhonemeParameter {
             Self::Position => "position",
             Self::Activity => "activity",
             Self::Strength => "strength",
+            Self::DurationScale => "durationScale",
         }
     }
 
@@ -39,6 +42,7 @@ impl PhonemeParameter {
             && match self {
                 Self::Position | Self::Activity => (0.0..=1.0).contains(&value),
                 Self::Strength => (-1.0..=1.0).contains(&value),
+                Self::DurationScale => (0.2_f32..=1.8).contains(&(value as f32)),
                 Self::LeftOffset => true,
             }
     }
@@ -56,6 +60,9 @@ pub struct PhonemeAttributes {
     pub activity: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub strength: Option<f64>,
+    /// Relative weight in the duration model's phone allocation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration_scale: Option<f64>,
 }
 
 impl PhonemeAttributes {
@@ -65,6 +72,7 @@ impl PhonemeAttributes {
             PhonemeParameter::Position => self.position,
             PhonemeParameter::Activity => self.activity,
             PhonemeParameter::Strength => self.strength,
+            PhonemeParameter::DurationScale => self.duration_scale,
         }
     }
 
@@ -74,6 +82,7 @@ impl PhonemeAttributes {
             PhonemeParameter::Position => self.position = value,
             PhonemeParameter::Activity => self.activity = value,
             PhonemeParameter::Strength => self.strength = value,
+            PhonemeParameter::DurationScale => self.duration_scale = value,
         }
     }
 
