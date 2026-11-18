@@ -96,7 +96,8 @@ fn execute(command: Command, options: &Options) -> Result<Value, String> {
             Ok(json!({
                 "ok": true, "stage_programs_available": inventory.prepare().map_err(error)?.summary().stage_programs_available,
                 "database_id": inventory.database_id, "sha256": inventory.content_hash,
-                "configuration": inventory.configuration, "files": inventory.files, "warnings": registry.warnings,
+                "configuration": inventory.configuration, "files": inventory.files,
+                "warnings": registry.warnings.iter().chain(&inventory.flat_warnings).collect::<Vec<_>>(),
             }))
         }
         Command::Import => unreachable!("import handled separately"),

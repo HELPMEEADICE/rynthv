@@ -120,8 +120,7 @@ fn run(
     let phone_lookup = if let Some(phone) = args.phone {
         let model = preparation.as_ref().expect("ResolvePhone prepares a voice");
         let result = model
-            .tree(phone.file, phone.tree)
-            .and_then(|tree| tree.resolve_phone(&phone.language, &phone.token))
+            .resolve_phone(phone.file, phone.tree, &phone.language, &phone.token)
             .map_err(|e| e.to_string())?;
         Some(json!({ "language": phone.language, "token": phone.token, "resolved": result }))
     } else {

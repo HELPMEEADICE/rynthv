@@ -12,7 +12,7 @@ use sha2::{Digest, Sha256};
 use super::{
     FlatArchive, FlatModelRegistry, FlatPackage, ModelRole, ModelSource, registry::model_member,
 };
-use crate::synthesis::voice::{PreparedTree, Result, VoiceError, embedded, hex};
+use crate::synthesis::voice::{PhoneSet, PreparedTree, Result, VoiceError, embedded, hex};
 
 const MAX_MODEL_BYTES: usize = 256 * 1024 * 1024;
 const REQUIRED: [ModelRole; 4] = [
@@ -42,6 +42,7 @@ pub struct FlatModel {
 pub struct ResolvedFlatModels {
     pub package: FlatPackage,
     pub models: Vec<FlatModel>,
+    pub phones: Vec<PhoneSet>,
 }
 
 impl FlatModelRegistry {
@@ -91,11 +92,16 @@ impl FlatModelRegistry {
                 missing.join(", ")
             )));
         }
+        let phones = super::phones::read(&mut archive, &package)?;
         let models = dependencies
             .into_iter()
             .map(|dependency| load_dependency(path, &mut archive, dependency))
             .collect::<Result<Vec<_>>>()?;
-        Ok(ResolvedFlatModels { package, models })
+        Ok(ResolvedFlatModels {
+            package,
+            models,
+            phones,
+        })
     }
 }
 

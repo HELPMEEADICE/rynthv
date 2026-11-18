@@ -5,18 +5,19 @@ use crate::{
     model::QUARTER,
     synthesis::{
         plan::{GlobalBlick, OwnerInput, TempoMapping},
-        voice::{PreparedTree, Result, VoiceError, VoiceFamily},
+        voice::{PhoneResolver, PreparedVoice, Result, VoiceError, VoiceFamily},
     },
 };
 
 pub fn prepare_owner(
     input: &OwnerInput,
     lexicon: &LyricFrontend,
-    duration_tree: &PreparedTree,
-    family: VoiceFamily,
+    voice: &PreparedVoice,
 ) -> Result<PreparedPhrase> {
-    let mut phrase = ExplicitScore::from_owner(input, lexicon, duration_tree, family)?
-        .prepare(duration_tree, family)?;
+    let family = voice.family;
+    let phones = voice.duration_phones()?;
+    let mut phrase = ExplicitScore::from_owner(input, lexicon, &phones, family)?
+        .prepare_with_phones(&phones, family)?;
     phrase.automations = super::PreparedAutomations::new(input)?.map(std::sync::Arc::new);
     phrase.voice_controls =
         super::PreparedVoiceControls::new(input, family, phrase.automations.clone())?;
@@ -38,10 +39,10 @@ pub fn prepare_owner(
 }
 
 impl ExplicitScore {
-    pub fn from_owner(
+    fn from_owner(
         input: &OwnerInput,
         lexicon: &LyricFrontend,
-        duration_tree: &PreparedTree,
+        phones: &PhoneResolver<'_>,
         family: VoiceFamily,
     ) -> Result<Self> {
         options::validate_owner(input, family)?;
@@ -152,7 +153,7 @@ impl ExplicitScore {
                 note_language,
                 lexicon,
                 input.voice.dictionary.as_ref(),
-                duration_tree,
+                phones,
             )?;
             let parts = u32::try_from(syllables.len())
                 .map_err(|_| VoiceError::new("Too many syllables in one note"))?;

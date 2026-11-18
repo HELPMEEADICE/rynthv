@@ -15,6 +15,7 @@ mod transposed_convolution;
 pub use affine::PreparedAffine;
 pub use convolution::PreparedConvolution;
 pub use duration::DurationInputLayout;
+pub(crate) use phones::PhoneResolver;
 pub use summary::*;
 pub use transposed_convolution::PreparedTransposedConvolution;
 

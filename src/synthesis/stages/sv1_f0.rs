@@ -11,7 +11,7 @@ use crate::synthesis::{
     inference::{ModelRuntime, Sequence},
     stages::f0::{PitchResult, TimedPhone, frontend::FrontendNote},
     voice::{
-        PreparedTree, Result, VoiceError,
+        PhoneSet, PreparedTree, Result, VoiceError,
         embedded::types::{F0_ROOT_TYPE_ID, F0_WRAPPER_TYPE_ID},
     },
 };
@@ -36,17 +36,18 @@ pub struct Sv1F0Stage<'a> {
 
 impl<'a> Sv1F0Stage<'a> {
     pub fn prepare(tree: &'a PreparedTree) -> Result<Self> {
-        Self::prepare_contract(tree, Contract::Compatible, None)
+        Self::prepare_contract(tree, Contract::Compatible, None, &[])
     }
 
     pub fn prepare_native(tree: &'a PreparedTree, enhancement: f32) -> Result<Self> {
-        Self::prepare_native_conditioned(tree, enhancement, None)
+        Self::prepare_native_conditioned(tree, enhancement, None, &[])
     }
 
     pub(crate) fn prepare_native_conditioned(
         tree: &'a PreparedTree,
         enhancement: f32,
         pitch: Option<&[f32]>,
+        overrides: &'a [PhoneSet],
     ) -> Result<Self> {
         if !enhancement.is_finite() {
             return Err(VoiceError::new("Native DDS F0 enhancement must be finite"));
@@ -57,6 +58,7 @@ impl<'a> Sv1F0Stage<'a> {
                 enhancement: enhancement.clamp(0.0, 1.0),
             },
             pitch,
+            overrides,
         )
     }
 
@@ -64,6 +66,7 @@ impl<'a> Sv1F0Stage<'a> {
         tree: &'a PreparedTree,
         contract: Contract,
         pitch: Option<&[f32]>,
+        overrides: &'a [PhoneSet],
     ) -> Result<Self> {
         let wrapper = tree.node(tree.root_index())?;
         let payload = tree.payload(tree.root_index())?;
@@ -92,7 +95,7 @@ impl<'a> Sv1F0Stage<'a> {
                 "Expected the five-child compatible DDS F0 model",
             ));
         }
-        let frontend = Frontend::prepare(tree, root.children[0])?;
+        let frontend = Frontend::prepare(tree, root.children[0], overrides)?;
         let stored = tree
             .tensor(root.children[1])?
             .vector()

@@ -107,7 +107,12 @@ impl<'a> Sv1TimbreNetwork<'a> {
         Ok(Self {
             contract,
             tree,
-            frontend: Frontend::prepare(tree, nodes[0], contract)?,
+            frontend: Frontend::prepare(
+                tree,
+                nodes[0],
+                contract,
+                flat.map_or(&[], |flat| flat.phones.as_slice()),
+            )?,
             context: Context::prepare(tree, nodes[2])?,
             sampler: Sampler::prepare(tree, nodes[3])?,
             bank,

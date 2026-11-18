@@ -3,7 +3,7 @@ use crate::{
     model::{Language, PronunciationDictionary},
     synthesis::{
         plan::NoteInput,
-        voice::{PreparedTree, Result, VoiceError},
+        voice::{PhoneResolver, Result, VoiceError},
     },
 };
 
@@ -12,7 +12,7 @@ pub(super) fn resolve_note(
     language: Language,
     frontend: &LyricFrontend,
     dictionary: Option<&PronunciationDictionary>,
-    tree: &PreparedTree,
+    resolver: &PhoneResolver<'_>,
 ) -> Result<Vec<Vec<String>>> {
     let explicit = (!note.phonemes.trim().is_empty())
         .then_some(note.phonemes.as_str())
@@ -22,7 +22,7 @@ pub(super) fn resolve_note(
                 .and_then(|dict| dict.entries.get(note.lyrics.trim()).map(String::as_str))
         });
     let syllables = if let Some(phones) = explicit {
-        split_syllables(phones, language, tree)?
+        split_syllables(phones, language, resolver)?
     } else {
         frontend.resolve(language, &note.lyrics).map_err(|error| {
             VoiceError::new(format!("音符 {} · {}：{error}", note.id, language.label()))
@@ -43,12 +43,12 @@ pub(super) fn resolve_note(
 fn split_syllables(
     phones: &str,
     language: Language,
-    tree: &PreparedTree,
+    resolver: &PhoneResolver<'_>,
 ) -> Result<Vec<Vec<String>>> {
     let tokens: Vec<String> = phones.split_whitespace().map(str::to_owned).collect();
     let mut nuclei = Vec::new();
     for (index, token) in tokens.iter().enumerate() {
-        let phone = tree.resolve_phone(language.id(), token)?;
+        let phone = resolver.resolve(language.id(), token)?;
         if matches!(phone.source_class, Some("vowel" | "diphthong")) {
             nuclei.push(index);
         }

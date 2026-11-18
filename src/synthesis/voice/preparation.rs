@@ -161,6 +161,18 @@ impl PreparedVoice {
             .ok_or_else(|| VoiceError::new("Prepared model file/tree index is out of range"))
     }
 
+    pub fn resolve_phone(
+        &self,
+        file: usize,
+        tree: usize,
+        language: &str,
+        token: &str,
+    ) -> Result<super::ResolvedPhone<'_>> {
+        self.tree(file, tree)?
+            .phone_resolver(self.phones())?
+            .resolve(language, token)
+    }
+
     /// Diagnostic execution of one identified module.
     pub fn execute_module(
         &self,

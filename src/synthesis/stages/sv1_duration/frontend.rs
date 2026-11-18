@@ -1,6 +1,6 @@
 use crate::synthesis::{
     stages::duration::{DurationRecord, PhoneFeatures},
-    voice::{PreparedTree, Result, VoiceError, embedded::types},
+    voice::{PhoneResolver, PreparedTree, Result, VoiceError, embedded::types},
 };
 
 pub(super) fn validate(tree: &PreparedTree, index: usize) -> Result<(i32, i32)> {
@@ -32,6 +32,7 @@ pub(super) fn validate(tree: &PreparedTree, index: usize) -> Result<(i32, i32)> 
 pub(super) fn prepare(
     tree: &PreparedTree,
     index: usize,
+    resolver: &PhoneResolver<'_>,
     records: &[DurationRecord],
 ) -> Result<Vec<PhoneFeatures>> {
     let (low, high) = validate(tree, index)?;
@@ -58,7 +59,7 @@ pub(super) fn prepare(
                     "SV1 synthesis does not yet support phoneme strength controls",
                 ));
             }
-            let resolved = tree.resolve_phone(&phone.language, &phone.token)?;
+            let resolved = resolver.resolve(&phone.language, &phone.token)?;
             output.push(PhoneFeatures {
                 unified_phone_index: resolved.unified_phone_index,
                 language_index: resolved.language_index,

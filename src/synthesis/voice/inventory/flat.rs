@@ -10,7 +10,7 @@ use super::{GraphSummary, TensorSummary, VoiceFile, VoiceInventory};
 use crate::synthesis::voice::{
     PreparedModule, Result, VoiceError,
     config::VoiceConfiguration,
-    flat::{FlatConditioning, FlatModel, FlatModelRegistry},
+    flat::{FlatConditioning, FlatModel, FlatModelRegistry, ModelRole},
     hex,
     preparation::{PreparedFile, PreparedModel, PreparedVoice},
 };
@@ -18,12 +18,26 @@ use crate::synthesis::voice::{
 pub(super) fn load(path: &Path, registry: &FlatModelRegistry) -> Result<VoiceInventory> {
     let resolved = registry.resolve(path)?;
     let manifest = resolved.package.manifest;
-    let (conditioning, styles) = FlatConditioning::from_manifest(&manifest)?;
-    let configuration = VoiceConfiguration::from_flat(&manifest, styles);
+    let (mut conditioning, styles) = FlatConditioning::from_manifest(&manifest)?;
+    conditioning.phones = resolved.phones;
+    let mut configuration = VoiceConfiguration::from_flat(&manifest, styles);
+    let excluded = filter_languages(&mut configuration, &resolved.models)?;
+    let flat_warnings = excluded
+        .into_iter()
+        .map(|language| {
+            format!(
+                "Flat language {language:?} is missing from a native DDS stage or lyric frontend"
+            )
+        })
+        .collect();
     let mut digest = Sha256::new();
-    digest.update(b"RynthV Flat voice manifest and DDS models\0");
+    digest.update(b"RynthV Flat voice manifest, phone tables and DDS models\0");
     digest
         .update(serde_json::to_vec(&manifest).map_err(|error| VoiceError::new(error.to_string()))?);
+    digest.update(
+        serde_json::to_vec(&conditioning.phones)
+            .map_err(|error| VoiceError::new(error.to_string()))?,
+    );
     let mut files = Vec::new();
     let mut prepared_files = Vec::new();
     for model in resolved.models {
@@ -66,9 +80,42 @@ pub(super) fn load(path: &Path, registry: &FlatModelRegistry) -> Result<VoiceInv
         files,
         configuration: Some(configuration),
         flat: Some(manifest),
+        flat_warnings,
         _models: Vec::new(),
         preparation: OnceLock::from(Ok(prepared)),
     })
+}
+
+fn filter_languages(config: &mut VoiceConfiguration, models: &[FlatModel]) -> Result<Vec<String>> {
+    let mut excluded = Vec::new();
+    config.supported_languages.retain(|language| {
+        let supported = crate::model::Language::parse(language).is_some()
+            && models
+                .iter()
+                .filter(|model| {
+                    matches!(
+                        model.role,
+                        ModelRole::Acoustic | ModelRole::Duration | ModelRole::F0
+                    )
+                })
+                .all(|model| {
+                    model.tree.nodes().iter().any(|node| {
+                        matches!(&node.module, PreparedModule::PhoneSet(table)
+                        if table.name.split_once('-').is_some_and(|(prefix, _)| prefix == language))
+                    })
+                });
+        if !supported {
+            excluded.push(language.clone());
+        }
+        supported
+    });
+    if excluded.contains(&config.default_language) {
+        return Err(VoiceError::new(format!(
+            "Default Flat language {:?} is missing from a native DDS stage or lyric frontend",
+            config.default_language
+        )));
+    }
+    Ok(excluded)
 }
 
 fn describe(model: &FlatModel) -> Result<VoiceFile> {

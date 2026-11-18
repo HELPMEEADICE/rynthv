@@ -22,7 +22,7 @@ pub fn prepare(
     base: Option<&CompletedOwner>,
     mut checkpoint: impl FnMut(RenderStage) -> Result<()>,
 ) -> Result<PreparedRender> {
-    let phrase = score::prepare_owner(input, lexicon, voice.model("duration")?, voice.family)?;
+    let phrase = score::prepare_owner(input, lexicon, voice)?;
     // Local invalidation currently uses the SV2 feature program. Compatible
     // voices still retain progressive PCM, but prepare a fresh owner on edits.
     let base = base.filter(|base| {

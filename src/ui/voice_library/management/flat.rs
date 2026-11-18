@@ -41,6 +41,11 @@ pub(super) fn details(app: &mut App, ui: &mut Ui, entry: &VoiceCatalogEntry) {
     if let Some(version) = &flat.format_version {
         weak(ui, format!("Flat 格式版本 {version}"));
     }
+    if let Some(inventory) = app.synthesis.inventory(&entry.selection()) {
+        for warning in &inventory.flat_warnings {
+            weak(ui, warning);
+        }
+    }
     ui.collapsing("Flat 模型依赖", |ui| {
         for dependency in &flat.dependencies {
             let role = match dependency.role {

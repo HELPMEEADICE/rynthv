@@ -19,6 +19,7 @@ pub(super) struct Frontend<'a> {
     contract: Contract,
     languages: Vec<&'a PhoneSet>,
     unified: &'a PhoneSet,
+    overrides: &'a [PhoneSet],
     linguistic: &'a RangeNormalizer,
     pitch: &'a RangeNormalizer,
     pitch_bounds: Option<[f32; 2]>,
@@ -36,7 +37,12 @@ pub(super) struct PhoneInput {
 }
 
 impl<'a> Frontend<'a> {
-    pub fn prepare(tree: &'a PreparedTree, index: usize, contract: Contract) -> Result<Self> {
+    pub fn prepare(
+        tree: &'a PreparedTree,
+        index: usize,
+        contract: Contract,
+        overrides: &'a [PhoneSet],
+    ) -> Result<Self> {
         let node = tree.node(index)?;
         if !matches!(
             node.type_id,
@@ -121,6 +127,7 @@ impl<'a> Frontend<'a> {
             contract,
             languages,
             unified,
+            overrides,
             linguistic,
             pitch,
             pitch_bounds,

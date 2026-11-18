@@ -86,6 +86,7 @@ pub(super) fn load(path: &Path) -> Result<VoiceInventory> {
         files: vec![file],
         configuration: Some(description.configuration),
         flat: None,
+        flat_warnings: Vec::new(),
         _models: vec![LoadedModel::Nofs { trees }],
         preparation: OnceLock::new(),
     })

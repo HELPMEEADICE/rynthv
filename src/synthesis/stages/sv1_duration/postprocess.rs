@@ -1,6 +1,6 @@
 use crate::synthesis::{
     stages::duration::{DurationRecord, PhoneDuration},
-    voice::{PreparedTree, Result, VoiceError},
+    voice::{PhoneResolver, PreparedTree, Result, VoiceError},
 };
 
 use super::frontend;
@@ -8,6 +8,7 @@ use super::frontend;
 pub(super) fn execute(
     tree: &PreparedTree,
     frontend: usize,
+    resolver: &PhoneResolver<'_>,
     records: &[DurationRecord],
     scalars: &[f32],
 ) -> Result<(Vec<PhoneDuration>, Vec<f64>)> {
@@ -53,7 +54,8 @@ pub(super) fn execute(
             .phones
             .iter()
             .map(|phone| {
-                tree.resolve_phone(&phone.language, &phone.token)
+                resolver
+                    .resolve(&phone.language, &phone.token)
                     .map(|phone| phone.source_class)
             })
             .collect::<Result<Vec<_>>>()?;

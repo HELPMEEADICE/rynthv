@@ -25,8 +25,10 @@ pub use catalog::{FlatCatalogEntry, VoiceAvailability, VoiceCatalog, VoiceCatalo
 pub use duration_frontend::{DURATION_ROOT_TYPE_ID, DurationConfiguration};
 pub use family::VoiceFamily;
 pub use inventory::VoiceInventory;
+pub(crate) use phones::resolve_with_overrides;
 pub use phones::{PHONE_SET_TYPE_ID, PhoneLookup, PhoneSet, ResolvedPhone, resolve_explicit};
 pub use preparation::{PreparationSummary, PreparedVoice};
+pub(crate) use prepared::PhoneResolver;
 pub use prepared::{PreparedModule, PreparedNode, PreparedTree, PreparedTreeSummary};
 pub use tensor::{TensorLayout, TensorStorage};
 

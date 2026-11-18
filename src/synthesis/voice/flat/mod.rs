@@ -5,6 +5,7 @@ mod conditioning;
 mod embedding;
 mod library;
 mod manifest;
+mod phones;
 mod registry;
 mod resolver;
 

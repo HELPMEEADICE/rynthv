@@ -5,11 +5,11 @@
 
 use crate::synthesis::{
     stages::{duration::DurationRecord, f0::frontend::FrontendNote},
-    voice::{PreparedTree, Result, VoiceError, VoiceFamily},
+    voice::{PhoneResolver, Result, VoiceError, VoiceFamily},
 };
 
 pub(super) fn redistribute_onsets(
-    tree: &PreparedTree,
+    phones: &PhoneResolver<'_>,
     records: &mut [DurationRecord],
     notes: &mut [FrontendNote],
     family: VoiceFamily,
@@ -26,7 +26,7 @@ pub(super) fn redistribute_onsets(
     for record in records.iter() {
         let mut first_core = None;
         for (index, phone) in record.phones.iter().enumerate() {
-            let resolved = tree.resolve_phone(&phone.language, &phone.token)?;
+            let resolved = phones.resolve(&phone.language, &phone.token)?;
             let core = match family {
                 // SV1 transfers every leading non-vowel, including
                 // semivowels; silence and breath are not nuclei.

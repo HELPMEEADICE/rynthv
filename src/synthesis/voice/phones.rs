@@ -53,6 +53,16 @@ pub fn resolve_explicit<'a>(
     language_query: &str,
     token: &str,
 ) -> Result<ResolvedPhone<'a>> {
+    resolve_with_overrides(languages, unified, &[], language_query, token)
+}
+
+pub(crate) fn resolve_with_overrides<'a>(
+    languages: &[&'a PhoneSet],
+    unified: &'a PhoneSet,
+    overrides: &'a [PhoneSet],
+    language_query: &str,
+    token: &str,
+) -> Result<ResolvedPhone<'a>> {
     let selected = (!language_query.is_empty())
         .then(|| {
             languages
@@ -60,7 +70,13 @@ pub fn resolve_explicit<'a>(
                 .position(|table| table.name.contains(language_query))
         })
         .flatten();
-    let source = selected.map_or(unified, |index| languages[index]);
+    let source = selected.map_or(unified, |index| {
+        let model = languages[index];
+        overrides
+            .iter()
+            .find(|table| table.name == model.name)
+            .unwrap_or(model)
+    });
     let local = source.lookup(token);
     // The local mapper passes an unknown token through unchanged.
     let mapped = local.and_then(|phone| phone.mapped_symbol).unwrap_or(token);
@@ -86,12 +102,48 @@ impl PhoneSet {
             return Err(VoiceError::new("Resource is not a phone set"));
         }
         let mut reader = Reader { bytes, offset: 16 };
-        let name = reader.string()?;
-        let symbols = reader.strings()?;
-        let classes_by_symbol = reader.strings()?;
-        let mapped_symbols = reader.strings()?;
-        let classes = reader.strings()?;
-        if reader.offset != bytes.len() {
+        let mut table = Self::read_tables(&mut reader)?;
+        table.classes = reader.strings()?;
+        table.validate(reader)?;
+        Ok(table)
+    }
+
+    pub(super) fn parse_flat(bytes: &[u8]) -> Result<Self> {
+        let mut reader = Reader { bytes, offset: 0 };
+        let mut table = Self::read_tables(&mut reader)?;
+        for class in &table.classes_by_symbol {
+            if !table.classes.contains(class) {
+                table.classes.push(class.clone());
+            }
+        }
+        if table.symbols.len() != table.mapped_symbols.len() {
+            return Err(VoiceError::new(
+                "Flat phone set token and mapping counts differ",
+            ));
+        }
+        table.validate(reader)?;
+        Ok(table)
+    }
+
+    fn read_tables(reader: &mut Reader<'_>) -> Result<Self> {
+        Ok(Self {
+            name: reader.string()?,
+            symbols: reader.strings()?,
+            classes_by_symbol: reader.strings()?,
+            mapped_symbols: reader.strings()?,
+            classes: Vec::new(),
+        })
+    }
+
+    fn validate(&self, reader: Reader<'_>) -> Result<()> {
+        let Self {
+            name,
+            symbols,
+            classes_by_symbol,
+            mapped_symbols,
+            classes,
+        } = self;
+        if reader.offset != reader.bytes.len() {
             return Err(VoiceError::new("Phone set has trailing bytes"));
         }
         if name.is_empty() || symbols.is_empty() || classes.is_empty() {
@@ -104,8 +156,8 @@ impl PhoneSet {
                 "Phone set class count differs from symbol count",
             ));
         }
-        validate_unique(&symbols, "symbols")?;
-        validate_unique(&classes, "classes")?;
+        validate_unique(symbols, "symbols")?;
+        validate_unique(classes, "classes")?;
         if classes_by_symbol
             .iter()
             .any(|class| !classes.contains(class))
@@ -117,13 +169,7 @@ impl PhoneSet {
         }
         // Do not impose equal length on mapped_symbols: the shared multiphone
         // table stores 111 symbols and 112 entries in this array.
-        Ok(Self {
-            name,
-            symbols,
-            classes_by_symbol,
-            mapped_symbols,
-            classes,
-        })
+        Ok(())
     }
 
     pub fn lookup(&self, token: &str) -> Option<PhoneLookup<'_>> {

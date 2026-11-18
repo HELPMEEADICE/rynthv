@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::synthesis::{
     stages::timbre::TimbreStyles,
-    voice::{Result, VoiceError},
+    voice::{PhoneSet, Result, VoiceError},
 };
 
 use super::FlatManifest;
@@ -12,6 +12,7 @@ pub(crate) struct FlatConditioning {
     pub styles: TimbreStyles,
     pub pitch: Option<[f32; 32]>,
     pub timing: Option<[f32; 128]>,
+    pub phones: Vec<PhoneSet>,
 }
 
 impl FlatConditioning {
@@ -51,6 +52,7 @@ impl FlatConditioning {
                 styles: TimbreStyles { neutral, variants },
                 pitch: manifest.pitch_embedding()?,
                 timing: manifest.timing_embedding()?,
+                phones: Vec::new(),
             },
             names,
         ))

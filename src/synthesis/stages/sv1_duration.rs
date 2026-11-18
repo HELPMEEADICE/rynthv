@@ -8,7 +8,7 @@ mod encoding;
 mod frontend;
 mod postprocess;
 
-use crate::synthesis::voice::{PreparedTree, Result, VoiceError};
+use crate::synthesis::voice::{PhoneResolver, PhoneSet, PreparedTree, Result, VoiceError};
 
 use super::duration::{DurationPrediction, DurationRecord, DurationResult};
 use configuration::Configuration;
@@ -18,6 +18,7 @@ pub struct Sv1DurationStage<'a> {
     children: [usize; 6],
     configuration: Configuration,
     constant: &'a [f32],
+    phones: PhoneResolver<'a>,
 }
 
 pub struct Sv1DurationResult {
@@ -29,12 +30,13 @@ pub struct Sv1DurationResult {
 
 impl<'a> Sv1DurationStage<'a> {
     pub fn prepare(tree: &'a PreparedTree) -> Result<Self> {
-        Self::prepare_conditioned(tree, None)
+        Self::prepare_conditioned(tree, None, &[])
     }
 
     pub(crate) fn prepare_conditioned(
         tree: &'a PreparedTree,
         timing: Option<&'a [f32]>,
+        overrides: &'a [PhoneSet],
     ) -> Result<Self> {
         let (configuration, children, stored) = configuration::validate(tree)?;
         let constant = timing.unwrap_or(stored);
@@ -48,11 +50,12 @@ impl<'a> Sv1DurationStage<'a> {
             children,
             configuration,
             constant,
+            phones: tree.phone_resolver(overrides)?,
         })
     }
 
     pub fn predict_explicit(&self, records: &[DurationRecord]) -> Result<Sv1DurationResult> {
-        let phones = frontend::prepare(self.tree, self.children[0], records)?;
+        let phones = frontend::prepare(self.tree, self.children[0], &self.phones, records)?;
         let scalars = if phones.is_empty() {
             Vec::new()
         } else {
@@ -72,7 +75,7 @@ impl<'a> Sv1DurationStage<'a> {
             scalars
         };
         let (durations, record_seconds) =
-            postprocess::execute(self.tree, self.children[0], records, &scalars)?;
+            postprocess::execute(self.tree, self.children[0], &self.phones, records, &scalars)?;
         let mut result = DurationResult::new(
             records,
             DurationPrediction {

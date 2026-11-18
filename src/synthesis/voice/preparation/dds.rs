@@ -2,13 +2,25 @@ use super::{PreparedVoice, Result, VoiceError};
 use crate::synthesis::stages::{
     sv1_duration::Sv1DurationStage, sv1_f0::Sv1F0Stage, sv1_timbre::Sv1TimbreNetwork,
 };
+use crate::synthesis::voice::{PhoneResolver, PhoneSet};
 
 impl PreparedVoice {
+    pub(crate) fn phones(&self) -> &[PhoneSet] {
+        self.flat
+            .as_ref()
+            .map_or(&[], |flat| flat.phones.as_slice())
+    }
+
+    pub(crate) fn duration_phones(&self) -> Result<PhoneResolver<'_>> {
+        self.model("duration")?.phone_resolver(self.phones())
+    }
+
     pub(crate) fn native_duration(&self) -> Result<Sv1DurationStage<'_>> {
         let timing = self.flat.as_ref().and_then(|flat| flat.timing.as_ref());
         Sv1DurationStage::prepare_conditioned(
             self.model("duration")?,
             timing.map(|row| row.as_slice()),
+            self.phones(),
         )
     }
 
@@ -21,6 +33,7 @@ impl PreparedVoice {
             self.model("f0")?,
             enhancement,
             pitch.map(|row| row.as_slice()),
+            self.phones(),
         )
     }
 

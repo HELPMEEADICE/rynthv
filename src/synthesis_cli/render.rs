@@ -23,12 +23,7 @@ pub fn run(
     let score: ExplicitScore =
         serde_json::from_slice(&fs::read(&args.input).map_err(|error| error.to_string())?)
             .map_err(|error| format!("Invalid explicit score: {error}"))?;
-    let phrase = score
-        .prepare(
-            voice.model("duration").map_err(|error| error.to_string())?,
-            voice.family,
-        )
-        .map_err(|error| error.to_string())?;
+    let phrase = score.prepare(voice).map_err(|error| error.to_string())?;
     let name = &inventory
         .configuration
         .as_ref()

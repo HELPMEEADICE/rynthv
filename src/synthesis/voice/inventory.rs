@@ -36,6 +36,8 @@ pub struct VoiceInventory {
     pub configuration: Option<VoiceConfiguration>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub flat: Option<super::flat::FlatManifest>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub flat_warnings: Vec<String>,
     #[serde(skip)]
     _models: Vec<LoadedModel>,
     #[serde(skip)]
@@ -240,6 +242,7 @@ impl VoiceInventory {
             files: Vec::new(),
             configuration: None,
             flat: None,
+            flat_warnings: Vec::new(),
             display_name: String::new(),
             content_hash: String::new(),
             resource_count: 0,

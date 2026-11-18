@@ -3,7 +3,7 @@ use super::{Frontend, PhoneInput, error};
 use crate::synthesis::{
     inference::Sequence,
     stages::f0::TimedPhone,
-    voice::{Result, VoiceError, resolve_explicit},
+    voice::{Result, VoiceError, resolve_with_overrides},
 };
 
 impl Frontend<'_> {
@@ -12,8 +12,19 @@ impl Frontend<'_> {
         let mut language_ids = Vec::with_capacity(phones.len());
         let mut noise_ids = Vec::with_capacity(phones.len());
         for (phone, row) in phones.iter().zip(raw.values.chunks_exact_mut(self.width)) {
-            let resolved =
-                resolve_explicit(&self.languages, self.unified, &phone.language, &phone.token)?;
+            let resolved = resolve_with_overrides(
+                &self.languages,
+                self.unified,
+                self.overrides,
+                &phone.language,
+                &phone.token,
+            )?;
+            if !self.overrides.is_empty() && resolved.used_silence_fallback {
+                return Err(VoiceError::new(format!(
+                    "Flat acoustic model has no mapping for {:?} in {}",
+                    phone.token, phone.language
+                )));
+            }
             if resolved.unified_phone_index >= self.width - 1 {
                 return Err(VoiceError::new(
                     "SV1 timbre phone exceeds its one-hot feature width",

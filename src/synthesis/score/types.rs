@@ -7,7 +7,7 @@ use crate::synthesis::{
         duration::{DurationNote, DurationRecord, ExplicitPhone},
         f0::frontend::{FrontendNote, frame_count},
     },
-    voice::{PreparedTree, Result, VoiceError, VoiceFamily},
+    voice::{PhoneResolver, PreparedVoice, Result, VoiceError, VoiceFamily},
 };
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -91,9 +91,13 @@ pub struct PreparedPhrase {
 }
 
 impl ExplicitScore {
-    pub fn prepare(
+    pub fn prepare(&self, voice: &PreparedVoice) -> Result<PreparedPhrase> {
+        self.prepare_with_phones(&voice.duration_phones()?, voice.family)
+    }
+
+    pub(super) fn prepare_with_phones(
         &self,
-        duration_tree: &PreparedTree,
+        phones: &PhoneResolver<'_>,
         family: VoiceFamily,
     ) -> Result<PreparedPhrase> {
         if !self.start_seconds.is_finite()
@@ -138,7 +142,7 @@ impl ExplicitScore {
                         "Score record {index} contains an invalid explicit phone"
                     )));
                 }
-                let resolved = duration_tree.resolve_phone(&phone.language, &phone.token)?;
+                let resolved = phones.resolve(&phone.language, &phone.token)?;
                 if resolved.used_silence_fallback
                     || (!phone.language.is_empty()
                         && !resolved.selected_phone_set.contains(&phone.language))
@@ -204,7 +208,7 @@ impl ExplicitScore {
             });
             notes.push(frontend);
         }
-        super::records::redistribute_onsets(duration_tree, &mut records, &mut notes, family)?;
+        super::records::redistribute_onsets(phones, &mut records, &mut notes, family)?;
         Ok(PreparedPhrase {
             automations: None,
             pitch_controls: None,
