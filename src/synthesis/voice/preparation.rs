@@ -15,11 +15,13 @@ pub struct PreparedVoice {
     summary: OnceLock<PreparationSummary>,
 }
 
+#[derive(Clone)]
 pub(super) struct PreparedFile {
     pub name: String,
     pub trees: Vec<PreparedModel>,
 }
 
+#[derive(Clone)]
 pub(super) struct PreparedModel {
     pub role: &'static str,
     pub tree: Arc<PreparedTree>,

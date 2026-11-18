@@ -48,13 +48,25 @@ fn run(
         return Ok(());
     };
     let start = Instant::now();
-    let inventory = if rynthv::synthesis::voice::flat::is_voice_path(&args.voice) {
-        let registry = flat::registry(
+    let registry = if rynthv::synthesis::voice::flat::is_voice_path(&args.voice) {
+        let mut registry = flat::registry(
             args.flat_directory.as_deref(),
             args.model_directory.as_deref(),
             Some(&args.voice),
         )?;
-        VoiceInventory::load_flat(&args.voice, &registry)
+        if let Some(blend) = args
+            .render
+            .as_ref()
+            .and_then(|render| render.blend.as_ref())
+        {
+            flat::include_neighbors(&mut registry, &blend.voice);
+        }
+        Some(registry)
+    } else {
+        None
+    };
+    let inventory = if let Some(registry) = &registry {
+        VoiceInventory::load_flat(&args.voice, registry)
     } else {
         VoiceInventory::load(&args.voice)
     }
@@ -131,6 +143,7 @@ fn run(
             render_args,
             &inventory,
             preparation.as_ref().expect("RenderScore prepares a voice"),
+            registry.as_ref(),
         )?)
     } else {
         None

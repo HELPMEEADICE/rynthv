@@ -11,6 +11,21 @@ pub(super) struct Features {
     pub context: Sequence,
 }
 
+pub(super) fn validate(tree: &PreparedTree, index: usize, style: usize) -> Result<&[usize]> {
+    let node = tree.node(index)?;
+    let payload = tree.payload(index)?;
+    if node.type_id != F0_FEATURES_TYPE_ID
+        || node.children.len() != 7
+        || payload.len() != 4
+        || u32::from_le_bytes(payload[..4].try_into().unwrap()) as usize != style
+    {
+        return Err(VoiceError::new(
+            "Invalid compatible F0 feature program dimensions",
+        ));
+    }
+    Ok(&node.children)
+}
+
 pub(super) fn execute(
     tree: &PreparedTree,
     index: usize,
@@ -19,20 +34,12 @@ pub(super) fn execute(
     phone_frames: &[usize],
     style: &[f32],
 ) -> Result<Features> {
-    let node = tree.node(index)?;
-    let payload = tree.payload(index)?;
-    if node.type_id != F0_FEATURES_TYPE_ID
-        || node.children.len() != 7
-        || payload.len() != 4
-        || u32::from_le_bytes(payload[..4].try_into().unwrap()) as usize != style.len()
-        || note_frames.len() != input.notes.frames
-        || phone_frames.len() != input.phone_ids.len()
-    {
+    let children = validate(tree, index, style.len())?;
+    if note_frames.len() != input.notes.frames || phone_frames.len() != input.phone_ids.len() {
         return Err(VoiceError::new(
             "Invalid compatible F0 feature program dimensions",
         ));
     }
-    let children = &node.children;
     let mut runtime = ModelRuntime::new(tree);
     let notes = runtime.execute(children[2], &input.notes, true)?;
     let phone_ids = Sequence::from_values(1, input.phone_ids.clone())?;

@@ -3,7 +3,7 @@ use rynthv::synthesis::{
     audio::save_wav,
     engine,
     score::ExplicitScore,
-    voice::{PreparedVoice, VoiceInventory, session_identity},
+    voice::{PreparedVoice, VoiceInventory, flat::FlatModelRegistry, session_identity},
 };
 use serde_json::{Value, json};
 use std::{fs, time::Instant};
@@ -12,6 +12,7 @@ pub fn run(
     args: &RenderArgs,
     inventory: &VoiceInventory,
     voice: &PreparedVoice,
+    registry: Option<&FlatModelRegistry>,
 ) -> Result<Value, String> {
     if fs::metadata(&args.input)
         .map_err(|error| error.to_string())?
@@ -23,6 +24,28 @@ pub fn run(
     let score: ExplicitScore =
         serde_json::from_slice(&fs::read(&args.input).map_err(|error| error.to_string())?)
             .map_err(|error| format!("Invalid explicit score: {error}"))?;
+    let blend = args
+        .blend
+        .as_ref()
+        .map(|blend| {
+            let registry = registry.ok_or("Flat blend registry is unavailable")?;
+            let other = VoiceInventory::load_flat(&blend.voice, registry)
+                .map_err(|error| error.to_string())?;
+            let model = other.prepare().map_err(|error| error.to_string())?;
+            let blended = voice
+                .blend_flat(&model, blend.weight)
+                .map_err(|error| error.to_string())?;
+            Ok::<_, String>((
+                blended,
+                json!({
+                    "voice": blend.voice,
+                    "weight": blend.weight,
+                    "sha256": other.content_hash,
+                }),
+            ))
+        })
+        .transpose()?;
+    let voice = blend.as_ref().map_or(voice, |(blended, _)| blended);
     let phrase = score.prepare(voice).map_err(|error| error.to_string())?;
     let name = &inventory
         .configuration
@@ -83,6 +106,7 @@ pub fn run(
         "duration_seconds": output.audio.duration_seconds(),
         "peak": peak,
         "rms": rms,
+        "flat_blend": blend.as_ref().map(|(_, report)| report),
         "render_ms": render_ms,
         "wav_write_ms": wav_write_ms,
         "stage_timings": output.timings,

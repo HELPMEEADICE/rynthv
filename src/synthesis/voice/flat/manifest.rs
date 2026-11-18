@@ -158,6 +158,11 @@ impl FlatManifest {
         self.model_ids()?;
         self.pitch_embedding()?;
         self.timing_embedding()?;
+        if self.styles.len() > 256 || self.support_languages.len() > 32 {
+            return Err(VoiceError::new(
+                "Flat voice exceeds its style or language count limit",
+            ));
+        }
         let mut names = BTreeSet::new();
         for style in &self.styles {
             if style.name.trim().is_empty()

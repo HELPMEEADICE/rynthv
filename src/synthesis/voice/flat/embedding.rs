@@ -7,9 +7,9 @@ pub(super) fn decode<const WIDTH: usize>(value: &str) -> Result<[f32; WIDTH]> {
             "Expected {WIDTH} little-endian Float32 values encoded as HEX"
         )));
     }
-    for (target, word) in output.iter_mut().zip(value.as_bytes().chunks_exact(8)) {
+    for (target, word) in output.iter_mut().zip(value.as_bytes().as_chunks::<8>().0) {
         let mut bytes = [0; 4];
-        for (byte, digits) in bytes.iter_mut().zip(word.chunks_exact(2)) {
+        for (byte, digits) in bytes.iter_mut().zip(word.as_chunks::<2>().0) {
             let hex = |digit: u8| match digit {
                 b'0'..=b'9' => Ok(digit - b'0'),
                 b'a'..=b'f' => Ok(digit - b'a' + 10),
@@ -24,4 +24,40 @@ pub(super) fn decode<const WIDTH: usize>(value: &str) -> Result<[f32; WIDTH]> {
         }
     }
     Ok(output)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::decode;
+    use crate::synthesis::voice::hex;
+
+    #[test]
+    fn synthetic_f32_hex_preserves_little_endian_bits() {
+        let expected = [1.25_f32, -3.5, -0.0, f32::MIN_POSITIVE];
+        let bytes = expected
+            .into_iter()
+            .flat_map(f32::to_le_bytes)
+            .collect::<Vec<_>>();
+        let encoded = hex(&bytes);
+        for input in [encoded.clone(), encoded.to_uppercase()] {
+            assert_eq!(
+                decode::<4>(&input).unwrap().map(f32::to_bits),
+                expected.map(f32::to_bits)
+            );
+        }
+    }
+
+    #[test]
+    fn synthetic_hex_rejects_corruption_and_nonfinite_values() {
+        for value in [
+            "",
+            "0000000000",
+            "000000gg",
+            "0000c07f",
+            "0000807f",
+            "000080ff",
+        ] {
+            assert!(decode::<1>(value).is_err(), "{value}");
+        }
+    }
 }

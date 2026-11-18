@@ -135,7 +135,8 @@ fn describe(model: &FlatModel) -> Result<VoiceFile> {
             let layout = tensor.layout();
             let stats = tensors.entry(layout.storage).or_default();
             stats.resources += 1;
-            stats.elements += layout.rows * layout.columns;
+            stats.elements += layout.elements;
+            stats.scales += layout.scales;
             stats.decoded_resources += 1;
         }
     }

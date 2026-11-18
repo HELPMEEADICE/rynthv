@@ -40,6 +40,8 @@ contexts.
 Only the matching voice and model generation are imported; raw session data and
 model-condition values are not printed in the report.
 render-score: --profile FILE (requires a build with --features synth-profile)
+              --blend-voice VOICE.sfpk --blend-weight 0..1 (Flat only,
+              both voices must use the same acoustic model)
               --duration-identity U64 (explicit research conditioning;
               otherwise uses the saved RynthV context;
               not used by original SV1 models)
@@ -78,8 +80,14 @@ pub struct RenderArgs {
     pub input: PathBuf,
     pub wav: PathBuf,
     pub duration_identity: Option<u64>,
+    pub blend: Option<BlendArgs>,
     #[cfg(feature = "synth-profile")]
     pub profile: Option<PathBuf>,
+}
+
+pub struct BlendArgs {
+    pub voice: PathBuf,
+    pub weight: f32,
 }
 
 pub struct PhoneArgs {
@@ -141,6 +149,8 @@ impl Args {
                         "--profile",
                         "--flat-dir",
                         "--model-dir",
+                        "--blend-voice",
+                        "--blend-weight",
                     ]
                     .contains(key)
                 })
@@ -205,6 +215,32 @@ impl Args {
             None
         };
         let render = if command == Command::RenderScore {
+            let blend = match (
+                values.remove("--blend-voice"),
+                values.remove("--blend-weight"),
+            ) {
+                (None, None) => None,
+                (Some(path), Some(weight)) => {
+                    let path = PathBuf::from(path);
+                    if !rynthv::synthesis::voice::flat::is_voice_path(&voice)
+                        || !rynthv::synthesis::voice::flat::is_voice_path(&path)
+                    {
+                        return Err("Flat blending requires two .sfpk voices".into());
+                    }
+                    let weight = weight
+                        .to_str()
+                        .and_then(|value| value.parse::<f32>().ok())
+                        .filter(|weight| (0.0..=1.0).contains(weight))
+                        .ok_or("--blend-weight requires a numeric value between 0 and 1")?;
+                    Some(BlendArgs {
+                        voice: path,
+                        weight,
+                    })
+                }
+                _ => {
+                    return Err("--blend-voice and --blend-weight must be provided together".into());
+                }
+            };
             let profile = values.remove("--profile").map(PathBuf::from);
             if profile.is_some() && !cfg!(feature = "synth-profile") {
                 return Err("--profile requires cargo build --release --features synth-profile --bin rynthv-synth".into());
@@ -233,6 +269,7 @@ impl Args {
                         .ok_or("render-score requires --wav FILE")?,
                 ),
                 duration_identity,
+                blend,
                 #[cfg(feature = "synth-profile")]
                 profile,
             })

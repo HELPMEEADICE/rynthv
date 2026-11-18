@@ -15,11 +15,11 @@ impl Frontend<'_> {
             let resolved = resolve_with_overrides(
                 &self.languages,
                 self.unified,
-                self.overrides,
+                self.flat.map_or(&[], |flat| flat.phones.as_slice()),
                 &phone.language,
                 &phone.token,
             )?;
-            if !self.overrides.is_empty() && resolved.used_silence_fallback {
+            if self.flat.is_some() && resolved.used_silence_fallback {
                 return Err(VoiceError::new(format!(
                     "Flat acoustic model has no mapping for {:?} in {}",
                     phone.token, phone.language

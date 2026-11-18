@@ -7,6 +7,7 @@ use crate::synthesis::{
 
 use super::FlatManifest;
 
+#[derive(Clone)]
 pub(crate) struct FlatConditioning {
     pub base: [f32; 32],
     pub styles: TimbreStyles,
@@ -16,6 +17,25 @@ pub(crate) struct FlatConditioning {
 }
 
 impl FlatConditioning {
+    pub fn blend_timbre(&self, other: &Self, weight: f32) -> Self {
+        let mut blended = self.clone();
+        let interpolate = |a: f32, b: f32| {
+            let weight = f64::from(weight);
+            (f64::from(a) * (1.0 - weight) + f64::from(b) * weight) as f32
+        };
+        for (value, &target) in blended.base.iter_mut().zip(&other.base) {
+            *value = interpolate(*value, target);
+        }
+        blended.styles.neutral = self
+            .styles
+            .neutral
+            .iter()
+            .zip(other.styles.neutral.iter())
+            .map(|(&a, &b)| interpolate(a, b))
+            .collect();
+        blended
+    }
+
     pub fn from_manifest(manifest: &FlatManifest) -> Result<(Self, Vec<String>)> {
         let mut base = None;
         let mut neutral: Arc<[f32]> = Arc::from([0.0; 32]);

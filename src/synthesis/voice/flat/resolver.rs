@@ -80,16 +80,22 @@ impl FlatModelRegistry {
         // Report all missing dependencies before reading any weight payload.
         let missing = dependencies
             .iter()
-            .filter(|dependency| dependency.sources.is_empty())
-            .map(|dependency| match &dependency.id {
-                Some(id) => format!("{}/{id}", dependency.role.directory()),
-                None => format!("{} (model ID absent)", dependency.role.directory()),
-            })
+            .filter(|dependency| dependency.is_missing())
+            .map(FlatDependency::label)
             .collect::<Vec<_>>();
         if !missing.is_empty() {
             return Err(VoiceError::new(format!(
                 "Missing Flat model dependencies: {}",
                 missing.join(", ")
+            )));
+        }
+        if let Some(assistant) = dependencies
+            .iter()
+            .find(|model| model.role == ModelRole::SingingAssistant)
+        {
+            return Err(VoiceError::new(format!(
+                "Unsupported Flat singing assistant model {}",
+                assistant.label()
             )));
         }
         let phones = super::phones::read(&mut archive, &package)?;
@@ -148,11 +154,6 @@ fn load_dependency(
     let id = dependency
         .id
         .expect("presence checked before loading models");
-    if role == ModelRole::SingingAssistant {
-        return Err(VoiceError::new(format!(
-            "Unsupported Flat singing assistant model {id:?}"
-        )));
-    }
     let load = || -> Result<_> {
         let mut first = None;
         for source in dependency.sources {
@@ -237,7 +238,7 @@ fn shared_tree(digest: [u8; 32], bytes: &[u8]) -> Result<Arc<PreparedTree>> {
     if let Some(cached) = tree.upgrade() {
         return Ok(cached);
     }
-    let prepared = Arc::new(PreparedTree::prepare_embedded(bytes)?);
+    let prepared = Arc::new(PreparedTree::prepare_flat_embedded(bytes)?);
     *tree = Arc::downgrade(&prepared);
     Ok(prepared)
 }

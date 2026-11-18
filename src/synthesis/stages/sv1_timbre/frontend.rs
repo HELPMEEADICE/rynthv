@@ -12,6 +12,7 @@ use crate::synthesis::{
     voice::{
         PhoneSet, PreparedModule, PreparedTree, Result, VoiceError,
         embedded::types::{TIMBRE_FRONTEND_TYPE_ID, TIMBRE_FRONTEND_V2_TYPE_ID},
+        flat::FlatConditioning,
     },
 };
 
@@ -19,7 +20,7 @@ pub(super) struct Frontend<'a> {
     contract: Contract,
     languages: Vec<&'a PhoneSet>,
     unified: &'a PhoneSet,
-    overrides: &'a [PhoneSet],
+    flat: Option<&'a FlatConditioning>,
     linguistic: &'a RangeNormalizer,
     pitch: &'a RangeNormalizer,
     pitch_bounds: Option<[f32; 2]>,
@@ -41,7 +42,7 @@ impl<'a> Frontend<'a> {
         tree: &'a PreparedTree,
         index: usize,
         contract: Contract,
-        overrides: &'a [PhoneSet],
+        flat: Option<&'a FlatConditioning>,
     ) -> Result<Self> {
         let node = tree.node(index)?;
         if !matches!(
@@ -127,7 +128,7 @@ impl<'a> Frontend<'a> {
             contract,
             languages,
             unified,
-            overrides,
+            flat,
             linguistic,
             pitch,
             pitch_bounds,

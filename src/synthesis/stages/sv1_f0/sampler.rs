@@ -8,7 +8,9 @@ mod inputs;
 use crate::synthesis::{
     inference::{ModelRuntime, Sequence, ops::standard_normalizer::StandardNormalizer},
     stages::f0::{frontend::FrontendNote, statistics::SamplerStatistics},
-    voice::{PreparedTree, Result, VoiceError, embedded::types::F0_SAMPLER_TYPE_ID},
+    voice::{
+        PreparedModule, PreparedTree, Result, VoiceError, embedded::types::F0_SAMPLER_TYPE_ID,
+    },
 };
 
 pub(super) struct SampleResult {
@@ -28,6 +30,19 @@ pub(super) struct Request<'a> {
     pub normalizer: &'a StandardNormalizer,
     pub transpose: f32,
     pub contract: super::Contract,
+}
+
+pub(super) fn validate(tree: &PreparedTree, index: usize) -> Result<()> {
+    Configuration::prepare(tree, index)?;
+    let node = tree.node(index)?;
+    for &child in &node.children[5..7] {
+        if !matches!(tree.node(child)?.module, PreparedModule::Conditional(_)) {
+            return Err(VoiceError::new(
+                "Flat DDS pitch sampler requires two conditional branches",
+            ));
+        }
+    }
+    Ok(())
 }
 
 pub(super) fn sample(

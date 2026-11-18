@@ -115,7 +115,14 @@ impl PreparedTree {
     }
 
     pub(crate) fn prepare_embedded(bytes: &[u8]) -> Result<Self> {
-        let records = super::embedded::parse(bytes)?;
+        Self::prepare_embedded_records(super::embedded::parse(bytes)?)
+    }
+
+    pub(super) fn prepare_flat_embedded(bytes: &[u8]) -> Result<Self> {
+        Self::prepare_embedded_records(super::embedded::parse_bounded(bytes, 65_536, 128)?)
+    }
+
+    fn prepare_embedded_records(records: Vec<super::embedded::Record>) -> Result<Self> {
         let root = records.len() - 1;
         let mut nodes = Vec::with_capacity(records.len());
         let mut resources = Vec::with_capacity(records.len());

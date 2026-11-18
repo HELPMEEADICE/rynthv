@@ -5,6 +5,29 @@ use crate::synthesis::stages::{
 use crate::synthesis::voice::{PhoneResolver, PhoneSet};
 
 impl PreparedVoice {
+    /// Interpolate Flat timbre conditions in the same validated acoustic
+    /// model. Timing, pitch, phonemes and selectable modes belong to self.
+    pub fn blend_flat(&self, other: &Self, weight: f32) -> Result<Self> {
+        if !(0.0..=1.0).contains(&weight) {
+            return Err(VoiceError::new("Flat blend weight must be between 0 and 1"));
+        }
+        let (Some(primary), Some(secondary)) = (&self.flat, &other.flat) else {
+            return Err(VoiceError::new("Flat blending requires two Flat voices"));
+        };
+        if !std::ptr::eq(self.model("timbre")?, other.model("timbre")?) {
+            return Err(VoiceError::new(
+                "Flat blending requires identical acoustic model weights",
+            ));
+        }
+        Ok(Self::new(
+            self.files.clone(),
+            self.family,
+            self.f0_enhancement,
+            self.style_names.clone(),
+            Some(primary.blend_timbre(secondary, weight)),
+        ))
+    }
+
     pub(crate) fn phones(&self) -> &[PhoneSet] {
         self.flat
             .as_ref()
@@ -28,13 +51,7 @@ impl PreparedVoice {
         let enhancement = self.f0_enhancement.ok_or_else(|| {
             VoiceError::new("SV1 voice is missing its native F0 enhancement configuration")
         })?;
-        let pitch = self.flat.as_ref().and_then(|flat| flat.pitch.as_ref());
-        Sv1F0Stage::prepare_native_conditioned(
-            self.model("f0")?,
-            enhancement,
-            pitch.map(|row| row.as_slice()),
-            self.phones(),
-        )
+        Sv1F0Stage::prepare_native_conditioned(self.model("f0")?, enhancement, self.flat.as_ref())
     }
 
     pub(crate) fn native_timbre(&self) -> Result<Sv1TimbreNetwork<'_>> {

@@ -24,7 +24,11 @@ fn file_uri(path: &Path) -> String {
     #[cfg(windows)]
     {
         let path = path.to_string_lossy().replace('\\', "/");
-        if path.starts_with("//") {
+        if let Some(unc) = path.strip_prefix("//?/UNC/") {
+            format!("file://{unc}")
+        } else if let Some(local) = path.strip_prefix("//?/") {
+            format!("file:///{local}")
+        } else if path.starts_with("//") {
             format!("file:{path}")
         } else {
             format!("file:///{path}")

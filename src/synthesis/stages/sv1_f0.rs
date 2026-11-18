@@ -11,8 +11,9 @@ use crate::synthesis::{
     inference::{ModelRuntime, Sequence},
     stages::f0::{PitchResult, TimedPhone, frontend::FrontendNote},
     voice::{
-        PhoneSet, PreparedTree, Result, VoiceError,
+        PreparedTree, Result, VoiceError,
         embedded::types::{F0_ROOT_TYPE_ID, F0_WRAPPER_TYPE_ID},
+        flat::FlatConditioning,
     },
 };
 
@@ -36,18 +37,17 @@ pub struct Sv1F0Stage<'a> {
 
 impl<'a> Sv1F0Stage<'a> {
     pub fn prepare(tree: &'a PreparedTree) -> Result<Self> {
-        Self::prepare_contract(tree, Contract::Compatible, None, &[])
+        Self::prepare_contract(tree, Contract::Compatible, None)
     }
 
     pub fn prepare_native(tree: &'a PreparedTree, enhancement: f32) -> Result<Self> {
-        Self::prepare_native_conditioned(tree, enhancement, None, &[])
+        Self::prepare_native_conditioned(tree, enhancement, None)
     }
 
     pub(crate) fn prepare_native_conditioned(
         tree: &'a PreparedTree,
         enhancement: f32,
-        pitch: Option<&[f32]>,
-        overrides: &'a [PhoneSet],
+        flat: Option<&'a FlatConditioning>,
     ) -> Result<Self> {
         if !enhancement.is_finite() {
             return Err(VoiceError::new("Native DDS F0 enhancement must be finite"));
@@ -57,16 +57,14 @@ impl<'a> Sv1F0Stage<'a> {
             Contract::Native {
                 enhancement: enhancement.clamp(0.0, 1.0),
             },
-            pitch,
-            overrides,
+            flat,
         )
     }
 
     fn prepare_contract(
         tree: &'a PreparedTree,
         contract: Contract,
-        pitch: Option<&[f32]>,
-        overrides: &'a [PhoneSet],
+        flat: Option<&'a FlatConditioning>,
     ) -> Result<Self> {
         let wrapper = tree.node(tree.root_index())?;
         let payload = tree.payload(tree.root_index())?;
@@ -95,11 +93,14 @@ impl<'a> Sv1F0Stage<'a> {
                 "Expected the five-child compatible DDS F0 model",
             ));
         }
-        let frontend = Frontend::prepare(tree, root.children[0], overrides)?;
+        let frontend = Frontend::prepare(tree, root.children[0], flat)?;
         let stored = tree
             .tensor(root.children[1])?
             .vector()
             .ok_or_else(|| VoiceError::new("Compatible F0 style is not a float vector"))?;
+        let pitch = flat
+            .and_then(|flat| flat.pitch.as_ref())
+            .map(|row| row.as_slice());
         let mut style = pitch.unwrap_or(stored).to_vec();
         if style.len() != stored.len() || style.iter().any(|value| !value.is_finite()) {
             return Err(VoiceError::new(
@@ -118,6 +119,10 @@ impl<'a> Sv1F0Stage<'a> {
         }
         for (style, &projected) in style.iter_mut().zip(&projection.values) {
             *style += projected;
+        }
+        if flat.is_some() {
+            features::validate(tree, root.children[3], style.len())?;
+            sampler::validate(tree, root.children[4])?;
         }
         Ok(Self {
             tree,

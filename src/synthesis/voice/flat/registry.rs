@@ -80,6 +80,11 @@ impl FlatModelRegistry {
     }
 
     fn scan_voices(&mut self, directory: &Path) {
+        let directory = if directory.as_os_str().is_empty() {
+            Path::new(".")
+        } else {
+            directory
+        };
         let directory = fs::canonicalize(directory).unwrap_or_else(|_| directory.to_owned());
         self.scan_package_folder(&directory, false);
         match super::library::import_directories(&directory) {

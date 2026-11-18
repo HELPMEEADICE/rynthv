@@ -48,6 +48,14 @@ pub(crate) fn root_type(bytes: &[u8]) -> Result<[u8; 16]> {
 /// Convert inline preorder records into the shared, checked postorder arena.
 /// Source tensors remain in memory and are never included in diagnostics.
 pub(crate) fn parse(bytes: &[u8]) -> Result<Vec<Record>> {
+    parse_bounded(bytes, usize::MAX, usize::MAX)
+}
+
+pub(super) fn parse_bounded(
+    bytes: &[u8],
+    max_nodes: usize,
+    max_depth: usize,
+) -> Result<Vec<Record>> {
     if u32_at(bytes, 0)? != 0x7fca00ff {
         return Err(VoiceError::new("Embedded DNNI signature is invalid"));
     }
@@ -62,6 +70,12 @@ pub(crate) fn parse(bytes: &[u8]) -> Result<Vec<Record>> {
     let mut records = Vec::new();
     while let Some(frame) = frames.last_mut() {
         if frame.remaining != 0 {
+            if frames.len() >= max_depth || records.len() + frames.len() >= max_nodes {
+                return Err(VoiceError::new(
+                    "Embedded DNNI tree exceeds supported size or depth",
+                ));
+            }
+            let frame = frames.last_mut().expect("current inline record exists");
             frame.remaining -= 1;
             frames.push(open(bytes, &mut offset, version)?);
             continue;

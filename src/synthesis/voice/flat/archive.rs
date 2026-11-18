@@ -60,6 +60,9 @@ impl<R: Read + Seek> FlatArchive<R> {
                 "Flat ZIP contains too many entries or duplicate names",
             ));
         }
+        if zip.has_overlapping_entries().map_err(zip_error)? {
+            return Err(VoiceError::new("Flat ZIP contains overlapping entries"));
+        }
         let mut files = BTreeMap::new();
         let mut total = 0u64;
         for index in 0..zip.len() {

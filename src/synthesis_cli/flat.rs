@@ -109,23 +109,28 @@ pub(super) fn registry(
     models: Option<&Path>,
     input: Option<&Path>,
 ) -> Result<FlatModelRegistry, String> {
-    let settings = SynthesisSettings::load()?;
-    let configured = settings.flat_voice_directory()?;
-    let default =
-        (settings.flat_databases.is_some() || configured.is_dir()).then_some(configured.as_path());
-    let mut registry = FlatModelRegistry::scan(
-        voices.or(default),
-        models.or(settings.flat_models.as_deref()),
-    );
-    if let Some(parent) = input.and_then(Path::parent) {
-        let parent = if parent.as_os_str().is_empty() {
-            Path::new(".")
-        } else {
-            parent
-        };
-        registry.extend(FlatModelRegistry::scan(Some(parent), None));
+    let mut registry = if let (Some(voices), Some(models)) = (voices, models) {
+        FlatModelRegistry::scan(Some(voices), Some(models))
+    } else {
+        let settings = SynthesisSettings::load()?;
+        let configured = settings.flat_voice_directory()?;
+        let default = (settings.flat_databases.is_some() || configured.is_dir())
+            .then_some(configured.as_path());
+        FlatModelRegistry::scan(
+            voices.or(default),
+            models.or(settings.flat_models.as_deref()),
+        )
+    };
+    if let Some(input) = input {
+        include_neighbors(&mut registry, input);
     }
     Ok(registry)
+}
+
+pub(super) fn include_neighbors(registry: &mut FlatModelRegistry, path: &Path) {
+    if let Some(parent) = path.parent() {
+        registry.extend(FlatModelRegistry::scan(Some(parent), None));
+    }
 }
 
 fn parse_options(

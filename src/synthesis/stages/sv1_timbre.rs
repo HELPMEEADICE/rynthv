@@ -21,7 +21,9 @@ use crate::synthesis::{
         f0::PitchResult,
         timbre::{TimbreOutput, TimbreRequest, TimbreStyles},
     },
-    voice::{PreparedTree, Result, VoiceError, embedded::types, flat::FlatConditioning},
+    voice::{
+        PreparedModule, PreparedTree, Result, VoiceError, embedded::types, flat::FlatConditioning,
+    },
 };
 use frontend::{Context, Frontend};
 use sampling::Sampler;
@@ -100,6 +102,13 @@ impl<'a> Sv1TimbreNetwork<'a> {
                     "Flat style embeddings differ from the DDS acoustic model",
                 ));
             }
+            for index in [nodes[4], nodes[6]] {
+                if !matches!(tree.node(index)?.module, PreparedModule::Conditional(_)) {
+                    return Err(VoiceError::new(
+                        "Flat DDS decoder requires two conditional branches",
+                    ));
+                }
+            }
             (flat.base.as_slice(), flat.styles.clone())
         } else {
             (stored_bank, stored_styles)
@@ -107,12 +116,7 @@ impl<'a> Sv1TimbreNetwork<'a> {
         Ok(Self {
             contract,
             tree,
-            frontend: Frontend::prepare(
-                tree,
-                nodes[0],
-                contract,
-                flat.map_or(&[], |flat| flat.phones.as_slice()),
-            )?,
+            frontend: Frontend::prepare(tree, nodes[0], contract, flat)?,
             context: Context::prepare(tree, nodes[2])?,
             sampler: Sampler::prepare(tree, nodes[3])?,
             bank,

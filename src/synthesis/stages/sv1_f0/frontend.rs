@@ -8,7 +8,10 @@ use crate::synthesis::{
         TimedPhone,
         frontend::{FrontendNote, duration_seconds},
     },
-    voice::{PhoneSet, PreparedModule, PreparedTree, Result, VoiceError, resolve_with_overrides},
+    voice::{
+        PhoneSet, PreparedModule, PreparedTree, Result, VoiceError, flat::FlatConditioning,
+        resolve_with_overrides,
+    },
 };
 
 use crate::synthesis::voice::embedded::types::F0_FRONTEND_TYPE_ID;
@@ -16,7 +19,7 @@ use crate::synthesis::voice::embedded::types::F0_FRONTEND_TYPE_ID;
 pub(super) struct Frontend<'a> {
     languages: Vec<&'a PhoneSet>,
     unified: &'a PhoneSet,
-    overrides: &'a [PhoneSet],
+    flat: Option<&'a FlatConditioning>,
     categories: bool,
     pub frame_seconds: f32,
     pub normalizer: &'a StandardNormalizer,
@@ -33,7 +36,7 @@ impl<'a> Frontend<'a> {
     pub fn prepare(
         tree: &'a PreparedTree,
         index: usize,
-        overrides: &'a [PhoneSet],
+        flat: Option<&'a FlatConditioning>,
     ) -> Result<Self> {
         let node = tree.node(index)?;
         let payload = tree.payload(index)?;
@@ -65,7 +68,7 @@ impl<'a> Frontend<'a> {
         Ok(Self {
             languages,
             unified,
-            overrides,
+            flat,
             categories: categories != 0,
             frame_seconds,
             normalizer,
@@ -158,11 +161,11 @@ impl<'a> Frontend<'a> {
             let resolved = resolve_with_overrides(
                 &self.languages,
                 self.unified,
-                self.overrides,
+                self.flat.map_or(&[], |flat| flat.phones.as_slice()),
                 &phone.language,
                 &phone.token,
             )?;
-            if !self.overrides.is_empty() && resolved.used_silence_fallback {
+            if self.flat.is_some() && resolved.used_silence_fallback {
                 return Err(VoiceError::new(format!(
                     "Flat F0 model has no mapping for {:?} in {}",
                     phone.token, phone.language
