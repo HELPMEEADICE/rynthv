@@ -34,6 +34,7 @@ rayon = "=1.12.0"
 blowfish = { version = "=0.10.0", features = ["zeroize"] }
 zeroize = { version = "=1.9.1", features = ["alloc"] }
 midly = { version = "=0.5.3", default-features = false, features = ["std", "strict"] }
+zip = { version = "=9.7.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
 [target.'cfg(windows)'.dependencies]
 wgpu = { version = "=30.0.1", default-features = false, features = ["dx12"] }
