@@ -3,9 +3,13 @@
 mod archive;
 mod embedding;
 mod manifest;
+mod registry;
+mod resolver;
 
 pub use archive::{FlatArchive, PackageKind};
 pub use manifest::{FlatManifest, FlatStyle, ModelRole, PackageConfig};
+pub use registry::{FlatModelRegistry, ModelSource};
+pub use resolver::{FlatDependency, FlatModel, ResolvedFlatModels};
 
 use std::path::Path;
 
