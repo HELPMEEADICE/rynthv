@@ -12,7 +12,7 @@
 
 ### Windows
 
-需要 MSVC、Windows SDK 和支持 DX12 的显卡。
+需要支持 DX12 的显卡。MSVC 目标使用 Windows SDK 的 `rc.exe`，GNU 目标可使用 MSYS2 工具链，其 `windres` 需在 `PATH` 中。
 
 ```powershell
 cargo run --release
