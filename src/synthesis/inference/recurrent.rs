@@ -3,7 +3,10 @@
 #[path = "recurrent/tanh.rs"]
 mod tanh;
 
-use std::{fmt, sync::Arc};
+use std::{
+    fmt,
+    sync::{Arc, OnceLock},
+};
 
 use super::{
     InferenceError,
@@ -51,6 +54,7 @@ pub struct Gru {
     // Input reset, input update, input candidate; then recurrent reset,
     // recurrent update, recurrent candidate, exactly as stored in the tree.
     layers: [Affine; 6],
+    gpu_weights: Arc<OnceLock<Arc<[f32]>>>,
 }
 
 /// A resumable frame-boundary state, including reusable execution buffers.
@@ -132,6 +136,7 @@ impl Gru {
                 Affine::new(hidden_update.matrix().clone(), None)?,
                 hidden_candidate,
             ],
+            gpu_weights: Arc::default(),
         })
     }
 
@@ -181,14 +186,54 @@ impl Gru {
         check_length("GRU sequence input", inputs, input.len())?;
         check_length("GRU sequence output", outputs, output.len())?;
         self.check_state(state)?;
-        for (input, output) in input
+        if frames != 0 && super::gpu::gru(self, input, output, state.hidden(), frames)? {
+            state.restore_hidden(&output[output.len() - self.output_channels()..])?;
+            return Ok(());
+        }
+        let cancellation = crate::synthesis::execution::current();
+        for (frame, (input, output)) in input
             .chunks_exact(self.input_channels())
             .zip(output.chunks_exact_mut(self.output_channels()))
+            .enumerate()
         {
+            if frame.is_multiple_of(32)
+                && cancellation
+                    .as_ref()
+                    .is_some_and(|token| token.is_cancelled())
+            {
+                return Err(MatrixError::Cancelled.into());
+            }
             self.step_validated(input, state)?;
             output.copy_from_slice(&state.hidden);
         }
         Ok(())
+    }
+
+    pub(super) fn gpu_weight_len(&self) -> usize {
+        self.layers
+            .iter()
+            .map(|layer| layer.matrix().values().len() + layer.output_channels())
+            .sum()
+    }
+
+    pub(super) fn gpu_weights(&self) -> &Arc<[f32]> {
+        self.gpu_weights.get_or_init(|| {
+            let mut packed = Vec::with_capacity(self.gpu_weight_len());
+            for layer in &self.layers {
+                let hidden = layer.output_channels();
+                for column in 0..layer.input_channels() {
+                    for channel in 0..hidden {
+                        packed.push(layer.matrix().row(channel)[column]);
+                    }
+                }
+                if let Some(bias) = layer.bias() {
+                    packed.extend_from_slice(bias);
+                } else {
+                    packed.resize(packed.len() + hidden, 0.0);
+                }
+            }
+            packed.into()
+        })
     }
 
     fn check_state(&self, state: &GruState) -> Result<(), MatrixError> {

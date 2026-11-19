@@ -76,6 +76,22 @@ impl BidirectionalGru {
         }
         let channels = self.input_channels();
         let split = self.forward.output_channels();
+        if frames != 0
+            && super::super::gpu::bidirectional_gru(
+                [&self.forward, &self.backward],
+                input,
+                output,
+                [&states[0], &states[1]],
+                frames,
+            )?
+        {
+            states[0].restore_hidden(
+                &output[output.len() - self.output_channels
+                    ..output.len() - self.output_channels + split],
+            )?;
+            states[1].restore_hidden(&output[split..self.output_channels])?;
+            return Ok(());
+        }
         let cancellation = crate::synthesis::execution::current();
         for frame in 0..frames {
             if frame.is_multiple_of(32)
