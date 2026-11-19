@@ -90,6 +90,7 @@ fn silence(edge: &ScoreNote, duration_seconds: f64) -> ScoreNote {
         performance: Default::default(),
         duration_seconds,
         pitch: edge.pitch,
+        pitch_offset: edge.pitch_offset,
         phones: vec![ScorePhone {
             language: edge
                 .phones

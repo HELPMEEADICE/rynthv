@@ -1,7 +1,7 @@
 //! Separate note and phone clocks for the SV1 NOFS DDS frontend.
 //!
 //! The acoustic wrapper truncates another clock, so its TimedPhone.frames
-//! must not be reused here. Note and phone boundaries also differ in precision.
+//! must not be reused here. Both DDS grids end at the same phrase frame.
 
 use crate::synthesis::{
     stages::f0::frontend::FrontendNote,
@@ -30,39 +30,47 @@ pub(super) fn duration_seconds(note: &FrontendNote) -> Result<f64> {
 }
 
 pub(super) fn note_frame_counts(notes: &[FrontendNote], step: f32) -> Result<Vec<usize>> {
-    let mut elapsed = 0.0_f32;
-    let inverse = 1.0_f32 / step;
-    let inverse_double = 1.0 / f64::from(step);
+    let mut elapsed = 0.0;
+    let mut previous = 0;
+    let inverse = f64::from(step).recip();
     notes
         .iter()
         .map(|note| {
-            // Left uses float seconds and a float reciprocal; the right endpoint
-            // adds the note's double seconds before the double round operation.
-            let left = frame(f64::from((elapsed * inverse).round()))?;
-            let end = f64::from(elapsed) + duration_seconds(note)?;
-            let right = frame((end * inverse_double).round())?;
-            elapsed = end as f32;
-            right
-                .checked_sub(left)
-                .ok_or_else(|| VoiceError::new("Native DDS note clock moved backwards"))
+            elapsed += duration_seconds(note)?;
+            let end = frame((elapsed * inverse).round())?;
+            let count = end - previous;
+            previous = end;
+            Ok(count)
         })
         .collect()
 }
 
-pub(super) fn phone_frame_counts(seconds: &[f64], step: f32) -> Result<Vec<usize>> {
+pub(super) fn phone_frame_counts(
+    seconds: &[f64],
+    step: f32,
+    phrase_frames: usize,
+) -> Result<Vec<usize>> {
     let mut elapsed = 0.0_f32;
+    let mut previous = 0;
     seconds
         .iter()
-        .map(|&duration| {
+        .enumerate()
+        .map(|(index, &duration)| {
             if !duration.is_finite() || duration < 0.0 || duration > f64::from(f32::MAX) {
                 return Err(VoiceError::new("Invalid native DDS phone duration"));
             }
-            let left = frame(f64::from((elapsed / step).round()))?;
             elapsed += duration as f32;
-            let right = frame(f64::from((elapsed / step).round()))?;
-            right
-                .checked_sub(left)
-                .ok_or_else(|| VoiceError::new("Native DDS phone clock moved backwards"))
+            let end = frame(f64::from((elapsed / step).round()))?;
+            // Rounded phone durations can drift slightly from the note clock.
+            // Anchor the phrase end at the trailing silence.
+            let end = if index + 1 == seconds.len() {
+                phrase_frames
+            } else {
+                end.min(phrase_frames)
+            };
+            let count = end - previous;
+            previous = end;
+            Ok(count)
         })
         .collect()
 }

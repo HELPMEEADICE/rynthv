@@ -76,6 +76,21 @@ impl ExplicitScore {
                 "Overlapping notes within one synthesis owner are not supported",
             ));
         }
+        let sources = sources
+            .into_iter()
+            .map(|(begin, end, note)| {
+                let offset = note
+                    .attributes
+                    .get("tNoteOffset")
+                    .and_then(serde_json::Value::as_f64)
+                    .unwrap_or(0.0);
+                Ok((
+                    seconds_at(&input.tempo, GlobalBlick(begin))? + offset,
+                    seconds_at(&input.tempo, GlobalBlick(end))?,
+                    note,
+                ))
+            })
+            .collect::<Result<Vec<_>>>()?;
         let visible_begin_seconds = seconds_at(&input.tempo, input.visible_begin)?;
         let visible_end_seconds = input
             .visible_end
@@ -83,9 +98,7 @@ impl ExplicitScore {
             .transpose()?;
         let start_seconds = sources
             .first()
-            .map(|(begin, _, _)| seconds_at(&input.tempo, GlobalBlick(*begin)))
-            .transpose()?
-            .unwrap_or(visible_begin_seconds);
+            .map_or(visible_begin_seconds, |(begin, _, _)| *begin);
         let mut score = Self {
             start_seconds,
             visible_begin_seconds,
@@ -95,9 +108,15 @@ impl ExplicitScore {
         let mut previous_time = 0.0;
         let mut previous_end_seconds = start_seconds;
         let mut previous_pitch = 60.0;
-        for (begin, end, note) in sources {
-            let begin_seconds = seconds_at(&input.tempo, GlobalBlick(begin))?;
-            let end_seconds = seconds_at(&input.tempo, GlobalBlick(end))?;
+        let mut previous_detune = 0.0;
+        for (index, &(begin_seconds, nominal_end, note)) in sources.iter().enumerate() {
+            // An early pronunciation takes time from a preceding note if it
+            // crosses that note's end. A late pronunciation leaves a gap.
+            let end_seconds = sources
+                .get(index + 1)
+                .map_or(nominal_end, |(next_begin, _, _)| {
+                    nominal_end.min(*next_begin)
+                });
             let begin_time = relative_time(begin_seconds - start_seconds, family)?;
             let end_time = relative_time(end_seconds - start_seconds, family)?;
             let (duration_seconds, gap_seconds) = if family == VoiceFamily::Sv1 {
@@ -126,6 +145,7 @@ impl ExplicitScore {
                     performance: Default::default(),
                     duration_seconds: gap_seconds,
                     pitch: previous_pitch,
+                    pitch_offset: previous_detune,
                     phones: vec![ScorePhone {
                         language: language.id().to_owned(),
                         token: "sil".to_owned(),
@@ -147,6 +167,7 @@ impl ExplicitScore {
                 .ok_or_else(|| {
                     VoiceError::new(format!("Note {} pitch is outside MIDI range", note.id))
                 })? as f32;
+            let detune = note.detune / 100.0;
             let note_language = lexicon.note_language(note, language)?;
             let previous = score
                 .notes
@@ -179,6 +200,7 @@ impl ExplicitScore {
                     .map_err(VoiceError::new)?,
                     duration_seconds,
                     pitch,
+                    pitch_offset: detune,
                     phones: tokens
                         .into_iter()
                         .map(|token| {
@@ -221,6 +243,7 @@ impl ExplicitScore {
             previous_time = end_time;
             previous_end_seconds = end_seconds;
             previous_pitch = pitch;
+            previous_detune = detune;
         }
         // ExplicitScore::prepare materializes the boundary context
         // and moves leading consonants into the preceding temporal record.

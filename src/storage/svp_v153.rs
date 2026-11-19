@@ -40,6 +40,13 @@ pub(super) fn import(project: &mut Project) -> Result<(), String> {
             synthesis::import_reference(reference);
         }
     }
+    // RynthV exports both vocal components together so the imported
+    // export configuration can be used without a separate breath stem.
+    if let Some(format) = project.render_config.get_mut("aspirationFormat")
+        && format.as_str() == Some("asFiles")
+    {
+        *format = "noAspiration".into();
+    }
     project.version = SVP_VERSION;
     Ok(())
 }

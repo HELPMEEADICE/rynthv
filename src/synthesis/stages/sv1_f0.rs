@@ -172,8 +172,7 @@ impl<'a> Sv1F0Stage<'a> {
         }
         // The SV2 adapter consumes the duration stage's corrected phone frame
         // counts directly; it does not quantize NOFS phone seconds.
-        let phone_frames: Vec<_> = phones.iter().map(|phone| phone.frames).collect();
-        self.predict(notes, phones, &phone_frames, pitch_seeds, vibrato)
+        self.predict(notes, phones, None, pitch_seeds, vibrato)
     }
 
     pub fn predict_native(
@@ -190,15 +189,14 @@ impl<'a> Sv1F0Stage<'a> {
                 "Invalid native DDS F0 phone timing request",
             ));
         }
-        let phone_frames = timing::phone_frame_counts(phone_seconds, self.frontend.frame_seconds)?;
-        self.predict(notes, phones, &phone_frames, pitch_seeds, vibrato)
+        self.predict(notes, phones, Some(phone_seconds), pitch_seeds, vibrato)
     }
 
     fn predict(
         &self,
         notes: &[FrontendNote],
         phones: &[TimedPhone],
-        phone_frames: &[usize],
+        phone_seconds: Option<&[f64]>,
         pitch_seeds: &[u32],
         vibrato: Option<&[f32]>,
     ) -> Result<PitchResult> {
@@ -208,23 +206,31 @@ impl<'a> Sv1F0Stage<'a> {
             ));
         }
         let note_frames = self.note_frames(notes)?;
+        let phone_frames: Vec<_> = match phone_seconds {
+            Some(seconds) => timing::phone_frame_counts(
+                seconds,
+                self.frontend.frame_seconds,
+                note_frames.iter().sum(),
+            )?,
+            None => phones.iter().map(|phone| phone.frames).collect(),
+        };
         let transpose = transposition(notes)?;
         let encoded =
             self.frontend
-                .encode(notes, phones, phone_frames, transpose, self.contract)?;
+                .encode(notes, phones, &phone_frames, transpose, self.contract)?;
         let features = features::execute(
             self.tree,
             self.features,
             &encoded,
             &note_frames,
-            phone_frames,
+            &phone_frames,
             &self.style,
         )?;
         let controls = controls::prepare(
             notes,
             &note_frames,
             phones,
-            phone_frames,
+            &phone_frames,
             self.defaults,
             self.contract,
             pitch_seeds,

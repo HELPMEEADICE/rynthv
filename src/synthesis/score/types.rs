@@ -37,6 +37,8 @@ pub struct ScoreNote {
     pub performance: NotePerformance,
     pub duration_seconds: f64,
     pub pitch: f32,
+    #[serde(default)]
+    pub pitch_offset: f32,
     pub phones: Vec<ScorePhone>,
     #[serde(default)]
     pub kind: u32,
@@ -122,6 +124,7 @@ impl ExplicitScore {
                 || note.duration_seconds <= 0.0
                 || !note.pitch.is_finite()
                 || !(0.0..=127.0).contains(&note.pitch)
+                || !note.pitch_offset.is_finite()
                 || note.phones.is_empty()
                 || note.parts == 0
                 || note.part_index >= note.parts
@@ -160,7 +163,7 @@ impl ExplicitScore {
                     .map(|phone| phone.token.clone())
                     .collect(),
                 pitch: note.pitch,
-                pitch_offset: 0.0,
+                pitch_offset: note.pitch_offset,
                 duration_seconds: note.duration_seconds,
                 frame_seconds: FRAME_SECONDS,
                 kind: note.kind,
@@ -204,7 +207,7 @@ impl ExplicitScore {
                 linked_durations_seconds: Vec::new(),
                 parts: note.parts,
                 part_index: note.part_index,
-                pitch_offset: 0.0,
+                pitch_offset: note.pitch_offset,
             });
             notes.push(frontend);
         }

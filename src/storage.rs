@@ -157,6 +157,7 @@ fn validate_content(p: &Project) -> Result<(), String> {
             n.duration <= 0
                 || n.onset.checked_add(n.duration).is_none()
                 || !(0..=127).contains(&n.pitch)
+                || !n.detune.is_finite()
         }) {
             return bad("音符时间或 MIDI 音高无效");
         }

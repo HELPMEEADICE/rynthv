@@ -2,6 +2,7 @@
 
 use super::{Contract, timing};
 
+use crate::model::NoteMode;
 use crate::synthesis::{
     inference::{Sequence, ops::standard_normalizer::StandardNormalizer},
     stages::f0::{
@@ -100,13 +101,6 @@ impl<'a> Frontend<'a> {
                     "Compatible F0 currently accepts ordinary singing and rest records",
                 ));
             }
-            if matches!(contract, Contract::Native { .. })
-                && note.tag.as_ref().is_some_and(|tag| !tag.is_empty())
-            {
-                return Err(VoiceError::new(
-                    "Native DDS F0 special-mode note tags are not supported",
-                ));
-            }
             let row = &mut rows.values[index * 10..(index + 1) * 10];
             let breath = note.phones.first().is_some_and(|phone| phone == "br")
                 && match contract {
@@ -127,10 +121,10 @@ impl<'a> Frontend<'a> {
                     true
                 }
                 Contract::Native { .. } => {
-                    // NOFS has a special-mode flag separate from FrontendNote.flag.
-                    // It is false for supported ordinary/rest notes; only special
-                    // mode supplies tone tags, so these inputs have no tone slots.
-                    false
+                    // The DDS rap flag is independent of the SV1 syllable-split flag.
+                    let rap = note.performance.mode == NoteMode::Rap;
+                    row[4] = f32::from(rap);
+                    rap
                 }
             };
             if tones_enabled

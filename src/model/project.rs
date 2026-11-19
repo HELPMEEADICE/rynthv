@@ -13,6 +13,8 @@ pub struct Note {
     pub onset: i64,
     pub duration: i64,
     pub pitch: i32,
+    #[serde(default)]
+    pub detune: f32,
     pub lyrics: String,
     pub phonemes: String,
     pub musical_type: String,
@@ -28,6 +30,7 @@ impl Note {
             onset,
             duration,
             pitch,
+            detune: 0.0,
             lyrics: "la".into(),
             phonemes: String::new(),
             musical_type: "singing".into(),
@@ -37,7 +40,6 @@ impl Note {
             ]),
             extra: BTreeMap::from([
                 ("accent".into(), json!("")),
-                ("detune".into(), json!(0)),
                 ("takes".into(), TakeSet::default().to_value()),
             ]),
         }

@@ -2,6 +2,7 @@
 
 use super::Contract;
 
+use crate::model::NoteMode;
 use crate::synthesis::{
     inference::noise::seeds::SeedSource,
     stages::{
@@ -75,14 +76,12 @@ pub(super) fn prepare(
                 )
             }
             Contract::Native { enhancement } => {
-                // The NOFS special-mode flag is separate from the connection
-                // flag in FrontendNote.flag. Ordinary notes have expression .5,
-                // so its multiplier is one; synthetic rests have no expression
-                // and keep position zero.
-                (
-                    defaults.temperature,
-                    if note.kind == 0 { enhancement } else { 0.0 },
-                )
+                let temperature = if note.performance.mode == NoteMode::Rap {
+                    defaults.temperature * defaults.flagged_temperature_scale
+                } else {
+                    defaults.temperature
+                };
+                (temperature, if note.kind == 0 { enhancement } else { 0.0 })
             }
         };
         temperature.extend(std::iter::repeat_n(note_temperature, count));
