@@ -3046,6 +3046,7 @@ dependencies = [
  "image",
  "midly",
  "num-bigint",
+ "pollster 0.4.0",
  "rayon",
  "rfd",
  "serde",

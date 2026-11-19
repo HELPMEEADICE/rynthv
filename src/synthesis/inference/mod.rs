@@ -2,8 +2,10 @@
 
 pub mod activation;
 pub mod affine;
+pub mod compute;
 pub mod convolution;
 pub mod extent;
+mod gpu;
 pub mod matrix;
 pub mod noise;
 pub mod ops;
