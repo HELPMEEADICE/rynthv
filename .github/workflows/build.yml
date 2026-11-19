@@ -1,4 +1,5 @@
 name: Build
+run-name: Build packages for ${{ github.ref_name }}
 
 on:
   workflow_dispatch:
