@@ -99,7 +99,15 @@ impl Session {
     }
 
     pub fn diagnostics(&self) -> Diagnostics {
-        let activity = self.0.activity.lock().unwrap().clone();
+        self.describe(self.0.activity.lock().unwrap().clone())
+    }
+
+    /// Capture one measurement while retaining device resources for the next render.
+    pub fn take_diagnostics(&self) -> Diagnostics {
+        self.describe(std::mem::take(&mut *self.0.activity.lock().unwrap()))
+    }
+
+    fn describe(&self, activity: Activity) -> Diagnostics {
         let actual = match (activity.gpu_submissions, activity.cpu_operators.is_empty()) {
             (0, true) => "idle",
             (0, false) => "cpu",

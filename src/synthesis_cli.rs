@@ -11,7 +11,7 @@ mod render;
 use args::{Args, Command};
 use rynthv::{
     storage,
-    synthesis::{plan::Planner, voice::VoiceInventory},
+    synthesis::{inference::compute, plan::Planner, voice::VoiceInventory},
 };
 use serde_json::json;
 use std::{
@@ -43,6 +43,27 @@ fn run(
     command: std::ffi::OsString,
     arguments: impl Iterator<Item = std::ffi::OsString>,
 ) -> Result<(), String> {
+    if command == "list-compute-devices" {
+        let mut arguments = arguments;
+        let output = match arguments.next() {
+            None => None,
+            Some(value) if value == "--output" => Some(
+                arguments
+                    .next()
+                    .filter(|path| !path.to_string_lossy().starts_with("--"))
+                    .ok_or("Missing path for --output")?
+                    .into(),
+            ),
+            _ => return Err("Usage: list-compute-devices [--output REPORT.json]".into()),
+        };
+        if arguments.next().is_some() {
+            return Err("Usage: list-compute-devices [--output REPORT.json]".into());
+        }
+        return write_report(
+            output,
+            &json!({ "cpu": true, "adapters": compute::list_devices() }),
+        );
+    }
     let Some(args) = Args::parse(command, arguments)? else {
         print!("{}", args::HELP);
         return Ok(());
@@ -107,11 +128,16 @@ fn run(
         if input.is_empty() || input.iter().any(|value| !value.is_finite()) {
             return Err("Module input must be nonempty and finite".into());
         }
+        let compute = compute::Session::new(module.backend);
+        compute.check()?;
         let start = Instant::now();
-        let output = preparation
-            .as_ref()
-            .expect("RunModule prepares a voice")
-            .execute_module(module.file, module.tree, module.node, &input)
+        let output = compute
+            .scope(|| {
+                preparation
+                    .as_ref()
+                    .expect("RunModule prepares a voice")
+                    .execute_module(module.file, module.tree, module.node, &input)
+            })
             .map_err(|e| e.to_string())?;
         if output.iter().any(|value| !value.is_finite()) {
             return Err(
@@ -123,7 +149,8 @@ fn run(
             "input_elements": input.len(), "output_elements": output.len(),
             "execution_ms": start.elapsed().as_secs_f64() * 1000.0,
             "values": output,
-            "scope": "individual recovered CPU module; intermediate features, not audio",
+            "compute": compute.diagnostics(),
+            "scope": "individual model module; intermediate features",
             "original_engine_bit_exact_verified": false,
         }))
     } else {

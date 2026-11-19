@@ -1,11 +1,12 @@
-use rynthv::synthesis::settings::SynthesisSettings;
-use std::{ffi::OsString, path::PathBuf};
+use rynthv::synthesis::{inference::compute::Backend, settings::SynthesisSettings};
+use std::{ffi::OsString, num::NonZeroUsize, path::PathBuf};
 
 use super::context::ContextImport;
 
 pub const HELP: &str = r#"RynthV synthesis tools
 
   rynthv-synth render-score --input SCORE.json --wav OUTPUT.wav [OPTIONS]
+  rynthv-synth list-compute-devices [--output REPORT.json]
   rynthv-synth inspect-voice [OPTIONS]
   rynthv-synth prepare-voice [OPTIONS]
   rynthv-synth import-context --context-file CONTEXT.json [OPTIONS]
@@ -39,7 +40,9 @@ a voice reads only the saved RynthV context. Native SV1 voices do not need model
 contexts.
 Only the matching voice and model generation are imported; raw session data and
 model-condition values are not printed in the report.
-render-score: --profile FILE (requires a build with --features synth-profile)
+render-score and run-module: --compute-backend auto|cpu|webgpu (default auto)
+render-score: --repeat N (measure warm renders with the same prepared voice)
+              --profile FILE (requires a build with --features synth-profile)
               --blend-voice VOICE.sfpk --blend-weight 0..1 (Flat only,
               both voices must use the same acoustic model)
               --duration-identity U64 (explicit research conditioning;
@@ -81,6 +84,8 @@ pub struct RenderArgs {
     pub wav: PathBuf,
     pub duration_identity: Option<u64>,
     pub blend: Option<BlendArgs>,
+    pub backend: Backend,
+    pub repeat: NonZeroUsize,
     #[cfg(feature = "synth-profile")]
     pub profile: Option<PathBuf>,
 }
@@ -102,6 +107,7 @@ pub struct ModuleArgs {
     pub tree: usize,
     pub node: usize,
     pub input: PathBuf,
+    pub backend: Backend,
 }
 
 impl Args {
@@ -151,6 +157,8 @@ impl Args {
                         "--model-dir",
                         "--blend-voice",
                         "--blend-weight",
+                        "--compute-backend",
+                        "--repeat",
                     ]
                     .contains(key)
                 })
@@ -200,6 +208,7 @@ impl Args {
                         .remove("--input")
                         .ok_or("run-module requires --input JSON")?,
                 ),
+                backend: backend(values.remove("--compute-backend"))?,
             })
         } else {
             None
@@ -270,6 +279,14 @@ impl Args {
                 ),
                 duration_identity,
                 blend,
+                backend: backend(values.remove("--compute-backend"))?,
+                repeat: match values.remove("--repeat") {
+                    Some(value) => value
+                        .to_str()
+                        .and_then(|text| text.parse().ok())
+                        .ok_or("--repeat requires a positive integer")?,
+                    None => NonZeroUsize::MIN,
+                },
                 #[cfg(feature = "synth-profile")]
                 profile,
             })
@@ -294,6 +311,15 @@ impl Args {
             flat_directory,
             model_directory,
         }))
+    }
+}
+
+fn backend(value: Option<OsString>) -> Result<Backend, String> {
+    match value.as_ref().map(|value| value.to_str()) {
+        None | Some(Some("auto")) => Ok(Backend::Auto),
+        Some(Some("cpu")) => Ok(Backend::Cpu),
+        Some(Some("webgpu")) => Ok(Backend::WebGpu),
+        _ => Err("--compute-backend requires auto, cpu or webgpu".into()),
     }
 }
 

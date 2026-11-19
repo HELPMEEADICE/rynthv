@@ -2,6 +2,7 @@ use super::args::RenderArgs;
 use rynthv::synthesis::{
     audio::save_wav,
     engine,
+    inference::compute,
     score::ExplicitScore,
     voice::{PreparedVoice, VoiceInventory, flat::FlatModelRegistry, session_identity},
 };
@@ -63,24 +64,44 @@ pub fn run(
     } else {
         None
     };
+    let compute = compute::Session::new(args.backend);
+    compute.check()?;
     #[cfg(feature = "synth-profile")]
     if args.profile.is_some() {
         rynthv::synthesis::profiling::start();
     }
-    let started = Instant::now();
-    let output = engine::synthesize(voice, identity, &phrase, |stage| {
-        eprintln!("合成：{}", stage.label());
-        Ok(())
-    })
-    .map_err(|error| error.to_string());
-    let render_ms = started.elapsed().as_secs_f64() * 1000.0;
+    let mut output = None;
+    let mut measurements = Vec::new();
+    for iteration in 0..args.repeat.get() {
+        let started = Instant::now();
+        let render = compute
+            .scope(|| {
+                engine::synthesize(voice, identity, &phrase, |stage| {
+                    if iteration == 0 {
+                        eprintln!("合成：{}", stage.label());
+                    }
+                    Ok(())
+                })
+            })
+            .map_err(|error| error.to_string())?;
+        let diagnostics = compute.take_diagnostics();
+        measurements.push(json!({
+            "render_ms": started.elapsed().as_secs_f64() * 1000.0,
+            "stage_timings": render.timings,
+            "compute": diagnostics,
+        }));
+        output = Some(render);
+    }
     #[cfg(feature = "synth-profile")]
     if let Some(path) = &args.profile {
-        let profile = rynthv::synthesis::profiling::finish();
+        let mut profile = serde_json::to_value(rynthv::synthesis::profiling::finish())
+            .map_err(|error| error.to_string())?;
+        profile["renders"] = json!(measurements);
         let bytes = serde_json::to_vec_pretty(&profile).map_err(|error| error.to_string())?;
         rynthv::storage::atomic_write(path, &bytes)?;
     }
-    let output = output?;
+    let output = output.expect("repeat is nonzero");
+    let last = measurements.last().expect("repeat is nonzero");
     let started = Instant::now();
     save_wav(&args.wav, &output.audio).map_err(|error| error.to_string())?;
     let wav_write_ms = started.elapsed().as_secs_f64() * 1000.0;
@@ -107,7 +128,9 @@ pub fn run(
         "peak": peak,
         "rms": rms,
         "flat_blend": blend.as_ref().map(|(_, report)| report),
-        "render_ms": render_ms,
+        "render_ms": last["render_ms"],
+        "compute": last["compute"],
+        "renders": measurements,
         "wav_write_ms": wav_write_ms,
         "stage_timings": output.timings,
         "identity_source": if args.duration_identity.is_some() { "explicit model conditioning" } else if voice.family.requires_identity() { "saved RynthV context" } else { "not required" },
