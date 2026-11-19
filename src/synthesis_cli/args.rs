@@ -6,7 +6,7 @@ use super::context::ContextImport;
 pub const HELP: &str = r#"RynthV synthesis tools
 
   rynthv-synth render-score --input SCORE.json --wav OUTPUT.wav [OPTIONS]
-  rynthv-synth list-compute-devices [--output REPORT.json]
+  rynthv-synth list-compute-devices [--validate] [--output REPORT.json]
   rynthv-synth inspect-voice [OPTIONS]
   rynthv-synth prepare-voice [OPTIONS]
   rynthv-synth import-context --context-file CONTEXT.json [OPTIONS]
@@ -42,6 +42,7 @@ Only the matching voice and model generation are imported; raw session data and
 model-condition values are not printed in the report.
 render-score and run-module: --compute-backend auto|cpu|webgpu (default auto)
 render-score: --repeat N (measure warm renders with the same prepared voice)
+              --stream-frames N (use the editor's bounded PCM producer)
               --profile FILE (requires a build with --features synth-profile)
               --blend-voice VOICE.sfpk --blend-weight 0..1 (Flat only,
               both voices must use the same acoustic model)
@@ -86,6 +87,7 @@ pub struct RenderArgs {
     pub blend: Option<BlendArgs>,
     pub backend: Backend,
     pub repeat: NonZeroUsize,
+    pub stream_frames: Option<NonZeroUsize>,
     #[cfg(feature = "synth-profile")]
     pub profile: Option<PathBuf>,
 }
@@ -159,6 +161,7 @@ impl Args {
                         "--blend-weight",
                         "--compute-backend",
                         "--repeat",
+                        "--stream-frames",
                     ]
                     .contains(key)
                 })
@@ -280,13 +283,9 @@ impl Args {
                 duration_identity,
                 blend,
                 backend: backend(values.remove("--compute-backend"))?,
-                repeat: match values.remove("--repeat") {
-                    Some(value) => value
-                        .to_str()
-                        .and_then(|text| text.parse().ok())
-                        .ok_or("--repeat requires a positive integer")?,
-                    None => NonZeroUsize::MIN,
-                },
+                repeat: positive(values.remove("--repeat"), "--repeat")?
+                    .unwrap_or(NonZeroUsize::MIN),
+                stream_frames: positive(values.remove("--stream-frames"), "--stream-frames")?,
                 #[cfg(feature = "synth-profile")]
                 profile,
             })
@@ -321,6 +320,17 @@ fn backend(value: Option<OsString>) -> Result<Backend, String> {
         Some(Some("webgpu")) => Ok(Backend::WebGpu),
         _ => Err("--compute-backend requires auto, cpu or webgpu".into()),
     }
+}
+
+fn positive(value: Option<OsString>, option: &str) -> Result<Option<NonZeroUsize>, String> {
+    value
+        .map(|value| {
+            value
+                .to_str()
+                .and_then(|text| text.parse().ok())
+                .ok_or_else(|| format!("{option} requires a positive integer"))
+        })
+        .transpose()
 }
 
 fn index(value: Option<OsString>, name: &str) -> Result<usize, String> {

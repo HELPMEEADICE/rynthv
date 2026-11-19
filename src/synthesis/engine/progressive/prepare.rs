@@ -8,7 +8,7 @@ use crate::synthesis::{
     plan::OwnerInput,
     render_cache::CompletedOwner,
     rendered::RenderedPhonemeTrack,
-    score::{self, HOP_SAMPLES, LyricFrontend, SAMPLE_RATE},
+    score::{self, HOP_SAMPLES, LyricFrontend, PreparedPhrase, SAMPLE_RATE},
     voice::{PreparedVoice, Result, VoiceError, VoiceFamily},
 };
 
@@ -51,7 +51,7 @@ pub fn prepare(
                 && ((pcm.start_seconds - phrase.start_seconds) * f64::from(SAMPLE_RATE)).abs()
                     < 0.0001
         });
-    let (acoustic, pcm) = if let Some((base, edit)) = base.zip(edit) {
+    if let Some((base, edit)) = base.zip(edit) {
         let updated = acoustics::recompute(
             voice,
             models::required_identity(identity)?,
@@ -64,7 +64,8 @@ pub fn prepare(
             &base.clip.state.components,
             edit.first_block..edit.stop_block,
         )?;
-        (
+        prepared(
+            voice,
             PreparedRenderAcoustics {
                 prepared: updated.state.prepared,
                 duration: updated.state.duration,
@@ -74,22 +75,38 @@ pub fn prepare(
             pcm,
         )
     } else {
-        let acoustic = prepare_acoustics(voice, identity, &phrase, checkpoint)?;
-        let frames = match acoustic.prepared.features {
-            PreparedModelFeatures::Sv1Local => acoustic
-                .prepared
-                .phones
-                .iter()
-                .try_fold(0_usize, |total, phone| total.checked_add(phone.frames)),
-            PreparedModelFeatures::Sv2 { .. } => Some(acoustic.pitch.pitch.len()),
-        }
-        .ok_or_else(|| VoiceError::new("Progressive acoustic frame count overflow"))?;
-        let samples = frames
-            .checked_mul(HOP_SAMPLES)
-            .ok_or_else(|| VoiceError::new("Progressive PCM size overflow"))?;
-        let pcm = PcmStore::new(phrase.start_seconds, samples)?;
-        (acoustic, pcm)
-    };
+        prepare_phrase(voice, identity, &phrase, checkpoint)
+    }
+}
+
+pub(super) fn prepare_phrase(
+    voice: &PreparedVoice,
+    identity: Option<u64>,
+    phrase: &PreparedPhrase,
+    checkpoint: impl FnMut(RenderStage) -> Result<()>,
+) -> Result<PreparedRender> {
+    let acoustic = prepare_acoustics(voice, identity, phrase, checkpoint)?;
+    let frames = match acoustic.prepared.features {
+        PreparedModelFeatures::Sv1Local => acoustic
+            .prepared
+            .phones
+            .iter()
+            .try_fold(0_usize, |total, phone| total.checked_add(phone.frames)),
+        PreparedModelFeatures::Sv2 { .. } => Some(acoustic.pitch.pitch.len()),
+    }
+    .ok_or_else(|| VoiceError::new("Progressive acoustic frame count overflow"))?;
+    let samples = frames
+        .checked_mul(HOP_SAMPLES)
+        .ok_or_else(|| VoiceError::new("Progressive PCM size overflow"))?;
+    let pcm = PcmStore::new(phrase.start_seconds, samples)?;
+    prepared(voice, acoustic, pcm)
+}
+
+fn prepared(
+    voice: &PreparedVoice,
+    acoustic: PreparedRenderAcoustics,
+    pcm: PcmStore,
+) -> Result<PreparedRender> {
     let pitch = models::pitch_track(voice, &acoustic.prepared.phrase, acoustic.pitch.clone())?;
     let phonemes =
         RenderedPhonemeTrack::from_phrase(&acoustic.prepared.phrase, &acoustic.duration)?;

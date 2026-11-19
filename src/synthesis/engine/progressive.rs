@@ -7,10 +7,12 @@ mod network;
 mod pcm;
 mod pipeline;
 mod prepare;
+mod render;
 
 pub use cursor::Cursor;
 pub use network::Network;
 pub use prepare::prepare;
+pub use render::synthesize;
 
 use super::{OwnerSynthesis, PreparedRenderAcoustics, RenderResult};
 use crate::synthesis::{

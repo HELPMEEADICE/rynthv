@@ -68,20 +68,41 @@ pub fn run(
     compute.check()?;
     #[cfg(feature = "synth-profile")]
     if args.profile.is_some() {
+        compute.enable_timestamps();
         rynthv::synthesis::profiling::start();
     }
     let mut output = None;
     let mut measurements = Vec::new();
     for iteration in 0..args.repeat.get() {
         let started = Instant::now();
+        let mut first_pcm_ms = None;
+        let mut chunks = 0;
+        let mut last_stage = None;
         let render = compute
             .scope(|| {
-                engine::synthesize(voice, identity, &phrase, |stage| {
-                    if iteration == 0 {
+                let checkpoint = |stage: engine::RenderStage| {
+                    if iteration == 0 && last_stage != Some(stage.label()) {
                         eprintln!("合成：{}", stage.label());
+                        last_stage = Some(stage.label());
                     }
                     Ok(())
-                })
+                };
+                if let Some(frames) = args.stream_frames {
+                    engine::progressive::synthesize(
+                        voice,
+                        identity,
+                        &phrase,
+                        frames,
+                        checkpoint,
+                        |_| {
+                            chunks += 1;
+                            first_pcm_ms
+                                .get_or_insert_with(|| started.elapsed().as_secs_f64() * 1000.0);
+                        },
+                    )
+                } else {
+                    engine::synthesize(voice, identity, &phrase, checkpoint)
+                }
             })
             .map_err(|error| error.to_string())?;
         let diagnostics = compute.take_diagnostics();
@@ -89,6 +110,8 @@ pub fn run(
             "render_ms": started.elapsed().as_secs_f64() * 1000.0,
             "stage_timings": render.timings,
             "compute": diagnostics,
+            "first_pcm_ms": first_pcm_ms,
+            "pcm_chunks": chunks,
         }));
         output = Some(render);
     }

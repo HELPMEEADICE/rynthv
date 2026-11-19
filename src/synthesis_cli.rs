@@ -44,25 +44,7 @@ fn run(
     arguments: impl Iterator<Item = std::ffi::OsString>,
 ) -> Result<(), String> {
     if command == "list-compute-devices" {
-        let mut arguments = arguments;
-        let output = match arguments.next() {
-            None => None,
-            Some(value) if value == "--output" => Some(
-                arguments
-                    .next()
-                    .filter(|path| !path.to_string_lossy().starts_with("--"))
-                    .ok_or("Missing path for --output")?
-                    .into(),
-            ),
-            _ => return Err("Usage: list-compute-devices [--output REPORT.json]".into()),
-        };
-        if arguments.next().is_some() {
-            return Err("Usage: list-compute-devices [--output REPORT.json]".into());
-        }
-        return write_report(
-            output,
-            &json!({ "cpu": true, "adapters": compute::list_devices() }),
-        );
+        return list_compute_devices(arguments);
     }
     let Some(args) = Args::parse(command, arguments)? else {
         print!("{}", args::HELP);
@@ -188,6 +170,39 @@ fn run(
         "audio": audio,
     });
     write_report(args.output, &report)
+}
+
+fn list_compute_devices(
+    mut arguments: impl Iterator<Item = std::ffi::OsString>,
+) -> Result<(), String> {
+    let mut output = None;
+    let mut validate = false;
+    while let Some(option) = arguments.next() {
+        match option.to_str() {
+            Some("--validate") if !validate => validate = true,
+            Some("--output") if output.is_none() => {
+                output = Some(
+                    arguments
+                        .next()
+                        .filter(|path| !path.to_string_lossy().starts_with("--"))
+                        .ok_or("Missing path for --output")?
+                        .into(),
+                );
+            }
+            _ => {
+                return Err(
+                    "Usage: list-compute-devices [--validate] [--output REPORT.json]".into(),
+                );
+            }
+        }
+    }
+    let mut report = json!({ "cpu": true, "adapters": compute::list_devices() });
+    if validate {
+        let session = compute::Session::new(compute::Backend::WebGpu);
+        report["shader_validation"] =
+            json!({ "compiled": session.validate_shaders()?, "device": session.status().device });
+    }
+    write_report(output, &report)
 }
 
 fn write_report(
