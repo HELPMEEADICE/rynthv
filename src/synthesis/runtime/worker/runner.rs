@@ -5,6 +5,7 @@ use super::{
 use crate::synthesis::{
     engine::{self, RenderStage, progressive},
     execution,
+    inference::compute,
     plan::OwnerId,
     render_cache::{Completion, RenderJob},
     rendered::RenderedClip,
@@ -141,6 +142,9 @@ pub(super) fn run(
                 let _active = control.register(&job, state.reset_generation);
                 let result = execution::scope(job.cancellation(), || {
                     execution::checkpoint()?;
+                    if let Some(compute) = compute::current() {
+                        compute.check().map_err(VoiceError::new)?;
+                    }
                     score::validate_voice(&job.request.input, &name, &version, &database_id)?;
                     progressive::prepare(
                         &voice,

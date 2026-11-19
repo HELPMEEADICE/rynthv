@@ -1,6 +1,9 @@
 //! Portable resource locations and the selected voice relative to its library.
 
-use super::voice::{VoiceCatalog, flat::FlatModelRegistry};
+use super::{
+    inference::compute::Backend,
+    voice::{VoiceCatalog, flat::FlatModelRegistry},
+};
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
@@ -24,6 +27,8 @@ pub struct SynthesisSettings {
     pub flat_models: Option<PathBuf>,
     pub dictionaries: Option<PathBuf>,
     pub selected_voice: Option<VoiceSelection>,
+    #[serde(default)]
+    pub compute_backend: Backend,
 }
 
 impl SynthesisSettings {

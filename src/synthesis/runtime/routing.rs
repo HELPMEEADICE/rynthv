@@ -79,6 +79,10 @@ impl Runtime {
         }
         // Models are shared across tracks, but only while referenced by this project.
         self.voices.retain(|key, _| required.contains(key));
+        let Some(compute) = self.compute.session() else {
+            self.pending_voices.extend(self.routes.keys().copied());
+            return;
+        };
         for key in required {
             if self.voices.contains_key(&key) {
                 continue;
@@ -94,6 +98,7 @@ impl Runtime {
                     dictionaries.to_owned(),
                     std::sync::Arc::clone(&self.library.flat_registry),
                     self.repaint.clone(),
+                    compute.clone(),
                 )
             })();
             let slot = VoiceSlot::new(worker);

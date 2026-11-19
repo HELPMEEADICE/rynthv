@@ -1,3 +1,4 @@
+mod compute;
 mod pages;
 mod preferences;
 mod shortcuts;

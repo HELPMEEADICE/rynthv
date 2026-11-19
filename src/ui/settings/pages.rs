@@ -26,12 +26,7 @@ pub(super) fn general(app: &mut App, ui: &mut Ui) {
             ui.ctx().data_mut(|data| data.remove::<f32>(id));
         }
     });
-    fixed(
-        ui,
-        "图形渲染",
-        "Direct3D 12",
-        "当前使用 GPU 渲染，暂不支持切换渲染后端",
-    );
+    fixed(ui, "图形渲染", &app.graphics_api, "编辑器图形渲染后端");
     section(ui, "帮助和指导");
     toggle(ui, "显示状态栏", &mut app.preferences.show_status_bar);
     toggle(ui, "显示控件操作提示", &mut app.preferences.control_hints);
@@ -103,6 +98,7 @@ pub(super) fn recording(ui: &mut Ui) {
 }
 
 pub(super) fn rendering(app: &mut App, ui: &mut Ui) {
+    super::compute::settings(app, ui);
     crate::ui::voice_library::settings(app, ui);
     row(ui, "歌声数据库", |ui| {
         if ui.button("管理歌声…").clicked() {

@@ -1,3 +1,4 @@
+mod compute;
 mod context;
 mod control;
 mod events;
@@ -49,6 +50,7 @@ pub struct Runtime {
     pub export_result: Option<Result<Vec<PathBuf>, String>>,
     pub instrumentals: super::instrumental::AudioLibrary,
     pub recording_error: Option<String>,
+    compute: compute::State,
     voices: BTreeMap<VoiceSelection, voices::VoiceSlot>,
     routes: BTreeMap<OwnerId, VoiceSelection>,
     binding_errors: BTreeMap<OwnerId, String>,
@@ -74,8 +76,11 @@ pub struct Runtime {
 
 impl Runtime {
     pub fn new(repaint: eframe::egui::Context) -> Self {
+        let library = VoiceLibrary::new(repaint.clone());
+        let compute = compute::State::new(library.settings.compute_backend, repaint.clone());
         Self {
-            library: VoiceLibrary::new(repaint.clone()),
+            library,
+            compute,
             context_import: ContextImport::default(),
             planner: Planner::default(),
             stats: CacheStats::default(),
@@ -110,6 +115,9 @@ impl Runtime {
     }
 
     pub fn poll(&mut self) {
+        if self.compute.poll() {
+            self.last_revision = None;
+        }
         self.instrumentals.poll();
         self.poll_library();
         self.poll_context_import();

@@ -131,7 +131,7 @@ impl VoiceLibrary {
         self.settings_error.as_deref()
     }
 
-    fn update(&mut self, settings: SynthesisSettings) -> bool {
+    pub(super) fn update(&mut self, settings: SynthesisSettings) -> bool {
         if self.invalid_settings {
             return false;
         }

@@ -25,6 +25,7 @@ pub enum FileAction {
 pub struct App {
     pub editor: Editor,
     pub synthesis: synthesis::runtime::Runtime,
+    pub graphics_api: String,
     pub view: ViewState,
     pub preferences: ui::settings::Preferences,
     pub path: Option<PathBuf>,
@@ -108,6 +109,11 @@ impl App {
         let mut app = Self {
             editor: Editor::new(Project::default()),
             synthesis: synthesis::runtime::Runtime::new(cc.egui_ctx.clone()),
+            graphics_api: cc
+                .wgpu_render_state
+                .as_ref()
+                .map(|state| format!("{:?}", state.adapter.get_info().backend))
+                .unwrap_or_else(|| "未初始化".into()),
             view,
             preferences,
             path: None,

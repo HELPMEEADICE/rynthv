@@ -12,6 +12,7 @@ use super::{
 };
 use crate::synthesis::{
     audio::{LiveAudio, RenderedAudio},
+    inference::compute::Session,
     plan::{OwnerId, RenderPlan},
     render_cache::{CacheStats, PublishedOwner},
     rendered::{PhonemeSnapshot, VisualPatch, VisualSnapshot},
@@ -101,6 +102,7 @@ impl Worker {
         dictionaries: PathBuf,
         flat_registry: Arc<FlatModelRegistry>,
         repaint: eframe::egui::Context,
+        compute: Session,
     ) -> Result<Self, String> {
         let (tx, commands) = mpsc::channel();
         let (events, rx) = mpsc::channel();
@@ -112,15 +114,17 @@ impl Worker {
             .name("synthesis-worker".into())
             .spawn(move || {
                 let _wake = WakeOnExit(repaint.clone());
-                run(
-                    path,
-                    dictionaries,
-                    flat_registry,
-                    commands,
-                    Events::new(events, repaint),
-                    running,
-                    dispatch,
-                );
+                compute.scope(|| {
+                    run(
+                        path,
+                        dictionaries,
+                        flat_registry,
+                        commands,
+                        Events::new(events, repaint),
+                        running,
+                        dispatch,
+                    )
+                });
             })
             .map_err(|error| format!("无法启动合成线程：{error}"))?;
         Ok(Self {

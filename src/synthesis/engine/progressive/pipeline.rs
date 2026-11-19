@@ -3,7 +3,7 @@
 
 use crate::synthesis::{
     execution::{self, Cancellation},
-    inference::Sequence,
+    inference::{Sequence, compute},
     stages::vocoder::{VocoderOutput, VocoderStage, VoiceControl},
     voice::{PreparedTree, Result, VoiceError},
 };
@@ -50,6 +50,7 @@ impl Pipeline {
     pub fn new(tree: Arc<PreparedTree>) -> Result<Self> {
         let cancellation = Cancellation::child(execution::current());
         let worker_cancellation = cancellation.clone();
+        let compute = compute::current();
         let (input, inputs) = mpsc::sync_channel(MAX_OUTSTANDING);
         // Outstanding accounting bounds this queue too. An unblocked sender
         // lets Drop close both ends and join even when no result is requested.
@@ -59,17 +60,19 @@ impl Pipeline {
         let worker = thread::Builder::new()
             .name("rynthv-vocoder".into())
             .spawn(move || {
-                execution::scope(worker_cancellation, || {
-                    let result = run(
-                        &tree,
-                        &inputs,
-                        &outputs,
-                        #[cfg(feature = "synth-profile")]
-                        profile,
-                    );
-                    if let Err(error) = result {
-                        let _ = outputs.send(Err(error));
-                    }
+                compute::scope(compute, || {
+                    execution::scope(worker_cancellation, || {
+                        let result = run(
+                            &tree,
+                            &inputs,
+                            &outputs,
+                            #[cfg(feature = "synth-profile")]
+                            profile,
+                        );
+                        if let Err(error) = result {
+                            let _ = outputs.send(Err(error));
+                        }
+                    })
                 });
             })?;
         Ok(Self {
