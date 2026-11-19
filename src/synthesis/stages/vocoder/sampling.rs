@@ -10,6 +10,7 @@ use crate::synthesis::{
     inference::{
         Sequence,
         affine::Affine,
+        compute,
         recurrent::{Gru, GruState},
     },
     voice::{PreparedModule, PreparedTree, Result, VoiceError},
@@ -156,23 +157,38 @@ impl PositionalGru {
             return Err(VoiceError::new("Invalid vocoder positional state or input"));
         }
         let mut output = Sequence::zeros(input.frames, self.output_channels())?;
-        let mut projected = vec![0.0; self.projection.output_channels()];
-        let mut features = vec![0.0; self.recurrent.input_channels()];
-        for (frame_index, (frame, &position)) in input
+        if input.frames == 0 {
+            return Ok(output);
+        }
+        let spectral: Vec<_> = input
             .values
             .as_chunks::<INPUT_CHANNELS>()
             .0
             .iter()
+            .flat_map(|frame| {
+                frame[SPECTRAL_START..SPECTRAL_START + SPECTRAL_CHANNELS]
+                    .iter()
+                    .copied()
+            })
+            .collect();
+        let width = self.projection.output_channels();
+        let mut projected = Sequence::zeros(input.frames, width)?;
+        self.projection
+            .execute_batch(&spectral, &mut projected.values, input.frames)
+            .map_err(|error| VoiceError::new(error.to_string()))?;
+
+        compute::record_cpu(
+            "vocoder_positional_features",
+            "CPU f64 trigonometric conditioning",
+        );
+        let mut features = Sequence::zeros(input.frames, self.recurrent.input_channels())?;
+        for ((projected, features), &position) in projected
+            .values
+            .chunks_exact(width)
+            .zip(features.values.chunks_exact_mut(features.channels))
             .zip(positions)
-            .enumerate()
         {
             checkpoint()?;
-            self.projection
-                .execute(
-                    &frame[SPECTRAL_START..SPECTRAL_START + SPECTRAL_CHANNELS],
-                    &mut projected,
-                )
-                .map_err(|error| VoiceError::new(error.to_string()))?;
             features[..self.retained_channels]
                 .copy_from_slice(&projected[..self.retained_channels]);
             // Compute theta and sin/cos in f64, narrowing each result to f32.
@@ -184,12 +200,10 @@ impl PositionalGru {
                 features[self.retained_channels + self.frequencies.len() + frequency_index] =
                     angle.cos() as f32;
             }
-            self.recurrent
-                .step(&features, state)
-                .map_err(|error| VoiceError::new(error.to_string()))?;
-            let start = frame_index * self.output_channels();
-            output.values[start..start + self.output_channels()].copy_from_slice(state.hidden());
         }
+        self.recurrent
+            .execute_sequence(&features.values, &mut output.values, input.frames, state)
+            .map_err(|error| VoiceError::new(error.to_string()))?;
         Ok(output)
     }
 }

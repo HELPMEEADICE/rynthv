@@ -256,6 +256,12 @@ pub(crate) fn postprocess_typed(
             "Duration output normalization returned invalid scalars",
         ));
     }
+    if count != 0 {
+        crate::synthesis::inference::compute::record_cpu(
+            "duration_record_softmax",
+            "CPU duration postprocessing",
+        );
+    }
     let mut output = Vec::with_capacity(count);
     let mut cursor = 0;
     for (record_index, record) in records.iter().enumerate() {

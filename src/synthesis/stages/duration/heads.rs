@@ -22,6 +22,12 @@ pub(super) fn maximum_index(values: &[f32], bins: usize, frames: usize) -> Resul
 
 pub(super) fn expected_index(values: &[f32], bins: usize, frames: usize) -> Result<Vec<f32>> {
     validate(values, bins, frames)?;
+    if frames != 0 {
+        crate::synthesis::inference::compute::record_cpu(
+            "duration_head_softmax",
+            "CPU duration postprocessing",
+        );
+    }
     let mut output = Vec::with_capacity(frames);
     for frame in values.chunks_exact(bins) {
         // Apply max-subtracted softmax, then compute the weighted bin index
