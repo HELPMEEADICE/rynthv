@@ -1,6 +1,9 @@
 //! Parameterized CPU activations.
 
-use crate::synthesis::inference::matrix::{MatrixError, check_length};
+use crate::synthesis::inference::{
+    gpu::{self, Element},
+    matrix::{MatrixError, check_length},
+};
 
 pub const LEAKY_RELU_TYPE_ID: [u8; 16] = [
     0x0f, 0x6d, 0x94, 0x93, 0xcd, 0xc6, 0x8f, 0x96, 0x35, 0x3c, 0xd3, 0x39, 0xb8, 0x19, 0xdb, 0x8c,
@@ -28,6 +31,9 @@ impl LeakyRelu {
 
     pub fn execute(&self, input: &[f32], output: &mut [f32]) -> Result<(), MatrixError> {
         check_length("leaky ReLU output", input.len(), output.len())?;
+        if gpu::elementwise(Element::LeakyRelu(self.negative_slope), input, output)? {
+            return Ok(());
+        }
         for (&value, target) in input.iter().zip(output.iter_mut()) {
             // The comparison is strictly 0 < x. In particular, ±0 and
             // NaN select the parameter, then still perform multiplication.
@@ -39,5 +45,9 @@ impl LeakyRelu {
             *target = multiplier * value;
         }
         Ok(())
+    }
+
+    pub(in crate::synthesis::inference) fn slope(&self) -> f32 {
+        self.negative_slope
     }
 }

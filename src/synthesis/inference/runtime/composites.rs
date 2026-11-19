@@ -139,6 +139,14 @@ impl ModelRuntime<'_> {
                     program.process(self, &node.children, input, condition, flush)
                 }
                 Program::Conditional(program) => {
+                    if flush
+                        && state.input_frames == input.frames
+                        && !program.has_pending()
+                        && let Some(output) =
+                            program.complete_on_gpu(tree, &node.children, input, condition)?
+                    {
+                        return Ok(output);
+                    }
                     program.process(self, &node.children, input, condition, flush)
                 }
                 Program::Sampler(program) => program.process(

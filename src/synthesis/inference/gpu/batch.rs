@@ -1,4 +1,4 @@
-use super::Device;
+use super::{Device, timestamps::Timestamps};
 use crate::synthesis::{
     execution,
     inference::{compute::Activity, matrix::MatrixError},
@@ -20,10 +20,12 @@ pub(in super::super) struct Batch<'a> {
     encoder: Option<wgpu::CommandEncoder>,
     buffers: Vec<Buffer>,
     activity: Activity,
+    timestamps: Option<Timestamps>,
+    scratch_bytes: u64,
 }
 
 impl<'a> Batch<'a> {
-    pub(in super::super) fn new(device: &'a Device) -> Result<Self, MatrixError> {
+    pub(in super::super) fn new(device: &'a Device, timestamps: bool) -> Result<Self, MatrixError> {
         checkpoint(device)?;
         Ok(Self {
             device,
@@ -36,6 +38,8 @@ impl<'a> Batch<'a> {
             ),
             buffers: Vec::new(),
             activity: Activity::default(),
+            timestamps: timestamps.then(|| Timestamps::new(device)).flatten(),
+            scratch_bytes: 0,
         })
     }
 
@@ -112,13 +116,20 @@ impl<'a> Batch<'a> {
                 layout: &pipeline.get_bind_group_layout(0),
                 entries: &entries,
             });
+        let timestamp_writes = self
+            .timestamps
+            .as_mut()
+            .and_then(|timestamps| timestamps.mark(kernel.entry));
+        if timestamp_writes.is_none() {
+            self.activity.untimed_dispatches += 1;
+        }
         let mut pass =
             self.encoder
                 .as_mut()
                 .unwrap()
                 .begin_compute_pass(&wgpu::ComputePassDescriptor {
                     label: Some(kernel.entry),
-                    timestamp_writes: None,
+                    timestamp_writes,
                 });
         pass.set_pipeline(&pipeline);
         pass.set_bind_group(0, &bind_group, &[]);
@@ -134,15 +145,35 @@ impl<'a> Batch<'a> {
     pub(super) fn read(&mut self, source: &Buffer, output: &mut [f32]) -> Result<(), MatrixError> {
         checkpoint(self.device)?;
         let bytes = output.len() as u64 * 4;
-        let staging = self.buffer(bytes, BufferUsages::MAP_READ | BufferUsages::COPY_DST);
         let mut encoder = self.encoder.take().unwrap();
+        let offset = bytes.next_multiple_of(8);
+        let timestamp_bytes = self.timestamps.as_ref().map_or(0, Timestamps::bytes);
+        let mapped_bytes = if timestamp_bytes == 0 {
+            bytes
+        } else {
+            offset + timestamp_bytes
+        };
+        let staging = self.buffer(
+            mapped_bytes,
+            BufferUsages::MAP_READ | BufferUsages::COPY_DST,
+        );
         encoder.copy_buffer_to_buffer(source, 0, &staging, 0, Some(bytes));
+        if timestamp_bytes != 0 {
+            let resolved = self.buffer(
+                timestamp_bytes,
+                BufferUsages::QUERY_RESOLVE | BufferUsages::COPY_SRC,
+            );
+            self.timestamps
+                .as_ref()
+                .unwrap()
+                .resolve(&mut encoder, &resolved, &staging, offset);
+        }
         let started = Instant::now();
         let submission = self.device.queue.submit([encoder.finish()]);
         self.activity.gpu_submissions += 1;
         self.activity.readback_count += 1;
-        self.activity.readback_bytes += bytes;
-        let slice = staging.slice(..bytes);
+        self.activity.readback_bytes += mapped_bytes;
+        let slice = staging.slice(..mapped_bytes);
         let (tx, rx) = mpsc::sync_channel(1);
         slice.map_async(wgpu::MapMode::Read, move |status| {
             let _ = tx.send(status);
@@ -166,15 +197,23 @@ impl<'a> Batch<'a> {
             let data = slice
                 .get_mapped_range()
                 .map_err(|e| MatrixError::Compute(format!("WebGPU mapped range: {e}")))?;
-            let values: &[f32] = bytemuck::cast_slice(&data);
+            let values: &[f32] = bytemuck::cast_slice(&data[..bytes as usize]);
             if values.iter().any(|value| !value.is_finite()) {
                 return Err(MatrixError::Compute(
                     "WebGPU inference produced a nonfinite value".into(),
                 ));
             }
             output.copy_from_slice(values);
+            if timestamp_bytes != 0 {
+                self.timestamps.as_ref().unwrap().record(
+                    &data[offset as usize..],
+                    self.device.queue.get_timestamp_period(),
+                    &mut self.activity,
+                );
+            }
         }
         staging.unmap();
+        self.activity.completed_gpu_submissions += 1;
         self.activity.readback_ms += started.elapsed().as_secs_f64() * 1000.0;
         let mut cache = self.device.cache.lock().unwrap();
         for buffer in self.buffers.drain(..) {
@@ -201,6 +240,11 @@ impl<'a> Batch<'a> {
             .unwrap()
             .buffer(self.device, bytes, usage);
         self.buffers.push(buffer.clone());
+        self.scratch_bytes += buffer.size();
+        self.activity.peak_batch_buffer_bytes = self
+            .activity
+            .peak_batch_buffer_bytes
+            .max(self.scratch_bytes);
         buffer
     }
 }

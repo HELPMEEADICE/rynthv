@@ -11,6 +11,7 @@ use crate::synthesis::{
     execution::{self, Cancellation},
     inference::{
         activation::ActivationOperator,
+        gpu::{self, Element},
         matrix::{MatrixError, check_length},
     },
 };
@@ -72,6 +73,16 @@ pub fn activate_projected(
             projected.len(),
             condition.len(),
         )?;
+    }
+    if gpu::elementwise(
+        Element::Gate {
+            channels,
+            condition,
+        },
+        projected,
+        output,
+    )? {
+        return Ok(());
     }
 
     // Frame boundaries also preserve the activation's SSE/scalar-tail split.

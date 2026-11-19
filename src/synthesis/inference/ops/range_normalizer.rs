@@ -93,6 +93,12 @@ impl RangeNormalizer {
         clip: bool,
     ) -> Result<(), RangeError> {
         self.check_buffers(input, output)?;
+        if !input.is_empty() {
+            crate::synthesis::inference::compute::record_cpu(
+                "range_normalizer",
+                "CPU feature conversion",
+            );
+        }
         for (position, (&value, target)) in input.iter().zip(output.iter_mut()).enumerate() {
             *target = self.normalize_value(position % self.channels(), value, clip);
         }
@@ -101,6 +107,12 @@ impl RangeNormalizer {
 
     pub fn denormalize(&self, input: &[f32], output: &mut [f32]) -> Result<(), RangeError> {
         self.check_buffers(input, output)?;
+        if !input.is_empty() {
+            crate::synthesis::inference::compute::record_cpu(
+                "range_normalizer",
+                "CPU feature conversion",
+            );
+        }
         for (position, (&value, target)) in input.iter().zip(output.iter_mut()).enumerate() {
             *target = self.denormalize_value(position % self.channels(), value);
         }

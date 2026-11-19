@@ -167,13 +167,7 @@ impl<'a> ModelRuntime<'a> {
                 }
                 output
             }
-            PreparedModule::Sequential => {
-                let mut output = input.clone();
-                for &child in &node.children {
-                    output = self.execute(child, &output, flush)?;
-                }
-                output
-            }
+            PreparedModule::Sequential => self.sequential(&node.children, input, flush)?,
             PreparedModule::Embedding(operator) => {
                 #[cfg(feature = "synth-profile")]
                 let _profile = crate::synthesis::profiling::span("op.embedding");
@@ -250,6 +244,28 @@ impl<'a> ModelRuntime<'a> {
             }
         };
         output.validate()?;
+        Ok(output)
+    }
+
+    fn sequential(
+        &mut self,
+        children: &[usize],
+        input: &Sequence,
+        flush: bool,
+    ) -> Result<Sequence> {
+        let mut output = input.clone();
+        let mut offset = 0;
+        while offset < children.len() {
+            if let Some((count, result)) =
+                super::gpu::sequence(self.tree, &children[offset..], &output)?
+            {
+                output = result;
+                offset += count;
+            } else {
+                output = self.execute(children[offset], &output, flush)?;
+                offset += 1;
+            }
+        }
         Ok(output)
     }
 

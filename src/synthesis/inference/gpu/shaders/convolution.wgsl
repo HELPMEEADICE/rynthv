@@ -27,8 +27,11 @@ fn convolution(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_i
         var valid = false;
         if (input_k < reduction && frame < params[1].z) {
             let row = frame * params[0].w + (input_k / inputs) * params[1].x;
-            if (row < params[1].y) {
-                sample = input[row * inputs + input_k % inputs];
+            let padding = params[2].w;
+            if (row < padding) {
+                valid = true;
+            } else if (row - padding < params[1].y) {
+                sample = input[(row - padding) * inputs + input_k % inputs];
                 valid = true;
             }
         }

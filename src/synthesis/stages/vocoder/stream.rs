@@ -7,7 +7,7 @@ use super::{
     stream_parameters::ParameterStream, stream_signals::SignalStream,
 };
 use crate::synthesis::{
-    inference::Sequence,
+    inference::{Sequence, compute},
     voice::{Result, VoiceError},
 };
 
@@ -77,6 +77,9 @@ impl VocoderStream<'_> {
             return Err(VoiceError::new(
                 "Vocoder PCM and metadata frames do not align",
             ));
+        }
+        if primary.frames != 0 {
+            compute::record_cpu("vocoder_dsp", "CPU sample-rate excitation and filtering");
         }
         self.output_frames = self
             .output_frames

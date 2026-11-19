@@ -5,7 +5,10 @@
 
 use std::{fmt, sync::Arc};
 
-use crate::synthesis::inference::matrix::DenseMatrix;
+use crate::synthesis::inference::{
+    gpu::{self, Element},
+    matrix::{DenseMatrix, MatrixError},
+};
 
 pub const EMBEDDING_TYPE_ID: [u8; 16] = [
     0x8b, 0x8c, 0x95, 0x22, 0x55, 0xe2, 0x7b, 0xfa, 0xe4, 0xe7, 0x85, 0xaa, 0xae, 0x69, 0xb1, 0x98,
@@ -20,6 +23,7 @@ pub struct Embedding {
 
 #[derive(Clone, Debug)]
 pub enum EmbeddingError {
+    Compute(MatrixError),
     SizeOverflow,
     OutputLength { expected: usize, actual: usize },
     NonFiniteIndex { position: usize },
@@ -28,6 +32,7 @@ pub enum EmbeddingError {
 impl fmt::Display for EmbeddingError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Compute(error) => error.fmt(f),
             Self::SizeOverflow => f.write_str("Embedding output dimensions overflow"),
             Self::OutputLength { expected, actual } => {
                 write!(
@@ -86,6 +91,18 @@ impl Embedding {
         }
         if let Some(position) = indices.iter().position(|value| !value.is_finite()) {
             return Err(EmbeddingError::NonFiniteIndex { position });
+        }
+        if gpu::elementwise(
+            Element::Embedding {
+                table: &self.values,
+                channels: self.features,
+            },
+            indices,
+            output,
+        )
+        .map_err(EmbeddingError::Compute)?
+        {
+            return Ok(());
         }
         for (&index, frame) in indices.iter().zip(output.chunks_exact_mut(self.features)) {
             let entry = index.round().clamp(0.0, (self.entries - 1) as f32) as usize;

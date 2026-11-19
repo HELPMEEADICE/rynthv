@@ -103,6 +103,12 @@ impl SumQueue {
         let frames = self.left.frames().min(self.right.frames());
         let mut output = self.left.take(frames)?;
         let right = self.right.take(frames)?;
+        if frames != 0 {
+            crate::synthesis::inference::compute::record_cpu(
+                "streamed_residual_sum",
+                "CPU queue alignment",
+            );
+        }
         for (target, value) in output.values.iter_mut().zip(right.values) {
             *target += value;
         }

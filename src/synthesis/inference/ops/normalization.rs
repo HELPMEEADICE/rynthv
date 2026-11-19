@@ -2,7 +2,10 @@
 
 use std::sync::Arc;
 
-use crate::synthesis::inference::matrix::{MatrixError, check_length};
+use crate::synthesis::inference::{
+    gpu::{self, Element},
+    matrix::{MatrixError, check_length},
+};
 
 pub const LAYER_NORM_TYPE_ID: [u8; 16] = [
     0x9d, 0x54, 0x76, 0x11, 0x23, 0x40, 0x2e, 0xb8, 0xc4, 0xaf, 0x7f, 0x5e, 0xf3, 0xe2, 0xeb, 0xb6,
@@ -80,6 +83,9 @@ impl LayerNorm {
         #[cfg(feature = "synth-profile")]
         let _profile = crate::synthesis::profiling::span("op.layer_norm");
         validate_buffers(self.channels, frames, input.len(), output.len())?;
+        if gpu::elementwise(self.gpu_element(), input, output)? {
+            return Ok(());
+        }
         let reciprocal_channels = 1.0 / self.channels as f32;
         for (input, output) in input
             .chunks_exact(self.channels)
@@ -119,6 +125,15 @@ impl LayerNorm {
         }
         Ok(())
     }
+
+    pub(in crate::synthesis::inference) fn gpu_element(&self) -> Element<'_> {
+        Element::LayerNorm {
+            channels: self.channels,
+            epsilon: self.epsilon,
+            gain: self.gain.as_ref(),
+            bias: self.bias.as_ref(),
+        }
+    }
 }
 
 /// Applies y = x * gain + bias without computing statistics.
@@ -151,6 +166,9 @@ impl ChannelAffine {
         #[cfg(feature = "synth-profile")]
         let _profile = crate::synthesis::profiling::span("op.channel_affine");
         validate_buffers(self.channels(), frames, input.len(), output.len())?;
+        if gpu::elementwise(self.gpu_element(), input, output)? {
+            return Ok(());
+        }
         for (input, output) in input
             .chunks_exact(self.channels())
             .zip(output.chunks_exact_mut(self.channels()))
@@ -160,6 +178,13 @@ impl ChannelAffine {
             }
         }
         Ok(())
+    }
+
+    pub(in crate::synthesis::inference) fn gpu_element(&self) -> Element<'_> {
+        Element::ChannelAffine {
+            gain: &self.gain,
+            bias: &self.bias,
+        }
     }
 }
 

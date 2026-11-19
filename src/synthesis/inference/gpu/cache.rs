@@ -39,6 +39,8 @@ impl Cache {
         if let Some(weight) = self.weights.get_mut(&key) {
             weight.used = self.clock;
             activity.weight_hits += 1;
+            activity.peak_weight_cache_bytes =
+                activity.peak_weight_cache_bytes.max(self.weight_bytes);
             return weight.buffer.clone();
         }
         // The weak allocation reserves the address, including after the CPU data
@@ -85,6 +87,7 @@ impl Cache {
             );
             self.weight_bytes += size;
         }
+        activity.peak_weight_cache_bytes = activity.peak_weight_cache_bytes.max(self.weight_bytes);
         buffer
     }
 
@@ -98,6 +101,7 @@ impl Cache {
             activity.pipeline_hits += 1;
             return pipeline.clone();
         }
+        let started = Instant::now();
         let module = self.modules.entry(kernel.source).or_insert_with(|| {
             device
                 .raw
@@ -118,6 +122,7 @@ impl Cache {
             });
         self.pipelines.insert(kernel.entry, pipeline.clone());
         activity.pipeline_misses += 1;
+        activity.pipeline_build_ms += started.elapsed().as_secs_f64() * 1000.0;
         pipeline
     }
 

@@ -69,6 +69,12 @@ impl StandardNormalizer {
 
     pub fn normalize(&self, input: &[f32], output: &mut [f32]) -> Result<(), StandardError> {
         self.check_buffers(input, output)?;
+        if !input.is_empty() {
+            crate::synthesis::inference::compute::record_cpu(
+                "standard_normalizer",
+                "CPU feature conversion",
+            );
+        }
         for (index, (&value, target)) in input.iter().zip(output.iter_mut()).enumerate() {
             *target = self.normalize_value(index % self.channels(), value);
         }
@@ -77,6 +83,12 @@ impl StandardNormalizer {
 
     pub fn denormalize(&self, input: &[f32], output: &mut [f32]) -> Result<(), StandardError> {
         self.check_buffers(input, output)?;
+        if !input.is_empty() {
+            crate::synthesis::inference::compute::record_cpu(
+                "standard_normalizer",
+                "CPU feature conversion",
+            );
+        }
         for (index, (&value, target)) in input.iter().zip(output.iter_mut()).enumerate() {
             *target = self.denormalize_value(index % self.channels(), value);
         }

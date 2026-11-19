@@ -1,6 +1,6 @@
 use super::{ModelRuntime, queue::SumQueue};
 use crate::synthesis::{
-    inference::{Sequence, ops::conditional::ConditionalConfig},
+    inference::{Sequence, gpu, ops::conditional::ConditionalConfig},
     voice::{PreparedModule, PreparedTree, Result, VoiceError},
 };
 
@@ -17,6 +17,7 @@ pub(super) struct ConditionalState {
     skips: Vec<usize>,
     residuals: Vec<usize>,
     layers: Vec<LayerState>,
+    processed: bool,
 }
 
 impl ConditionalState {
@@ -54,7 +55,31 @@ impl ConditionalState {
             skips: lists.next().expect("three lists"),
             residuals: lists.next().expect("three lists"),
             layers: vec![LayerState::default(); layers],
+            processed: false,
         })
+    }
+
+    pub(super) fn has_pending(&self) -> bool {
+        self.processed
+    }
+
+    pub(super) fn complete_on_gpu(
+        &self,
+        tree: &PreparedTree,
+        children: &[usize],
+        input: &Sequence,
+        condition: Option<&Sequence>,
+    ) -> Result<Option<Sequence>> {
+        gpu::conditional(
+            tree,
+            input,
+            condition,
+            &self.gates,
+            &self.skips,
+            &self.residuals,
+            condition.map(|_| children[3]),
+            self.config.output_channels,
+        )
     }
 
     pub(super) fn process(
@@ -67,6 +92,7 @@ impl ConditionalState {
     ) -> Result<Sequence> {
         #[cfg(feature = "synth-profile")]
         let _profile = crate::synthesis::profiling::span("op.conditional");
+        self.processed = true;
         let mut output = match condition {
             Some(condition) => runtime.execute(children[3], condition, flush)?,
             None => Sequence::zeros(input.frames, self.config.output_channels)?,

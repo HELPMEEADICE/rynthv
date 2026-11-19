@@ -27,12 +27,12 @@ pub struct RelativeAttention {
 }
 
 #[derive(Clone)]
-struct RelativePositions {
+pub(in crate::synthesis::inference) struct RelativePositions {
     key_channels: usize,
     value_channels: usize,
-    entries: usize,
-    key: Arc<[f32]>,
-    value: Arc<[f32]>,
+    pub(in crate::synthesis::inference) entries: usize,
+    pub(in crate::synthesis::inference) key: Arc<[f32]>,
+    pub(in crate::synthesis::inference) value: Arc<[f32]>,
 }
 
 #[derive(Clone, Debug)]
@@ -42,6 +42,7 @@ pub enum AttentionError {
     InvalidLength(&'static str),
     NonFiniteInput,
     Softmax(String),
+    Compute(String),
 }
 
 impl fmt::Display for AttentionError {
@@ -56,6 +57,7 @@ impl fmt::Display for AttentionError {
             Self::InvalidLength(name) => write!(f, "Invalid attention {name} length"),
             Self::NonFiniteInput => f.write_str("Attention input contains a non-finite value"),
             Self::Softmax(error) => write!(f, "Attention softmax: {error}"),
+            Self::Compute(error) => f.write_str(error),
         }
     }
 }
@@ -147,9 +149,29 @@ impl RelativeAttention {
             .checked_mul(output_width)
             .ok_or(AttentionError::InvalidDimensions)?;
         let mut output = vec![0.0; output_len];
+        if query_frames != 0
+            && super::super::gpu::attention(
+                [query, key, value],
+                self.positions.as_ref(),
+                &mut output,
+                [
+                    query_frames,
+                    key_frames,
+                    heads,
+                    key_channels,
+                    value_channels,
+                ],
+                options,
+            )
+            .map_err(|error| AttentionError::Compute(error.to_string()))?
+        {
+            return Ok(output);
+        }
         let mut scores = vec![0.0; key_frames];
         let scale = 1.0 / (key_channels as f32).sqrt();
         for query_index in 0..query_frames {
+            crate::synthesis::execution::checkpoint()
+                .map_err(|e| AttentionError::Compute(e.to_string()))?;
             for head in 0..heads {
                 let query_start = query_index * query_width + head * key_channels;
                 let query = &query[query_start..query_start + key_channels];

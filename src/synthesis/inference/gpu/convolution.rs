@@ -24,24 +24,40 @@ pub(in super::super) fn convolution(
         |batch| {
             let source = batch.input(input);
             let result = batch.output(output.len());
-            let columns = (op.output_channels() as u32).div_ceil(8);
-            let grid = batch.grid((frames as u32).div_ceil(8) * columns)?;
-            let mut params = parameters(op, input.len(), output.len());
-            params[7] = grid[0];
-            params[8] = columns;
-            encode(
+            encode_convolution(
                 batch,
-                "convolution",
                 op,
-                grid,
-                params,
                 &source,
                 &result,
-                None,
+                input.len() / op.input_channels(),
+                frames,
+                0,
             )?;
             batch.read(&result, output)
         },
     )
+}
+
+pub(super) fn encode_convolution(
+    batch: &mut Batch<'_>,
+    op: &Convolution,
+    source: &Buffer,
+    result: &Buffer,
+    input_frames: usize,
+    output_frames: usize,
+    padding: usize,
+) -> Result<(), MatrixError> {
+    let columns = (op.output_channels() as u32).div_ceil(8);
+    let grid = batch.grid((output_frames as u32).div_ceil(8) * columns)?;
+    let mut params = parameters(
+        op,
+        input_frames * op.input_channels(),
+        output_frames * op.output_channels(),
+    );
+    params[7] = grid[0];
+    params[8] = columns;
+    params[11] = padding as u32;
+    encode(batch, "convolution", op, grid, params, source, result, None)
 }
 
 pub(in super::super) fn transpose(
@@ -55,6 +71,7 @@ pub(in super::super) fn transpose(
     if [first_input, config.stride, config.dilation]
         .iter()
         .any(|&n| u32::try_from(n).is_err())
+        || u32::try_from((config.kernel - 1) * config.dilation).is_err()
     {
         compute::record_cpu(
             "transposed_convolution",

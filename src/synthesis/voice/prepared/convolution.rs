@@ -89,6 +89,10 @@ impl PreparedConvolution {
         self.operator.stream().map_err(voice_error)
     }
 
+    pub(crate) fn operator(&self) -> &Convolution {
+        &self.operator
+    }
+
     pub fn output_frames(&self, frames: usize) -> Result<usize> {
         self.operator.output_frames(frames).map_err(voice_error)
     }

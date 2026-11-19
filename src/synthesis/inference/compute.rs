@@ -9,7 +9,10 @@ use super::{
 use serde::{Deserialize, Serialize};
 use std::{
     cell::RefCell,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
     time::Instant,
 };
 
@@ -34,6 +37,7 @@ struct Inner {
     initialization_error: Option<String>,
     initialization_ms: f64,
     activity: Mutex<Activity>,
+    timestamps: AtomicBool,
 }
 
 #[derive(Serialize)]
@@ -65,6 +69,18 @@ impl Session {
             initialization_error,
             initialization_ms: started.elapsed().as_secs_f64() * 1000.0,
             activity: Mutex::default(),
+            timestamps: AtomicBool::new(false),
+        }))
+    }
+
+    pub(crate) fn unavailable(requested: Backend, reason: String) -> Self {
+        Self(Arc::new(Inner {
+            requested,
+            device: None,
+            initialization_error: Some(reason),
+            initialization_ms: 0.0,
+            activity: Mutex::default(),
+            timestamps: AtomicBool::new(false),
         }))
     }
 
@@ -98,6 +114,11 @@ impl Session {
         scope(Some(self.clone()), run)
     }
 
+    #[cfg(feature = "synth-profile")]
+    pub fn enable_timestamps(&self) {
+        self.0.timestamps.store(true, Ordering::Relaxed);
+    }
+
     pub fn diagnostics(&self) -> Diagnostics {
         self.describe(self.0.activity.lock().unwrap().clone())
     }
@@ -108,7 +129,10 @@ impl Session {
     }
 
     fn describe(&self, activity: Activity) -> Diagnostics {
-        let actual = match (activity.gpu_submissions, activity.cpu_operators.is_empty()) {
+        let actual = match (
+            activity.completed_gpu_submissions,
+            activity.cpu_operators.is_empty(),
+        ) {
             (0, true) => "idle",
             (0, false) => "cpu",
             (_, true) => "webgpu",
@@ -119,6 +143,13 @@ impl Session {
             activity,
             status: self.status(),
         }
+    }
+
+    /// Compile every WGSL entry point with the selected device's backend.
+    pub fn validate_shaders(&self) -> Result<Vec<&'static str>, String> {
+        self.check()?;
+        let device = self.0.device.as_ref().ok_or("No WebGPU inference device")?;
+        super::gpu::validate(device)
     }
 
     fn record_cpu(&self, operator: &'static str, reason: &'static str) {
@@ -135,43 +166,50 @@ impl Session {
     }
 }
 
-pub(super) fn record_cpu(operator: &'static str, reason: &'static str) {
+pub(crate) fn record_cpu(operator: &'static str, reason: &'static str) {
     if let Some(session) = current() {
         session.record_cpu(operator, reason);
     }
 }
 
 pub(super) fn accelerate(
-    operator: &'static str,
+    operator: impl Into<Option<&'static str>>,
     work: usize,
     min_auto_work: usize,
     lengths: &[usize],
     run: impl FnOnce(&mut Batch<'_>) -> Result<(), MatrixError>,
 ) -> Result<bool, MatrixError> {
+    let operator = operator.into();
     let Some(session) = current() else {
         return Ok(false);
     };
     let Some(device) = &session.0.device else {
         session.check().map_err(MatrixError::Compute)?;
-        session.record_cpu(
-            operator,
-            if session.0.requested == Backend::Cpu {
-                "CPU selected"
-            } else {
-                "GPU unavailable"
-            },
-        );
+        if let Some(operator) = operator {
+            session.record_cpu(
+                operator,
+                if session.0.requested == Backend::Cpu {
+                    "CPU selected"
+                } else {
+                    "GPU unavailable"
+                },
+            );
+        }
         return Ok(false);
     };
     if session.0.requested == Backend::Auto && work < min_auto_work {
-        session.record_cpu(operator, "below GPU scheduling threshold");
+        if let Some(operator) = operator {
+            session.record_cpu(operator, "below GPU scheduling threshold");
+        }
         return Ok(false);
     }
     if !device.fits(lengths) {
-        session.record_cpu(operator, "tensor exceeds WebGPU storage limits");
+        if let Some(operator) = operator {
+            session.record_cpu(operator, "tensor exceeds WebGPU storage limits");
+        }
         return Ok(false);
     }
-    let mut batch = Batch::new(device)?;
+    let mut batch = Batch::new(device, session.0.timestamps.load(Ordering::Relaxed))?;
     let result = run(&mut batch);
     session.0.activity.lock().unwrap().merge(batch.activity());
     result.map(|()| true)
@@ -179,6 +217,15 @@ pub(super) fn accelerate(
 
 pub fn current() -> Option<Session> {
     CURRENT.with(|current| current.borrow().clone())
+}
+
+pub(super) fn has_gpu() -> bool {
+    CURRENT.with(|current| {
+        current
+            .borrow()
+            .as_ref()
+            .is_some_and(|session| session.0.device.is_some())
+    })
 }
 
 pub fn scope<T>(session: Option<Session>, run: impl FnOnce() -> T) -> T {

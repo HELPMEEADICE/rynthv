@@ -74,12 +74,18 @@ impl ConvolutionStream {
             .len()
             .checked_add(input.len())
             .ok_or(MatrixError::InvalidShape)?;
+        let previous_length = self.pending.len();
         self.pending.extend_from_slice(input);
         if frames == 0 {
             // A zero-output call leaves the final flag unset.
             return Ok(Vec::new());
         }
-        let output = self.operator.execute_pending(&self.pending, frames)?;
+        let output = self
+            .operator
+            .execute_pending(&self.pending, frames)
+            .inspect_err(|_| {
+                self.pending.truncate(previous_length);
+            })?;
         if final_chunk {
             self.pending.clear();
             self.finished = true;

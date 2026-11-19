@@ -45,6 +45,7 @@ pub enum UnaryOperator {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum InferenceError {
+    Compute(matrix::MatrixError),
     UnsupportedModule([u8; 16]),
     LengthMismatch { input: usize, output: usize },
 }
@@ -52,6 +53,7 @@ pub enum InferenceError {
 impl fmt::Display for InferenceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Compute(error) => error.fmt(f),
             Self::UnsupportedModule(type_id) => {
                 f.write_str("Unsupported synthesis module type: ")?;
                 for byte in type_id {
@@ -88,6 +90,12 @@ impl UnaryOperator {
                 input: input.len(),
                 output: output.len(),
             });
+        }
+        if self != Self::Identity
+            && gpu::elementwise(gpu::Element::Unary(self), input, output)
+                .map_err(InferenceError::Compute)?
+        {
+            return Ok(());
         }
         match self {
             Self::Identity => output.copy_from_slice(input),
