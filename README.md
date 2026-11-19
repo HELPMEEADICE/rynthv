@@ -50,4 +50,6 @@ Windows ARM64 和 Linux 可通过上下文文件或手动输入导入二代声�
 
 命令行合成与诊断工具的用法可通过 `cargo run --release --locked --bin rynthv-synth -- --help` 查看。
 
+CPU / WebGPU 推理设置和性能对比方法见 [原生 WebGPU 推理指南](docs/webgpu-inference.md)。
+
 SynthV Flat 明文声库的导入、模型目录配置、原生合成和兼容范围见 [SynthV Flat 指南](docs/synthv-flat.md)。

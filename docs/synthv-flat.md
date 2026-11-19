@@ -29,4 +29,4 @@ Use the imported SFPK path returned in the JSON report for an individual voice f
 
 To blend two Flat timbres, add `--blend-voice second.sfpk --blend-weight 0.35` to `render-score`. Both voices must resolve to identical acoustic model bytes. The blend interpolates the base and default acoustic conditions. Pitch, timing, pronunciation, selectable Vocal Modes, and the vocoder come from `--voice`.
 
-See [the format notes](synthv-flat-format.md) and [the compatibility and verification report](synthv-flat-compatibility.md).
+See [the format notes](synthv-flat-format.md), [the compatibility and verification report](synthv-flat-compatibility.md), and [native WebGPU inference](webgpu-inference.md).
