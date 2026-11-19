@@ -45,13 +45,7 @@ impl Cache {
         }
         // The weak allocation reserves the address, including after the CPU data
         // is dropped. Dead entries are discarded when preparing new weights.
-        self.weights.retain(|_, weight| {
-            let alive = weight.source.strong_count() != 0;
-            if !alive {
-                self.weight_bytes -= weight.buffer.size();
-            }
-            alive
-        });
+        self.prune_weights();
         let started = Instant::now();
         let data = bytemuck::cast_slice(source);
         let buffer = device
@@ -91,6 +85,16 @@ impl Cache {
         buffer
     }
 
+    pub(super) fn prune_weights(&mut self) {
+        self.weights.retain(|_, weight| {
+            let alive = weight.source.strong_count() != 0;
+            if !alive {
+                self.weight_bytes -= weight.buffer.size();
+            }
+            alive
+        });
+    }
+
     pub(super) fn pipeline(
         &mut self,
         device: &Device,
@@ -117,7 +121,12 @@ impl Cache {
                 layout: None,
                 module,
                 entry_point: Some(kernel.entry),
-                compilation_options: Default::default(),
+                compilation_options: wgpu::PipelineCompilationOptions {
+                    // GRU initializes each active hidden channel before reading
+                    // it, and writes the entire next bank before switching.
+                    zero_initialize_workgroup_memory: kernel.entry != "gru_recurrent",
+                    ..Default::default()
+                },
                 cache: None,
             });
         self.pipelines.insert(kernel.entry, pipeline.clone());

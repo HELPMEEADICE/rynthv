@@ -55,19 +55,32 @@ impl Device {
     pub(in super::super) fn is_available(&self) -> bool {
         self.error.get().is_none()
     }
+
+    pub(in super::super) fn prune_weights(&self) {
+        self.cache.lock().unwrap().prune_weights();
+    }
 }
 
 pub fn list_devices() -> Vec<AdapterInfo> {
-    adapters().iter().map(adapter_info).collect()
+    adapters().1.iter().map(adapter_info).collect()
 }
 
 pub(in super::super) fn open() -> Result<Device, String> {
-    let mut adapters = adapters();
-    adapters.sort_by_key(|adapter| match adapter.get_info().device_type {
-        DeviceType::DiscreteGpu => 0,
-        DeviceType::IntegratedGpu => 1,
-        DeviceType::VirtualGpu => 2,
-        _ => 3,
+    let (backends, mut adapters) = adapters();
+    adapters.sort_by_key(|adapter| {
+        let info = adapter.get_info();
+        let device = match info.device_type {
+            DeviceType::DiscreteGpu => 0,
+            DeviceType::IntegratedGpu => 1,
+            DeviceType::VirtualGpu => 2,
+            _ => 3,
+        };
+        let api = match info.backend {
+            wgpu::Backend::Vulkan => 0,
+            wgpu::Backend::Dx12 => 1,
+            _ => 2,
+        };
+        (device, api)
     });
     let mut failures = Vec::new();
     for adapter in adapters {
@@ -109,7 +122,7 @@ pub(in super::super) fn open() -> Result<Device, String> {
         }
     }
     if failures.is_empty() {
-        Err("No native WebGPU adapter found (DX12 on Windows, Vulkan/GL on Linux)".into())
+        Err(format!("No native WebGPU adapter found for {backends:?}"))
     } else {
         Err(format!(
             "No usable WebGPU inference device: {}",
@@ -118,16 +131,23 @@ pub(in super::super) fn open() -> Result<Device, String> {
     }
 }
 
-fn adapters() -> Vec<Adapter> {
+fn adapters() -> (Backends, Vec<Adapter>) {
     let mut descriptor = wgpu::InstanceDescriptor::new_without_display_handle();
-    descriptor.backends = if cfg!(windows) {
-        Backends::DX12
+    let supported = if cfg!(windows) {
+        Backends::DX12 | Backends::VULKAN
     } else {
         Backends::VULKAN | Backends::GL
     };
+    descriptor.backends = supported & supported.with_env();
     let backends = descriptor.backends;
+    if backends.is_empty() {
+        return (backends, Vec::new());
+    }
     let instance = wgpu::Instance::new(descriptor);
-    pollster::block_on(instance.enumerate_adapters(backends))
+    (
+        backends,
+        pollster::block_on(instance.enumerate_adapters(backends)),
+    )
 }
 
 fn limits(adapter: &Adapter) -> Limits {
@@ -159,7 +179,10 @@ fn adapter_info(adapter: &Adapter) -> AdapterInfo {
     };
     AdapterInfo {
         name: info.name,
-        api: format!("{:?}", info.backend),
+        api: match info.backend {
+            wgpu::Backend::Dx12 => "DX12".into(),
+            backend => format!("{backend:?}"),
+        },
         device_type: format!("{:?}", info.device_type),
         supports_compute,
         unavailable_reason,

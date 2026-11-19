@@ -210,26 +210,32 @@ impl Gru {
     }
 
     pub(super) fn gpu_weight_len(&self) -> usize {
-        self.layers
-            .iter()
-            .map(|layer| layer.matrix().values().len() + layer.output_channels())
-            .sum()
+        self.input_channels()
+            .saturating_add(self.output_channels())
+            .saturating_add(2)
+            .saturating_mul(self.output_channels())
+            .saturating_mul(4)
     }
 
     pub(super) fn gpu_weights(&self) -> &Arc<[f32]> {
         self.gpu_weights.get_or_init(|| {
             let mut packed = Vec::with_capacity(self.gpu_weight_len());
-            for layer in &self.layers {
-                let hidden = layer.output_channels();
-                for column in 0..layer.input_channels() {
+            // One aligned vector load supplies all three gates for a connection.
+            for layers in self.layers.as_chunks::<3>().0 {
+                let hidden = self.output_channels();
+                for column in 0..layers[0].input_channels() {
                     for channel in 0..hidden {
-                        packed.push(layer.matrix().row(channel)[column]);
+                        let [reset, update, candidate] = layers
+                            .each_ref()
+                            .map(|layer| layer.matrix().row(channel)[column]);
+                        packed.extend([reset, update, candidate, 0.0]);
                     }
                 }
-                if let Some(bias) = layer.bias() {
-                    packed.extend_from_slice(bias);
-                } else {
-                    packed.resize(packed.len() + hidden, 0.0);
+                for channel in 0..hidden {
+                    let [reset, update, candidate] = layers
+                        .each_ref()
+                        .map(|layer| layer.bias().map_or(0.0, |bias| bias[channel]));
+                    packed.extend([reset, update, candidate, 0.0]);
                 }
             }
             packed.into()

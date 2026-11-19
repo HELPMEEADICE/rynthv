@@ -125,6 +125,7 @@ impl Worker {
                         dispatch,
                     )
                 });
+                compute.prune_weights();
             })
             .map_err(|error| format!("无法启动合成线程：{error}"))?;
         Ok(Self {

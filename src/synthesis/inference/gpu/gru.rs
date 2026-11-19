@@ -49,7 +49,8 @@ fn execute(
             compute::record_cpu(name, "sequence exceeds WebGPU recurrent workgroup budget");
             return Ok(false);
         }
-        work = work.saturating_add(frames.saturating_mul(op.gpu_weight_len()));
+        let gate_work = hidden.saturating_mul(op.input_channels().saturating_add(hidden));
+        work = work.saturating_add(frames.saturating_mul(gate_work).saturating_mul(3));
         lengths.extend([frames.saturating_mul(3 * hidden), op.gpu_weight_len()]);
     }
     let width = output.len() / frames;
@@ -91,7 +92,7 @@ fn encode(
     let weights = batch.weight(op.gpu_weights());
     let state = batch.input(initial);
     let projected = batch.output(frames * 3 * hidden);
-    let grid = batch.grid(((frames * 3 * hidden) as u32).div_ceil(64))?;
+    let grid = batch.grid(((frames * hidden) as u32).div_ceil(64))?;
     let mut params = [0; 16];
     params[..8].copy_from_slice(&[
         op.input_channels() as u32,

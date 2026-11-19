@@ -116,6 +116,12 @@ impl Session {
         scope(Some(self.clone()), run)
     }
 
+    pub(crate) fn prune_weights(&self) {
+        if let Some(device) = &self.0.device {
+            device.prune_weights();
+        }
+    }
+
     #[cfg(feature = "synth-profile")]
     pub fn enable_timestamps(&self) {
         self.0.timestamps.store(true, Ordering::Relaxed);
