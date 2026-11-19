@@ -1,8 +1,11 @@
+mod history;
+
 use super::{ModelRuntime, queue::SumQueue};
 use crate::synthesis::{
-    inference::{Sequence, gpu, ops::conditional::ConditionalConfig},
+    inference::{Sequence, compute, gpu::ConditionalGraph, ops::conditional::ConditionalConfig},
     voice::{PreparedModule, PreparedTree, Result, VoiceError},
 };
+use history::History;
 
 #[derive(Clone, Default)]
 struct LayerState {
@@ -18,6 +21,7 @@ pub(super) struct ConditionalState {
     residuals: Vec<usize>,
     layers: Vec<LayerState>,
     processed: bool,
+    history: Option<History>,
 }
 
 impl ConditionalState {
@@ -56,30 +60,8 @@ impl ConditionalState {
             residuals: lists.next().expect("three lists"),
             layers: vec![LayerState::default(); layers],
             processed: false,
+            history: None,
         })
-    }
-
-    pub(super) fn has_pending(&self) -> bool {
-        self.processed
-    }
-
-    pub(super) fn complete_on_gpu(
-        &self,
-        tree: &PreparedTree,
-        children: &[usize],
-        input: &Sequence,
-        condition: Option<&Sequence>,
-    ) -> Result<Option<Sequence>> {
-        gpu::conditional(
-            tree,
-            input,
-            condition,
-            &self.gates,
-            &self.skips,
-            &self.residuals,
-            condition.map(|_| children[3]),
-            self.config.output_channels,
-        )
     }
 
     pub(super) fn process(
@@ -92,7 +74,61 @@ impl ConditionalState {
     ) -> Result<Sequence> {
         #[cfg(feature = "synth-profile")]
         let _profile = crate::synthesis::profiling::span("op.conditional");
+        let tree = runtime.tree;
+        if (self.history.is_some() || !self.processed && compute::has_gpu())
+            && let Some(graph) = ConditionalGraph::prepare(
+                tree,
+                [&self.gates, &self.skips, &self.residuals],
+                condition.map(|_| children[3]),
+                self.config.output_channels,
+            )?
+        {
+            if flush && self.history.is_none() {
+                if let Some(output) = graph.execute(input, condition, 0..input.frames)? {
+                    return Ok(output);
+                }
+            } else {
+                let mut history = self.history.clone().unwrap_or_default();
+                let output = history.process(
+                    input,
+                    condition,
+                    flush,
+                    graph.radii(),
+                    self.config.output_channels,
+                    |input, condition, rows| {
+                        if let Some(output) = graph.execute(input, condition, rows.clone())? {
+                            return Ok(output);
+                        }
+                        // Replaying a bounded context is also valid on the CPU.
+                        // The original stream queues are never mixed with halo state.
+                        compute::record_cpu(
+                            "conditional",
+                            "GPU window below threshold or exceeds device budget",
+                        );
+                        let mut cpu = Self::new(tree, children, self.config)?;
+                        let mut runtime = ModelRuntime::new(tree);
+                        compute::scope(None, || {
+                            cpu.process_queued(&mut runtime, children, input, condition, true)
+                        })?
+                        .slice_frames(rows)
+                    },
+                )?;
+                self.history = (!flush).then_some(history);
+                return Ok(output);
+            }
+        }
         self.processed = true;
+        self.process_queued(runtime, children, input, condition, flush)
+    }
+
+    fn process_queued(
+        &mut self,
+        runtime: &mut ModelRuntime<'_>,
+        children: &[usize],
+        input: &Sequence,
+        condition: Option<&Sequence>,
+        flush: bool,
+    ) -> Result<Sequence> {
         let mut output = match condition {
             Some(condition) => runtime.execute(children[3], condition, flush)?,
             None => Sequence::zeros(input.frames, self.config.output_channels)?,

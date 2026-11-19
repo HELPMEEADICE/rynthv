@@ -143,6 +143,15 @@ impl<'a> Batch<'a> {
     }
 
     pub(super) fn read(&mut self, source: &Buffer, output: &mut [f32]) -> Result<(), MatrixError> {
+        self.read_from(source, 0, output)
+    }
+
+    pub(super) fn read_from(
+        &mut self,
+        source: &Buffer,
+        first: usize,
+        output: &mut [f32],
+    ) -> Result<(), MatrixError> {
         checkpoint(self.device)?;
         let bytes = output.len() as u64 * 4;
         let mut encoder = self.encoder.take().unwrap();
@@ -157,7 +166,7 @@ impl<'a> Batch<'a> {
             mapped_bytes,
             BufferUsages::MAP_READ | BufferUsages::COPY_DST,
         );
-        encoder.copy_buffer_to_buffer(source, 0, &staging, 0, Some(bytes));
+        encoder.copy_buffer_to_buffer(source, first as u64 * 4, &staging, 0, Some(bytes));
         if timestamp_bytes != 0 {
             let resolved = self.buffer(
                 timestamp_bytes,

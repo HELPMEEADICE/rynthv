@@ -16,7 +16,7 @@ mod validate;
 pub(super) use attention::attention;
 pub(super) use batch::Batch;
 pub(super) use chain::sequence;
-pub(super) use conditional::conditional;
+pub(super) use conditional::ConditionalGraph;
 pub(super) use convolution::{convolution, transpose};
 pub use device::{AdapterInfo, list_devices};
 pub(super) use device::{Device, open};
