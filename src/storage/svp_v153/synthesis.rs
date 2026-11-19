@@ -43,6 +43,7 @@ pub(super) fn import_note(note: &mut Note) -> Result<(), String> {
         "dF0Vbr",
         "pF0Vbr",
         "fF0Vbr",
+        "dF0Jitter",
         "strength",
     ] {
         note.attributes.remove(key);
