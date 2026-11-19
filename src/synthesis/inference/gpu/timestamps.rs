@@ -61,7 +61,7 @@ impl Timestamps {
     }
 
     pub(super) fn record(&self, data: &[u8], period_ns: f32, activity: &mut Activity) {
-        for (&kernel, pair) in self.kernels.iter().zip(data.chunks_exact(16)) {
+        for (&kernel, pair) in self.kernels.iter().zip(data.as_chunks::<16>().0) {
             let first = u64::from_le_bytes(pair[..8].try_into().unwrap());
             let last = u64::from_le_bytes(pair[8..].try_into().unwrap());
             let milliseconds =

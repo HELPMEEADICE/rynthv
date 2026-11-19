@@ -104,16 +104,21 @@ pub fn run(
                     engine::synthesize(voice, identity, &phrase, checkpoint)
                 }
             })
-            .map_err(|error| error.to_string())?;
+            .map_err(|error| error.to_string());
         let diagnostics = compute.take_diagnostics();
+        let failed = render.is_err();
         measurements.push(json!({
             "render_ms": started.elapsed().as_secs_f64() * 1000.0,
-            "stage_timings": render.timings,
+            "stage_timings": render.as_ref().ok().map(|render| &render.timings),
             "compute": diagnostics,
             "first_pcm_ms": first_pcm_ms,
             "pcm_chunks": chunks,
+            "error": render.as_ref().err(),
         }));
         output = Some(render);
+        if failed {
+            break;
+        }
     }
     #[cfg(feature = "synth-profile")]
     if let Some(path) = &args.profile {
@@ -123,7 +128,7 @@ pub fn run(
         let bytes = serde_json::to_vec_pretty(&profile).map_err(|error| error.to_string())?;
         rynthv::storage::atomic_write(path, &bytes)?;
     }
-    let output = output.expect("repeat is nonzero");
+    let output = output.expect("repeat is nonzero")?;
     let last = measurements.last().expect("repeat is nonzero");
     let started = Instant::now();
     save_wav(&args.wav, &output.audio).map_err(|error| error.to_string())?;
@@ -150,6 +155,12 @@ pub fn run(
         "duration_seconds": output.audio.duration_seconds(),
         "peak": peak,
         "rms": rms,
+        "pitch": {
+            "start_seconds": output.visuals.pitch.start_seconds,
+            "frame_seconds": output.visuals.pitch.frame_seconds,
+            "midi": output.visuals.pitch.values.as_ref(),
+        },
+        "phone_frame_counts": output.state.duration.durations.iter().map(|phone| phone.frames).collect::<Vec<_>>(),
         "flat_blend": blend.as_ref().map(|(_, report)| report),
         "render_ms": last["render_ms"],
         "compute": last["compute"],

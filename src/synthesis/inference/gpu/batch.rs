@@ -178,21 +178,30 @@ impl<'a> Batch<'a> {
         slice.map_async(wgpu::MapMode::Read, move |status| {
             let _ = tx.send(status);
         });
-        loop {
+        let mapped = loop {
             checkpoint(self.device)?;
             match self.device.raw.poll(wgpu::PollType::Wait {
                 submission_index: Some(submission.clone()),
                 timeout: Some(Duration::from_millis(5)),
             }) {
-                Ok(_) => break,
+                Ok(_) => {}
                 Err(wgpu::PollError::Timeout) => {}
                 Err(error) => return Err(MatrixError::Compute(error.to_string())),
             }
-        }
+            // A concurrent poll can collect the callback and deliver it after
+            // this thread's wait returns.
+            match rx.recv_timeout(Duration::from_millis(5)) {
+                Ok(status) => break status,
+                Err(mpsc::RecvTimeoutError::Timeout) => {}
+                Err(error) => {
+                    return Err(MatrixError::Compute(format!(
+                        "WebGPU readback callback: {error}"
+                    )));
+                }
+            }
+        };
         checkpoint(self.device)?;
-        rx.try_recv()
-            .map_err(|e| MatrixError::Compute(format!("WebGPU readback callback: {e}")))?
-            .map_err(|e| MatrixError::Compute(format!("WebGPU readback: {e}")))?;
+        mapped.map_err(|e| MatrixError::Compute(format!("WebGPU readback: {e}")))?;
         {
             let data = slice
                 .get_mapped_range()

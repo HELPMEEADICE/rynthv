@@ -52,7 +52,7 @@ pub(super) fn settings(app: &mut App, ui: &mut Ui) {
     let initialization = match (status.requested, &status.device, &status.error) {
         (_, Some(_), None) => "已就绪 · 支持计算",
         (Backend::Cpu, _, _) => "CPU 已就绪",
-        (Backend::Auto, None, Some(_)) => "GPU 不可用 · 使用 CPU",
+        (Backend::Auto, _, Some(_)) => "GPU 不可用 · 使用 CPU",
         _ => "WebGPU 计算失败",
     };
     row(ui, "推理设备状态", |ui| {

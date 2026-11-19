@@ -51,6 +51,10 @@ impl Device {
     pub(in super::super) fn error(&self) -> Option<String> {
         self.error.get().cloned()
     }
+
+    pub(in super::super) fn is_available(&self) -> bool {
+        self.error.get().is_none()
+    }
 }
 
 pub fn list_devices() -> Vec<AdapterInfo> {

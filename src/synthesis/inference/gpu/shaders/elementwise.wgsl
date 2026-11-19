@@ -69,8 +69,8 @@ fn layer_norm(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_in
     }
     let divisor = 1.0 / f32(channels);
     let mean = sum * divisor;
-    let std = sqrt((square_sum * divisor + bitcast<f32>(params[0].w)) - mean * mean);
-    let inverse = 1.0 / std;
+    let deviation = sqrt((square_sum * divisor + bitcast<f32>(params[0].w)) - mean * mean);
+    let inverse = 1.0 / deviation;
     let vector_end = channels & ~3u;
     for (var i = 0u; i < channels; i += 1u) {
         let centered = input[base + i] - mean;
@@ -82,7 +82,7 @@ fn layer_norm(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_in
         if (i < vector_end && params[1].x != 0u) {
             normalized = (gain * inverse) * centered;
         } else if (i == vector_end && (channels & 1u) != 0u && (params[1].x | params[1].y) != 0u) {
-            normalized = (centered * gain) / std;
+            normalized = (centered * gain) / deviation;
         } else if (params[1].x != 0u) {
             normalized = (centered * gain) * inverse;
         }

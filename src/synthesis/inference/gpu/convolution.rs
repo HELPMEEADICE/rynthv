@@ -65,8 +65,8 @@ pub(in super::super) fn transpose(
     input: &[f32],
     previous: &[f32],
     first_input: usize,
-    output: &mut [f32],
-) -> Result<bool, MatrixError> {
+    output_len: usize,
+) -> Result<Option<Vec<f32>>, MatrixError> {
     let config = op.config();
     if [first_input, config.stride, config.dilation]
         .iter()
@@ -77,8 +77,9 @@ pub(in super::super) fn transpose(
             "transposed_convolution",
             "frame address exceeds WebGPU index range",
         );
-        return Ok(false);
+        return Ok(None);
     }
+    let mut output = Vec::new();
     compute::accelerate(
         "transposed_convolution",
         work(
@@ -89,15 +90,15 @@ pub(in super::super) fn transpose(
         &[
             input.len(),
             op.shared_weights().len(),
-            output.len(),
+            output_len,
             previous.len(),
         ],
         |batch| {
             let source = batch.input(input);
             let pending = batch.input(previous);
-            let result = batch.output(output.len());
-            let grid = batch.grid((output.len() as u32).div_ceil(64))?;
-            let mut params = parameters(op, input.len(), output.len());
+            let result = batch.output(output_len);
+            let grid = batch.grid((output_len as u32).div_ceil(64))?;
+            let mut params = parameters(op, input.len(), output_len);
             params[7] = grid[0];
             params[8] = first_input as u32;
             params[9] = previous.len() as u32;
@@ -111,9 +112,11 @@ pub(in super::super) fn transpose(
                 &result,
                 Some(&pending),
             )?;
-            batch.read(&result, output)
+            output.resize(output_len, 0.0);
+            batch.read(&result, &mut output)
         },
     )
+    .map(|ran| ran.then_some(output))
 }
 
 fn work(op: &Convolution, output_values: usize) -> usize {

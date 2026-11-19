@@ -113,15 +113,17 @@ impl TransposedConvolutionStream {
                 .ok_or(MatrixError::InvalidShape)?
         };
         let previous_length = self.pending.len();
-        let mut output = vec![0.0; length];
-        let first_input = count
-            .checked_sub(frames)
-            .and_then(|frames| frames.checked_mul(op.config.stride))
-            .ok_or(MatrixError::InvalidShape)?
-            .saturating_sub(self.origin);
-        let gpu = frames != 0
-            && super::super::gpu::transpose(op, input, &self.pending, first_input, &mut output)?;
-        if gpu {
+        let gpu = if frames != 0 {
+            let first_input = self
+                .input_frames
+                .checked_mul(op.config.stride)
+                .and_then(|frame| frame.checked_sub(self.origin))
+                .ok_or(MatrixError::InvalidShape)?;
+            super::super::gpu::transpose(op, input, &self.pending, first_input, length)?
+        } else {
+            None
+        };
+        if let Some(output) = gpu {
             self.pending = output;
         } else {
             self.pending.resize(length, 0.0);
@@ -136,8 +138,6 @@ impl TransposedConvolutionStream {
                 #[cfg(feature = "synth-profile")]
                 let _profile = crate::synthesis::profiling::span("kernel.transposed_convolution");
                 for (frame, source) in input.chunks_exact(op.input_channels()).enumerate() {
-                    crate::synthesis::execution::checkpoint()
-                        .map_err(|_| ConvolutionError::Cancelled)?;
                     for tap in 0..op.config.kernel {
                         let target_frame = (self.input_frames + frame) * op.config.stride
                             + tap * op.config.dilation;

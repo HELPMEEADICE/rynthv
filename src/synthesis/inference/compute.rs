@@ -99,14 +99,16 @@ impl Session {
     }
 
     pub fn check(&self) -> Result<(), String> {
+        if self.0.requested != Backend::WebGpu {
+            return Ok(());
+        }
         match &self.0.device {
             Some(device) => device.error().map_or(Ok(()), Err),
-            None if self.0.requested == Backend::WebGpu => Err(self
+            None => Err(self
                 .0
                 .initialization_error
                 .clone()
                 .unwrap_or_else(|| "No WebGPU inference device".into())),
-            None => Ok(()),
         }
     }
 
@@ -197,6 +199,12 @@ pub(super) fn accelerate(
         }
         return Ok(false);
     };
+    if !device.is_available() && session.0.requested == Backend::Auto {
+        if let Some(operator) = operator {
+            session.record_cpu(operator, "GPU execution unavailable");
+        }
+        return Ok(false);
+    }
     if session.0.requested == Backend::Auto && work < min_auto_work {
         if let Some(operator) = operator {
             session.record_cpu(operator, "below GPU scheduling threshold");
@@ -224,7 +232,8 @@ pub(super) fn has_gpu() -> bool {
         current
             .borrow()
             .as_ref()
-            .is_some_and(|session| session.0.device.is_some())
+            .and_then(|session| session.0.device.as_ref())
+            .is_some_and(Device::is_available)
     })
 }
 
