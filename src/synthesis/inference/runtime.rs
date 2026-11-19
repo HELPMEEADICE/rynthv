@@ -119,6 +119,9 @@ impl<'a> ModelRuntime<'a> {
                 )?
             }
             PreparedModule::Pool(config) => {
+                if input.frames != 0 {
+                    super::compute::record_cpu("pooling", "CPU stream operator");
+                }
                 if let std::collections::hash_map::Entry::Vacant(entry) = self.pools.entry(index) {
                     entry.insert(config.stream(input.channels).map_err(error)?);
                 }

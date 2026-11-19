@@ -209,8 +209,19 @@ impl Convolution {
                 .ok_or(MatrixError::InvalidShape)?;
         }
         let mut output = vec![0.0; length];
+        if frames != 0 && super::gpu::convolution(self, pending, &mut output, frames)? {
+            return Ok(output);
+        }
         self.weights
             .execute_pending(self.config, pending, &mut output, self.bias.as_deref())?;
         Ok(output)
+    }
+
+    pub(super) fn shared_weights(&self) -> &Arc<[f32]> {
+        self.weights.values()
+    }
+
+    pub(super) fn shared_bias(&self) -> Option<&Arc<[f32]>> {
+        self.bias.as_ref()
     }
 }

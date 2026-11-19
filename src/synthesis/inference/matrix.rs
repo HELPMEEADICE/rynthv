@@ -14,6 +14,7 @@ pub enum MatrixError {
     UnsupportedBits(u32),
     InvalidScale,
     Parallel(String),
+    Compute(String),
     Cancelled,
 }
 
@@ -35,7 +36,7 @@ impl fmt::Display for MatrixError {
             Self::InvalidScale => {
                 f.write_str("Integer matrix scale must be finite and nonnegative")
             }
-            Self::Parallel(message) => f.write_str(message),
+            Self::Parallel(message) | Self::Compute(message) => f.write_str(message),
             Self::Cancelled => f.write_str("合成任务已由更新的编辑替代。"),
         }
     }
@@ -143,6 +144,10 @@ impl DenseMatrix {
 
     pub(super) fn row(&self, output: usize) -> &[f32] {
         &self.values[output * self.columns..(output + 1) * self.columns]
+    }
+
+    pub(super) fn values(&self) -> &Arc<[f32]> {
+        &self.values
     }
 }
 

@@ -1,10 +1,12 @@
 use serde::Serialize;
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 use wgpu::{Adapter, Backends, DeviceType, DownlevelFlags, Features, Limits};
 
 pub(in super::super) struct Device {
     pub(super) raw: wgpu::Device,
     pub(super) queue: wgpu::Queue,
+    pub(super) cache: Mutex<super::cache::Cache>,
+    pub(super) limits: Limits,
     info: AdapterInfo,
     error: Arc<OnceLock<String>>,
 }
@@ -22,6 +24,17 @@ pub struct AdapterInfo {
 }
 
 impl Device {
+    pub(in super::super) fn fits(&self, lengths: &[usize]) -> bool {
+        let limit = self
+            .limits
+            .max_storage_buffer_binding_size
+            .min(self.limits.max_buffer_size)
+            / 4;
+        lengths
+            .iter()
+            .all(|&length| length as u64 <= limit && u32::try_from(length).is_ok())
+    }
+
     pub(in super::super) fn info(&self) -> AdapterInfo {
         AdapterInfo {
             max_storage_binding_bytes: self.raw.limits().max_storage_buffer_binding_size,
@@ -80,8 +93,10 @@ pub(in super::super) fn open() -> Result<Device, String> {
                     ));
                 });
                 return Ok(Device {
+                    limits: raw.limits(),
                     raw,
                     queue,
+                    cache: Mutex::default(),
                     info,
                     error,
                 });

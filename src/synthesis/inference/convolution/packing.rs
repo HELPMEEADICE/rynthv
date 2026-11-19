@@ -62,4 +62,8 @@ impl PackedWeights {
     pub(super) fn blocks(&self) -> std::slice::ChunksExact<'_, f32> {
         self.values.chunks_exact(self.block_length)
     }
+
+    pub(in crate::synthesis::inference) fn values(&self) -> &Arc<[f32]> {
+        &self.values
+    }
 }

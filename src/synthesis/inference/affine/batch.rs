@@ -11,7 +11,7 @@ const MIN_PARALLEL_MACS: usize = 2 * 1024 * 1024;
 const MIN_TASK_MACS: usize = 256 * 1024;
 
 impl Affine {
-    pub(super) fn execute_frames(
+    pub(in crate::synthesis::inference) fn execute_frames(
         &self,
         input: &[f32],
         output: &mut [f32],

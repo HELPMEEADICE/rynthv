@@ -84,7 +84,14 @@ impl Affine {
             .ok_or(MatrixError::InvalidShape)?;
         check_length("affine input", inputs, input.len())?;
         check_length("affine output", outputs, output.len())?;
+        if frames != 0 && super::gpu::affine(self, input, output, frames)? {
+            return Ok(());
+        }
         self.execute_frames(input, output, frames)
+    }
+
+    pub(super) fn shared_bias(&self) -> Option<&Arc<[f32]>> {
+        self.bias.as_ref()
     }
 }
 

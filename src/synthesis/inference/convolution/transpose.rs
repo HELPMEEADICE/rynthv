@@ -113,24 +113,38 @@ impl TransposedConvolutionStream {
                 .ok_or(MatrixError::InvalidShape)?
         };
         let previous_length = self.pending.len();
-        self.pending.resize(length, 0.0);
-        // Unlike ordinary convolution, the transpose operation initializes
-        // each new output row with bias BEFORE adding matrix contributions.
-        if let Some(bias) = &op.bias {
-            for row in self.pending[previous_length..].chunks_exact_mut(output_channels) {
-                row.copy_from_slice(bias);
+        let mut output = vec![0.0; length];
+        let first_input = count
+            .checked_sub(frames)
+            .and_then(|frames| frames.checked_mul(op.config.stride))
+            .ok_or(MatrixError::InvalidShape)?
+            .saturating_sub(self.origin);
+        let gpu = frames != 0
+            && super::super::gpu::transpose(op, input, &self.pending, first_input, &mut output)?;
+        if gpu {
+            self.pending = output;
+        } else {
+            self.pending.resize(length, 0.0);
+            // Unlike ordinary convolution, the transpose operation initializes
+            // each new output row with bias BEFORE adding matrix contributions.
+            if let Some(bias) = &op.bias {
+                for row in self.pending[previous_length..].chunks_exact_mut(output_channels) {
+                    row.copy_from_slice(bias);
+                }
             }
-        }
-        {
-            #[cfg(feature = "synth-profile")]
-            let _profile = crate::synthesis::profiling::span("kernel.transposed_convolution");
-            for (frame, source) in input.chunks_exact(op.input_channels()).enumerate() {
-                for tap in 0..op.config.kernel {
-                    let target_frame =
-                        (self.input_frames + frame) * op.config.stride + tap * op.config.dilation;
-                    let offset = (target_frame - self.origin) * output_channels;
-                    let target = &mut self.pending[offset..offset + output_channels];
-                    op.weights.accumulate(tap, source, target);
+            {
+                #[cfg(feature = "synth-profile")]
+                let _profile = crate::synthesis::profiling::span("kernel.transposed_convolution");
+                for (frame, source) in input.chunks_exact(op.input_channels()).enumerate() {
+                    crate::synthesis::execution::checkpoint()
+                        .map_err(|_| ConvolutionError::Cancelled)?;
+                    for tap in 0..op.config.kernel {
+                        let target_frame = (self.input_frames + frame) * op.config.stride
+                            + tap * op.config.dilation;
+                        let offset = (target_frame - self.origin) * output_channels;
+                        let target = &mut self.pending[offset..offset + output_channels];
+                        op.weights.accumulate(tap, source, target);
+                    }
                 }
             }
         }

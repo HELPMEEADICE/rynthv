@@ -200,17 +200,17 @@ impl Gru {
     }
 
     fn step_validated(&self, input: &[f32], state: &mut GruState) -> Result<(), RecurrentError> {
-        self.layers[0].execute(input, &mut state.scratch)?;
+        self.layers[0].execute_frames(input, &mut state.scratch, 1)?;
         self.layers[3].execute_accumulate(&state.hidden, &mut state.scratch)?;
         sigmoid(&state.scratch, &mut state.reset)?;
 
-        self.layers[1].execute(input, &mut state.scratch)?;
+        self.layers[1].execute_frames(input, &mut state.scratch, 1)?;
         self.layers[4].execute_accumulate(&state.hidden, &mut state.scratch)?;
         sigmoid(&state.scratch, &mut state.update)?;
 
         // Reset is applied AFTER the recurrent candidate affine, including its
         // bias, not to h before the matrix multiply.
-        self.layers[5].execute(&state.hidden, &mut state.candidate)?;
+        self.layers[5].execute_frames(&state.hidden, &mut state.candidate, 1)?;
         for (candidate, reset) in state.candidate.iter_mut().zip(&state.reset) {
             *candidate *= reset;
         }
