@@ -123,6 +123,7 @@ fn reserved_name(name: &str) -> bool {
 impl Runtime {
     pub fn export_ready(&self, revision: u64) -> bool {
         self.last_revision == Some(revision)
+            && self.last_audio_generation == self.instrumentals.generation
             && self.export.is_none()
             && self.recording_error.is_none()
             && self.recordings.pending.is_empty()
@@ -139,7 +140,11 @@ impl Runtime {
 
     pub fn export_project(&mut self, request: ExportRequest, revision: u64) {
         if !self.export_ready(revision) {
-            self.export_result = Some(Err("请等待当前工程合成完成后再导出".into()));
+            let error = self
+                .recording_error
+                .clone()
+                .unwrap_or_else(|| "请等待当前工程合成完成后再导出".into());
+            self.export_result = Some(Err(error));
             return;
         }
         let owners = self.export_owners.clone();

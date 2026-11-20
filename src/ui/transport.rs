@@ -23,15 +23,20 @@ pub fn show(app: &mut App, ui: &mut Ui) {
                 .icon_size(21.0)
         };
         let transport = &mut app.editor.transport;
+        let recording_error = app.synthesis.recording_error.as_deref();
         if ui
-            .add(button(
-                if transport.playing {
-                    Icon::Pause
-                } else {
-                    Icon::Play
-                },
-                "播放 / 暂停（Space）",
-            ))
+            .add_enabled(
+                recording_error.is_none(),
+                button(
+                    if transport.playing {
+                        Icon::Pause
+                    } else {
+                        Icon::Play
+                    },
+                    "播放 / 暂停（Space）",
+                ),
+            )
+            .on_disabled_hover_text(recording_error.unwrap_or_default())
             .clicked()
         {
             transport.toggle();

@@ -62,7 +62,12 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
                 ready,
                 Button::new("导出为文件").min_size(vec2(ui.available_width(), 28.0)),
             )
-            .on_disabled_hover_text("等待伴奏加载和当前歌声合成完成后导出")
+            .on_disabled_hover_text(
+                app.synthesis
+                    .recording_error
+                    .as_deref()
+                    .unwrap_or("等待伴奏加载和当前歌声合成完成后导出"),
+            )
             .clicked();
         if app.synthesis.is_exporting() {
             ui.horizontal(|ui| {

@@ -203,9 +203,7 @@ impl Runtime {
         self.aggregate_voices();
     }
     pub fn playback_error(&self) -> Option<String> {
-        self.recording_error
-            .clone()
-            .or_else(|| self.playback.snapshot().error)
+        self.playback.snapshot().error
     }
     pub fn audition_key(&self, note: Option<u8>) {
         self.playback.audition_key(note);
@@ -248,7 +246,7 @@ impl Runtime {
     }
     pub fn status(&self) -> &'static str {
         if self.recording_error.is_some() {
-            "伴奏混音失败 · 查看渲染面板"
+            "伴奏不可用 · 查看渲染面板"
         } else if !self.recordings.pending.is_empty() {
             "伴奏未就绪 · 查看伴奏轨"
         } else if self.library.is_scanning() {

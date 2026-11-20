@@ -34,6 +34,9 @@ pub fn render_status(app: &mut App, ui: &mut Ui) {
     if (stats.failed > 0 || app.synthesis.error.is_some()) && ui.button("重试合成").clicked() {
         app.synthesis.retry();
     }
+    if let Some(error) = &app.synthesis.recording_error {
+        ui.colored_label(Color32::from_rgb(218, 142, 126), error);
+    }
     if let Some(error) = app.synthesis.playback_error() {
         ui.colored_label(
             Color32::from_rgb(218, 142, 126),

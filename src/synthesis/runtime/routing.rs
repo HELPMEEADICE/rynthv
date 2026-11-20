@@ -165,6 +165,7 @@ impl Runtime {
             Err(error) => {
                 self.project_error = Some(error);
                 self.recordings = super::mixer::RecordingMix::default();
+                self.recording_error = None;
                 for voice in self.voices.values_mut() {
                     if let Some(worker) = &voice.worker {
                         worker.send(worker::Command::Reset);

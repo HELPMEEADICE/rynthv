@@ -502,7 +502,9 @@ impl eframe::App for App {
             self.synthesis
                 .sync_project(&self.editor.project, self.editor.revision);
         }
-        if self.editor.transport.playing {
+        if self.synthesis.recording_error.is_some() {
+            self.editor.transport.playing = false;
+        } else if self.editor.transport.playing {
             self.editor.transport.constrain_to_loop();
         }
         self.synthesis.set_loop_range(

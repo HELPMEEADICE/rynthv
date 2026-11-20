@@ -53,6 +53,8 @@ pub(crate) fn recordings(
                 frames,
                 gains,
             });
+        } else if let Some(error) = library.error(&clip.path) {
+            return Err(format!("伴奏音轨 {} 加载失败：{error}", track.name));
         } else {
             mix.pending.push(start..end);
         }

@@ -157,7 +157,12 @@ pub fn menus(app: &mut App, ui: &mut Ui) {
             item(ui, "设置歌声", "", false);
         });
         ui.menu_button("走带控制", |ui| {
-            if item(ui, "播放 / 暂停", "Space", true) {
+            if item(
+                ui,
+                "播放 / 暂停",
+                "Space",
+                app.synthesis.recording_error.is_none(),
+            ) {
                 app.editor.transport.toggle();
             }
             if item(ui, "停止", "Ctrl+Space", true) {
@@ -333,7 +338,7 @@ pub fn shortcuts(app: &mut App, ctx: &Context) {
     }
     if command(Key::Space, ctrl) {
         app.editor.transport.stop();
-    } else if command(Key::Space, Modifiers::NONE) {
+    } else if command(Key::Space, Modifiers::NONE) && app.synthesis.recording_error.is_none() {
         app.editor.transport.toggle();
     }
     if command(Key::End, ctrl) {
