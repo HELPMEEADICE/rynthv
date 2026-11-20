@@ -1,8 +1,16 @@
 use crate::model::*;
-use std::{collections::HashSet, fs, io::Write, path::Path};
+use std::{
+    collections::HashSet,
+    fs,
+    io::{Read, Write},
+    path::Path,
+};
 
 mod identity;
 mod svp_v153;
+
+const MAX_PROJECT_MIB: u64 = 64;
+const MAX_PROJECT_BYTES: u64 = MAX_PROJECT_MIB * 1024 * 1024;
 
 pub struct LoadedProject {
     pub project: Project,
@@ -10,10 +18,13 @@ pub struct LoadedProject {
 }
 
 pub fn load(path: &Path) -> Result<LoadedProject, String> {
-    if fs::metadata(path).map_err(|e| e.to_string())?.len() > 64 * 1024 * 1024 {
-        return Err("工程超过 64 MiB 读取上限".into());
-    }
-    let bytes = fs::read(path).map_err(|e| e.to_string())?;
+    let file = fs::File::open(path).map_err(|e| e.to_string())?;
+    check_project_size(file.metadata().map_err(|e| e.to_string())?.len())?;
+    let mut bytes = Vec::new();
+    file.take(MAX_PROJECT_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| e.to_string())?;
+    check_project_size(bytes.len() as u64)?;
     let mut project: Project =
         serde_json::from_slice(&bytes).map_err(|e| format!("SVP 解析失败：{e}"))?;
     let imported = match project.version {
@@ -73,7 +84,15 @@ pub fn save(path: &Path, project: &Project) -> Result<(), String> {
         group.notes.sort_by_key(|n| n.onset);
     }
     let bytes = serde_json::to_vec_pretty(&ordered).map_err(|e| e.to_string())?;
+    check_project_size(bytes.len() as u64)?;
     atomic_write(path, &bytes)
+}
+
+fn check_project_size(bytes: u64) -> Result<(), String> {
+    if bytes > MAX_PROJECT_BYTES {
+        return Err(format!("工程超过 {MAX_PROJECT_MIB} MiB 文件大小上限"));
+    }
+    Ok(())
 }
 
 pub fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), String> {
