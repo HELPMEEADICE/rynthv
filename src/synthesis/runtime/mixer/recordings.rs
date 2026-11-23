@@ -23,13 +23,15 @@ pub(crate) fn recordings(
         let Some(clip) = track.audio_clip() else {
             continue;
         };
-        let start = (clip.onset_seconds * sample_rate).round() as usize;
-        let end = (clip.end_seconds() * sample_rate).ceil() as usize;
-        mix.end = mix.end.max(end);
+        if !clip.valid() {
+            return Err(format!("伴奏音轨 {} 的片段时间无效", track.name));
+        }
         let controls = Controls::read(&track.mixer)?;
         if controls.mute || (!solo.is_empty() && !solo.contains(&track.id)) {
             continue;
         }
+        let start = (clip.onset_seconds * sample_rate).round() as usize;
+        let requested_end = (clip.end_seconds() * sample_rate).ceil() as usize;
         if let Some(asset) = library.asset(&clip.path) {
             let source_start = (clip.source_offset_seconds * sample_rate).round() as usize;
             let frames = asset
@@ -45,6 +47,7 @@ pub(crate) fn recordings(
             if gains.iter().any(|gain| !gain.is_finite()) {
                 return Err(format!("音轨 {} 的音量超出有效范围", track.name));
             }
+            mix.end = mix.end.max(start.saturating_add(frames));
             mix.layers.push(AudioLayer {
                 track_id: track.id,
                 audio: Arc::clone(&asset.audio),
@@ -56,7 +59,8 @@ pub(crate) fn recordings(
         } else if let Some(error) = library.error(&clip.path) {
             return Err(format!("伴奏音轨 {} 加载失败：{error}", track.name));
         } else {
-            mix.pending.push(start..end);
+            mix.end = mix.end.max(requested_end);
+            mix.pending.push(start..requested_end);
         }
     }
     Ok(mix)

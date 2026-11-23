@@ -38,16 +38,22 @@ impl ExportRequest {
             return Err("请选择有效的目标文件夹".into());
         }
         let name = text("filename").trim();
+        let stem = if name.len() >= 4 && name[name.len() - 4..].eq_ignore_ascii_case(".wav") {
+            &name[..name.len() - 4]
+        } else {
+            name
+        };
         if name.is_empty()
             || name.ends_with(['.', ' '])
+            || stem.is_empty()
+            || stem.ends_with(['.', ' '])
             || name
                 .chars()
                 .any(|c| c.is_control() || "<>:\"/\\|?*".contains(c))
         {
             return Err("文件名称为空或含有无效字符".into());
         }
-        let stem = name.strip_suffix(".wav").unwrap_or(name);
-        if stem.is_empty() || reserved_name(stem) {
+        if reserved_name(stem) {
             return Err("请使用有效的文件名称".into());
         }
         let sample_rate = number("sampleRate");

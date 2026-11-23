@@ -188,7 +188,10 @@ impl Runtime {
         let Some(dialog) = &mut self.context_import.dialog else {
             return;
         };
-        if dialog.phase == ContextImportPhase::Importing
+        if matches!(
+            dialog.phase,
+            ContextImportPhase::Importing | ContextImportPhase::Discovering
+        ) || self.context_import.task.is_some()
             || dialog.source != ContextImportSource::Online
             || !session_identity::supports_online_import()
         {

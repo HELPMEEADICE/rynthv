@@ -20,7 +20,12 @@ pub(super) fn validate_project_mixer(value: Option<&Value>) -> Result<(), String
 pub(super) fn validate_mixer(mixer: &Extra) -> Result<(), String> {
     for (key, value) in mixer {
         let supported = match key.as_str() {
-            "gainDecibel" | "pan" => value.as_f64().is_some_and(f64::is_finite),
+            "gainDecibel" => value
+                .as_f64()
+                .is_some_and(|db| (10.0_f64.powf(db / 20.0) as f32).is_finite()),
+            "pan" => value
+                .as_f64()
+                .is_some_and(|pan| pan.is_finite() && (-1.0..=1.0).contains(&pan)),
             "mute" | "solo" | "display" => value.is_boolean(),
             "fxPresetName" => value.is_string(),
             "fxParams" => {

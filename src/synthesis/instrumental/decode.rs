@@ -3,14 +3,23 @@ use crate::synthesis::{
     audio::{ChannelLayout, RenderedAudio, conversion},
     rendered::Waveform,
 };
-use std::{fs::File, path::Path, sync::Arc};
+use std::{
+    fs::File,
+    path::Path,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+};
 use symphonia::core::{
     codecs::audio::AudioDecoderOptions,
     formats::{TrackType, probe::Hint},
     io::MediaSourceStream,
 };
 
-pub(super) fn load(path: &Path) -> Result<AudioAsset, String> {
+const MAX_SAMPLES: usize = 512 * 1024 * 1024;
+
+pub(super) fn load(path: &Path, cancelled: &AtomicBool) -> Result<AudioAsset, String> {
     let file = File::open(path).map_err(|e| format!("无法打开音频文件：{e}"))?;
     let stream = MediaSourceStream::new(Box::new(file), Default::default());
     let mut hint = Hint::new();
@@ -35,6 +44,9 @@ pub(super) fn load(path: &Path) -> Result<AudioAsset, String> {
     let mut spec = None;
     let mut samples = Vec::<f32>::new();
     while let Some(packet) = format.next_packet().map_err(|e| e.to_string())? {
+        if cancelled.load(Ordering::Relaxed) {
+            return Err("音频加载已取消".into());
+        }
         if packet.track_id != id {
             continue;
         }
@@ -47,15 +59,26 @@ pub(super) fn load(path: &Path) -> Result<AudioAsset, String> {
         if spec.as_ref().is_some_and(|s| s != audio.spec()) {
             return Err("不支持采样率或声道数在文件中途变化的音频".into());
         }
-        if !(1..=2).contains(&audio.spec().channels().count()) {
+        let channels = audio.spec().channels().count();
+        if !(1..=2).contains(&channels) {
             return Err("目前支持单声道和立体声音频".into());
+        }
+        if !(1..=384_000).contains(&audio.spec().rate()) {
+            return Err("音频采样率不在 1..=384000 Hz 范围内".into());
         }
         spec = Some(audio.spec().clone());
         let count = audio.samples_interleaved();
         let start = samples.len();
         let end = start
             .checked_add(count)
-            .filter(|n| *n <= 512 * 1024 * 1024)
+            .filter(|n| *n <= MAX_SAMPLES)
+            .filter(|n| {
+                let source_frames = (*n / channels) as u128;
+                let resampled_frames = source_frames
+                    .saturating_mul(48_000)
+                    .div_ceil(u128::from(audio.spec().rate()));
+                resampled_frames.saturating_mul(channels as u128) <= MAX_SAMPLES as u128
+            })
             .ok_or("音频解码后超过 2 GiB，请拆分文件后导入")?;
         samples
             .try_reserve(count)
@@ -63,20 +86,23 @@ pub(super) fn load(path: &Path) -> Result<AudioAsset, String> {
         samples.resize(end, 0.0);
         audio.copy_to_slice_interleaved(&mut samples[start..]);
     }
+    if cancelled.load(Ordering::Relaxed) {
+        return Err("音频加载已取消".into());
+    }
     let spec = spec.ok_or("音频文件为空")?;
     let layout = if spec.channels().count() == 1 {
         ChannelLayout::Mono
     } else {
         ChannelLayout::Stereo
     };
-    let source =
-        RenderedAudio::new(spec.rate(), 0.0, layout, samples).map_err(|e| e.to_string())?;
-    let audio = Arc::new(if source.sample_rate() == 48_000 {
-        source
+    let audio = Arc::new(if spec.rate() == 48_000 {
+        RenderedAudio::new(48_000, 0.0, layout, samples).map_err(|e| e.to_string())?
     } else {
-        let converted = conversion::convert(&source, 48_000, layout).map_err(|e| e.to_string())?;
-        drop(source);
-        converted
+        if samples.iter().any(|sample| !sample.is_finite()) {
+            return Err("音频包含非有限采样值".into());
+        }
+        conversion::convert_samples(spec.rate(), 0.0, layout, &samples, 48_000, layout)
+            .map_err(|e| e.to_string())?
     });
     let waveforms = (0..layout.channels())
         .map(|c| Waveform::new_channel(&audio, c))

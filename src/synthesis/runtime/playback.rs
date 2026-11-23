@@ -129,10 +129,12 @@ impl Playback {
             && state.serial == self.latest.load(Ordering::Acquire)
             && let Some(control) = &state.control
         {
-            state.error = control
-                .request(playing, seek)
-                .err()
-                .map(|error| error.to_string());
+            if playing && state.error.is_some() {
+                return;
+            }
+            if let Err(error) = control.request(playing, seek) {
+                state.error = Some(error.to_string());
+            }
             return;
         }
         self.send(Transport::Control { playing, seek });

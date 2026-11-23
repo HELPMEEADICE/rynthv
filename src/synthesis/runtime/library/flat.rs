@@ -41,6 +41,9 @@ impl VoiceLibrary {
 
 impl Runtime {
     pub fn set_flat_databases(&mut self, path: PathBuf) {
+        if self.library.settings.flat_databases.as_ref() == Some(&path) {
+            return;
+        }
         let mut settings = self.library.settings.clone();
         settings.flat_databases = Some(path);
         if !self.library.flat_busy() && self.library.update(settings) {
@@ -49,6 +52,9 @@ impl Runtime {
     }
 
     pub fn set_flat_models(&mut self, path: Option<PathBuf>) {
+        if self.library.settings.flat_models == path {
+            return;
+        }
         let mut settings = self.library.settings.clone();
         settings.flat_models = path;
         if !self.library.flat_busy() && self.library.update(settings) {

@@ -206,6 +206,9 @@ impl Runtime {
         self.library.settings.dictionaries.as_deref()
     }
     pub fn set_databases(&mut self, path: PathBuf) {
+        if self.library.settings.databases.as_ref() == Some(&path) {
+            return;
+        }
         let mut settings = self.library.settings.clone();
         settings.databases = Some(path);
         if self.library.update(settings) {
@@ -213,6 +216,9 @@ impl Runtime {
         }
     }
     pub fn set_sv1_databases(&mut self, path: PathBuf) {
+        if self.library.settings.sv1_databases.as_ref() == Some(&path) {
+            return;
+        }
         let mut settings = self.library.settings.clone();
         settings.sv1_databases = Some(path);
         if self.library.update(settings) {
@@ -220,6 +226,9 @@ impl Runtime {
         }
     }
     pub fn set_dictionaries(&mut self, path: PathBuf) {
+        if self.library.settings.dictionaries.as_ref() == Some(&path) {
+            return;
+        }
         let mut settings = self.library.settings.clone();
         settings.dictionaries = Some(path);
         if self.library.update(settings) {

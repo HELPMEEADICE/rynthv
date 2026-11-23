@@ -43,20 +43,16 @@ impl PcmStore {
     }
 
     /// Dirty blocks remain available solely as seam context, not playback.
-    pub fn from_existing(base: &PcmComponents, dirty: Range<usize>) -> Result<Self> {
+    pub fn from_existing(base: &PcmComponents, dirty: Range<i64>) -> Result<Self> {
         if base.primary.len() != base.secondary.len() || dirty.start >= dirty.end {
             return Err(VoiceError::new("Invalid progressive PCM baseline"));
         }
         let mut store = Self::new(base.start_seconds, base.primary.len())?;
         store.samples = [base.primary.to_vec(), base.secondary.to_vec()];
         store.ready.fill(true);
-        let first = i64::try_from(dirty.start)
-            .map_err(|_| VoiceError::new("Progressive dirty block overflow"))?;
-        let stop = i64::try_from(dirty.end)
-            .map_err(|_| VoiceError::new("Progressive dirty block overflow"))?;
         for (index, ready) in store.ready.iter_mut().enumerate() {
             let block = store.first_block + index as i64;
-            if (first..stop).contains(&block) {
+            if dirty.contains(&block) {
                 *ready = false;
             }
         }

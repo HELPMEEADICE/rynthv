@@ -34,22 +34,33 @@ pub(super) fn run(
             Ok(Command::Transport(serial, command)) => {
                 let resets_error = !matches!(&command, Transport::Control { .. });
                 let result = apply(command, &mut player, serial, &pending, &piano, &looping);
-                match result {
-                    Err(error) => command_error = Some(error),
-                    Ok(())
-                        if resets_error
-                            || player.as_ref().and_then(Player::position_seconds).is_some() =>
-                    {
-                        command_error = None
+                let ok = match result {
+                    Err(error) => {
+                        command_error = Some(error);
+                        false
                     }
-                    Ok(()) => {}
-                }
+                    Ok(()) => {
+                        if resets_error
+                            || player.as_ref().and_then(Player::position_seconds).is_some()
+                        {
+                            command_error = None;
+                        }
+                        true
+                    }
+                };
                 if let Ok(mut status) = published.lock()
                     && serial == pending.load(Ordering::Acquire)
                 {
                     status.serial = serial;
                     status.error = command_error.clone();
+                    if ok
+                        && command_error.is_none()
+                        && player.as_ref().and_then(Player::position_seconds).is_some()
+                    {
+                        status.audition_error = None;
+                    }
                 }
+                repaint.request_repaint();
             }
             Err(RecvTimeoutError::Timeout) => {}
         }

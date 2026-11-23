@@ -19,7 +19,11 @@ impl AudioLayer {
     }
 
     pub(crate) fn sample(&self, position: f64) -> [f32; 2] {
-        if position < self.start_frame as f64 || position >= self.end_frame() as f64 {
+        if self.frames == 0
+            || !position.is_finite()
+            || position < self.start_frame as f64
+            || position >= self.end_frame() as f64
+        {
             return [0.0; 2];
         }
         let local = position - self.start_frame as f64;

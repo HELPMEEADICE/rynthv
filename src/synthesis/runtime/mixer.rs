@@ -199,7 +199,7 @@ impl Controls {
             return Err("声像 pan 必须在 -1 到 1 之间".into());
         }
         let gain = 10.0_f64.powf(decibels / 20.0);
-        if !gain.is_finite() {
+        if !(gain as f32).is_finite() {
             return Err("gainDecibel 产生了非有限增益".into());
         }
         Ok(Self {

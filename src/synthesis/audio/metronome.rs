@@ -35,8 +35,14 @@ impl Metronome {
         let index = (tick - start) / step;
         let onset = start + index * step;
         let frame = |tick| (self.time.seconds_at(tick) * f64::from(LIVE_SAMPLE_RATE)).round();
+        let onset_frame = frame(onset);
         Beat {
-            frame: frame(onset),
+            start: if bar == 0 && index == 0 {
+                0.0
+            } else {
+                position.min(onset_frame)
+            },
+            frame: onset_frame,
             next: frame(onset.saturating_add(step)),
             accent: index == 0,
         }
@@ -44,6 +50,7 @@ impl Metronome {
 }
 
 struct Beat {
+    start: f64,
     frame: f64,
     next: f64,
     accent: bool,
@@ -63,13 +70,13 @@ impl<'a> MetronomeSampler<'a> {
     }
 
     pub fn sample(&mut self, position: f64) -> f32 {
-        if !self.metronome.enabled.load(Ordering::Relaxed) {
+        if !position.is_finite() || !self.metronome.enabled.load(Ordering::Relaxed) {
             return 0.0;
         }
         if self
             .beat
             .as_ref()
-            .is_none_or(|beat| position < beat.frame || position >= beat.next)
+            .is_none_or(|beat| position < beat.start || position >= beat.next)
         {
             self.beat = Some(self.metronome.beat_at(position));
         }

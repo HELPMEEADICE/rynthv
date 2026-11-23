@@ -107,7 +107,7 @@ fn choose_anchor(old: &[f32], fresh: &[f32], count: usize, fade: usize, period: 
         return anchor;
     }
     let mut prefix = vec![0.0_f32; count];
-    let mut best = 1e9_f32;
+    let mut best = f32::INFINITY;
     for phase in 0..10 {
         let offset = ((phase as f64 / 10.0) * period as f64) as usize;
         let mut sum = 0.0_f32;
@@ -150,7 +150,7 @@ fn choose_shift(
             as f32;
     }
     let mut shift = 0;
-    let mut best = 1e9_f32;
+    let mut best = f32::INFINITY;
     for index in 1..scores.len().saturating_sub(1) {
         if scores[index] < scores[index - 1]
             && scores[index] < scores[index + 1]

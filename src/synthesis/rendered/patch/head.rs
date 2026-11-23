@@ -26,7 +26,7 @@ pub fn splice_head(
     let fade = block_samples.min(MAX_FADE_SAMPLES);
     let radius = ((block_samples / 2).min(fade * 2) / 2) as i32;
     let mut shift = 0_i32;
-    let mut best = 1e9_f32;
+    let mut best = f32::INFINITY;
     let seam_start = block_samples - fade;
     if seam_start < radius as usize {
         return Err(VoiceError::new(

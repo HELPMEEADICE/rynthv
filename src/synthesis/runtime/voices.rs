@@ -107,6 +107,7 @@ impl Runtime {
             worker::Event::Ready => {
                 v.ready = true;
                 v.context_required = false;
+                self.last_revision = None;
             }
             worker::Event::ContextRequired { error } => {
                 v.context_required = true;

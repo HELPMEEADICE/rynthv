@@ -6,7 +6,11 @@ use crate::model::Project;
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
-    sync::{Arc, mpsc},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+        mpsc,
+    },
     thread,
 };
 
@@ -16,9 +20,20 @@ pub struct AudioAsset {
 }
 
 enum Entry {
-    Loading(mpsc::Receiver<Result<Arc<AudioAsset>, String>>),
+    Loading {
+        rx: mpsc::Receiver<Result<Arc<AudioAsset>, String>>,
+        cancel: Arc<AtomicBool>,
+    },
     Ready(Arc<AudioAsset>),
     Failed(String),
+}
+
+impl Drop for Entry {
+    fn drop(&mut self) {
+        if let Self::Loading { cancel, .. } = self {
+            cancel.store(true, Ordering::Relaxed);
+        }
+    }
 }
 
 #[derive(Default)]
@@ -53,7 +68,9 @@ impl AudioLibrary {
 
     pub fn poll(&mut self) {
         for entry in self.entries.values_mut() {
-            let Entry::Loading(rx) = entry else { continue };
+            let Entry::Loading { rx, .. } = entry else {
+                continue;
+            };
             let result = match rx.try_recv() {
                 Ok(result) => result,
                 Err(mpsc::TryRecvError::Empty) => continue,
@@ -92,21 +109,25 @@ impl AudioLibrary {
             return;
         }
         let (tx, rx) = mpsc::sync_channel(1);
+        let cancel = Arc::new(AtomicBool::new(false));
+        let worker_cancel = Arc::clone(&cancel);
         let file = path.clone();
         let ctx = ctx.clone();
         let result = thread::Builder::new()
             .name("audio-import".into())
             .spawn(move || {
-                let result = decode::load(&file)
+                let result = decode::load(&file, &worker_cancel)
                     .map(Arc::new)
                     .map_err(|error| format!("{}：{error}", file.display()));
-                let _ = tx.send(result);
-                ctx.request_repaint();
+                if !worker_cancel.load(Ordering::Relaxed) {
+                    let _ = tx.send(result);
+                    ctx.request_repaint();
+                }
             });
         self.entries.insert(
             path,
             match result {
-                Ok(_) => Entry::Loading(rx),
+                Ok(_) => Entry::Loading { rx, cancel },
                 Err(error) => Entry::Failed(format!("无法加载音频：{error}")),
             },
         );

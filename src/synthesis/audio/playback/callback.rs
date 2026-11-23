@@ -55,6 +55,7 @@ pub(super) fn build<T: SizedSample + FromSample<f32>>(
                 f32::from_bits(controls.gain.load(Ordering::Relaxed))
             });
             let mut buffering = false;
+            let mut natural_end = false;
             let mut sampler = session.map(|session| MixSampler::new(&session.audio));
             let mut project_active = session.is_some();
             for frame in output.chunks_exact_mut(channels) {
@@ -62,10 +63,14 @@ pub(super) fn build<T: SizedSample + FromSample<f32>>(
                 if project_active
                     && let (Some(controls), Some(sampler)) = (controls, sampler.as_mut())
                 {
-                    if (loop_range.is_none() && cursor >= controls.device_frames)
+                    let reached_end = loop_range.is_none() && cursor >= controls.device_frames;
+                    if reached_end
                         || !controls.playing.load(Ordering::Acquire)
                         || controls.position.load(Ordering::Acquire) != start
                     {
+                        if reached_end {
+                            natural_end = true;
+                        }
                         project_active = false;
                     } else if let Some(sample) = sampler.sample(cursor as f64 * step) {
                         stereo = sample;
@@ -102,8 +107,11 @@ pub(super) fn build<T: SizedSample + FromSample<f32>>(
                     )
                     .is_ok()
             {
+                if natural_end {
+                    controls.playing.store(false, Ordering::Release);
+                }
                 controls.buffering.store(
-                    buffering && controls.playing.load(Ordering::Acquire),
+                    !natural_end && buffering && controls.playing.load(Ordering::Acquire),
                     Ordering::Release,
                 );
             }

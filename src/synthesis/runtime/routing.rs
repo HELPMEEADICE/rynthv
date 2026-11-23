@@ -170,9 +170,13 @@ impl Runtime {
                     if let Some(worker) = &voice.worker {
                         worker.send(worker::Command::Reset);
                     }
+                    voice.waiting = false;
                     voice.live = None;
                     voice.audio = None;
                     voice.owners.clear();
+                    voice.failures.clear();
+                    voice.stats = Default::default();
+                    voice.progress = None;
                     voice.plan = RenderPlan::default();
                     voice.revision = self.request_serial;
                 }
@@ -235,7 +239,6 @@ impl Runtime {
                 output_controls,
             };
             voice.revision = self.request_serial;
-            voice.solo = self.solo_tracks.clone();
             voice.live = None;
             voice.audio = None;
             voice.owners.clear();
@@ -254,8 +257,9 @@ impl Runtime {
                     revision: voice.revision,
                     solo_tracks: self.solo_tracks.clone(),
                 });
+                voice.solo = self.solo_tracks.clone();
+                voice.plan = subset;
             }
-            voice.plan = subset;
         }
     }
 }

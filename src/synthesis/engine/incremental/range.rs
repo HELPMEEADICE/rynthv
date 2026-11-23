@@ -18,8 +18,8 @@ pub struct IncrementalEdit {
     pub previous_records: Range<usize>,
     pub work_records: Range<usize>,
     pub write_frames: Range<usize>,
-    pub first_block: usize,
-    pub stop_block: usize,
+    pub first_block: i64,
+    pub stop_block: i64,
 }
 
 impl IncrementalEdit {
@@ -113,8 +113,8 @@ impl IncrementalEdit {
             new.tempo
                 .seconds_at(GlobalBlick(blick.saturating_add(new.content_offset.0)))
         };
-        let first_block = (seconds(core_begin).max(0.0) * 2.0).floor() as usize;
-        let stop_block = (seconds(core_end).max(0.0) * 2.0).ceil() as usize;
+        let first_block = (seconds(core_begin) * 2.0).floor() as i64;
+        let stop_block = (seconds(core_end) * 2.0).ceil() as i64;
         if work_records.is_empty() || write_frames.is_empty() || first_block >= stop_block {
             return Ok(None);
         }
