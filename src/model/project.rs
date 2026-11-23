@@ -124,8 +124,10 @@ impl GroupRef {
         global >= self.blick_absolute_begin && global < self.visible_end()
     }
     pub fn note_range(&self, note: &Note) -> Option<(i64, i64)> {
-        let start = (note.onset + self.blick_offset).max(self.blick_absolute_begin);
-        let end = (note.onset + note.duration + self.blick_offset).min(self.visible_end());
+        let onset = note.onset.checked_add(self.blick_offset)?;
+        let note_end = onset.checked_add(note.duration)?;
+        let start = onset.max(self.blick_absolute_begin);
+        let end = note_end.min(self.visible_end());
         (start < end).then_some((start, end))
     }
     pub fn new(group: &Group, end: i64) -> Self {

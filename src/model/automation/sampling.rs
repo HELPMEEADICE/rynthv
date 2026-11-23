@@ -10,9 +10,9 @@ pub struct AutomationSampler<'a> {
 
 #[derive(Clone, Copy)]
 struct CubicSegment {
-    width: f32,
-    left_tangent: f32,
-    right_tangent: f32,
+    width: f64,
+    left_tangent: f64,
+    right_tangent: f64,
 }
 
 impl<'a> AutomationSampler<'a> {
@@ -56,15 +56,14 @@ impl<'a> AutomationSampler<'a> {
         if position == right_point.0 {
             return Ok(f64::from(right_point.1 as f32));
         }
-        let width = (right_point.0 as i128 - left_point.0 as i128) as f32;
-        let elapsed = (i128::from(position) - i128::from(left_point.0)) as f32;
+        let elapsed = (i128::from(position) - i128::from(left_point.0)) as f64;
+        let width = (right_point.0 as i128 - left_point.0 as i128) as f64;
         let fraction = elapsed / width;
         let left_value = left_point.1 as f32;
         let right_value = right_point.1 as f32;
         let value = match self.interpolation {
             Interpolation::Cosine => {
-                let fraction =
-                    ((1.0 - (f64::from(fraction) * std::f64::consts::PI).cos()) * 0.5) as f32;
+                let fraction = (1.0 - (fraction * std::f64::consts::PI).cos()) * 0.5;
                 linear(left_value, right_value, fraction)
             }
             Interpolation::Cubic if !self.cubic.is_empty() => {
@@ -99,43 +98,43 @@ impl CubicSegment {
             let point = points[index + 2];
             (i128::from(point.0), point.1)
         };
-        let left_value = left_value as f32;
-        let right_value = right_value as f32;
-        let width = (right_time - left_time) as f32;
-        let distance = (width / 705_600_000.0_f32 - 0.25_f32).max(0.0);
+        let left_value = f64::from(left_value as f32);
+        let right_value = f64::from(right_value as f32);
+        let previous_value = f64::from(previous_value as f32);
+        let next_value = f64::from(next_value as f32);
+        let width = (right_time - left_time) as f64;
+        let distance = (width / 705_600_000.0 - 0.25).max(0.0);
         let weight = if distance <= 4.0 {
-            (1.0 / (f64::from(distance * 10.0_f32) + 1.0)) as f32
+            1.0 / (distance * 10.0 + 1.0)
         } else {
             0.0
         };
-        let linear_slope =
-            f64::from((right_value - left_value) / width) * (1.0 - f64::from(weight));
-        let left_slope =
-            (right_value - previous_value as f32) / (right_time - previous_time) as f32;
-        let right_slope = (next_value as f32 - left_value) / (next_time - left_time) as f32;
+        // Tangents are scaled to the unit interval [0, 1], so the linear fallback
+        // term is dy/du = (right_value - left_value) without dividing by width.
+        let linear_tangent = (right_value - left_value) * (1.0 - weight);
+        let left_slope = (right_value - previous_value) / (right_time - previous_time) as f64;
+        let right_slope = (next_value - left_value) / (next_time - left_time) as f64;
         Self {
             width,
-            left_tangent: (f64::from(left_slope * width * weight) + linear_slope) as f32,
-            right_tangent: (f64::from(right_slope * width * weight) + linear_slope) as f32,
+            left_tangent: left_slope * width * weight + linear_tangent,
+            right_tangent: right_slope * width * weight + linear_tangent,
         }
     }
 
-    fn sample(self, left: f32, right: f32, elapsed: f32) -> f32 {
+    fn sample(self, left: f32, right: f32, elapsed: f64) -> f32 {
         let fraction = elapsed / self.width;
-        let squared = f64::from(fraction * fraction);
-        let cubed = f64::from(fraction * fraction * fraction);
-        let fraction = f64::from(fraction);
+        let squared = fraction * fraction;
+        let cubed = squared * fraction;
         let left_basis = 2.0 * cubed - 3.0 * squared + 1.0;
         let left_tangent_basis = cubed - 2.0 * squared + fraction;
         let right_basis = 3.0 * squared - 2.0 * cubed;
         let right_tangent_basis = cubed - squared;
-        let value =
-            left_tangent_basis * f64::from(self.left_tangent) + left_basis * f64::from(left);
+        let value = left_tangent_basis * self.left_tangent + left_basis * f64::from(left);
         let value = value + right_basis * f64::from(right);
-        (value + right_tangent_basis * f64::from(self.right_tangent)) as f32
+        (value + right_tangent_basis * self.right_tangent) as f32
     }
 }
 
-fn linear(left: f32, right: f32, fraction: f32) -> f32 {
-    left * (1.0_f32 - fraction) + right * fraction
+fn linear(left: f32, right: f32, fraction: f64) -> f32 {
+    (f64::from(left) * (1.0 - fraction) + f64::from(right) * fraction) as f32
 }

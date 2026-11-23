@@ -62,7 +62,16 @@ impl PitchCurve {
         if !position.is_finite() {
             return None;
         }
-        let time = position - self.pos as f64;
+        self.sample_offset(position - self.pos as f64)
+    }
+
+    /// Samples a local absolute MIDI pitch at an exact local blick position.
+    pub fn sample_tick(&self, position: i64) -> Option<f64> {
+        let time = (i128::from(position) - i128::from(self.pos)) as f64;
+        self.sample_offset(time)
+    }
+
+    fn sample_offset(&self, time: f64) -> Option<f64> {
         let first = self.points.first()?;
         let last = self.points.last()?;
         if time < first.0 as f64 || time > last.0 as f64 {

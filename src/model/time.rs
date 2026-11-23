@@ -120,6 +120,13 @@ impl TimeAxis {
         seconds
     }
     pub fn position_at(&self, seconds: f64) -> i64 {
+        if !seconds.is_finite() {
+            return if seconds == f64::INFINITY {
+                i64::MAX
+            } else {
+                0
+            };
+        }
         let mut left = (seconds - self.start_time_seconds).max(0.0);
         for (i, tempo) in self.tempo.iter().enumerate() {
             if let Some(next) = self.tempo.get(i + 1) {
@@ -130,7 +137,8 @@ impl TimeAxis {
                 }
             }
             // Seconds-to-blick conversion truncates toward zero.
-            return tempo.position + (left * tempo.bpm / 60.0 * QUARTER as f64) as i64;
+            let offset = (left * tempo.bpm / 60.0 * QUARTER as f64) as i64;
+            return tempo.position.saturating_add(offset);
         }
         0
     }

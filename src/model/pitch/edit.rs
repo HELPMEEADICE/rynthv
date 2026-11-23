@@ -81,7 +81,7 @@ fn clipped(curve: &PitchCurve, start: i64, end: i64) -> Option<PitchCurve> {
     let first = start.checked_sub(curve.pos)?;
     let last = end.checked_sub(curve.pos)?;
     let mut clipped = curve.clone();
-    clipped.points = vec![(first, curve.sample(start as f64)? - curve.pitch)];
+    clipped.points = vec![(first, curve.sample_tick(start)? - curve.pitch)];
     clipped.points.extend(
         curve
             .points
@@ -91,6 +91,6 @@ fn clipped(curve: &PitchCurve, start: i64, end: i64) -> Option<PitchCurve> {
     );
     clipped
         .points
-        .push((last, curve.sample(end as f64)? - curve.pitch));
+        .push((last, curve.sample_tick(end)? - curve.pitch));
     clipped.valid().then_some(clipped)
 }

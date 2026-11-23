@@ -124,7 +124,11 @@ impl PhonemeAttributes {
         {
             return Ok(());
         }
-        let required = index.checked_add(1).ok_or("音素索引超出支持范围")?;
+        const MAX_PHONEMES_PER_NOTE: usize = 4096;
+        let required = index
+            .checked_add(1)
+            .filter(|&count| count <= MAX_PHONEMES_PER_NOTE)
+            .ok_or("音素索引超出支持范围")?;
         let entries = attributes
             .entry("phonemes".into())
             .or_insert_with(|| Value::Array(Vec::new()))
