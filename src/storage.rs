@@ -7,10 +7,10 @@ use std::{
 };
 
 mod identity;
+mod project_size;
 mod svp_v153;
 
-const MAX_PROJECT_MIB: u64 = 64;
-const MAX_PROJECT_BYTES: u64 = MAX_PROJECT_MIB * 1024 * 1024;
+use project_size::{MAX_PROJECT_BYTES, ProjectWriter, check_project_size};
 
 pub struct LoadedProject {
     pub project: Project,
@@ -83,8 +83,9 @@ pub fn save(path: &Path, project: &Project) -> Result<(), String> {
         if let Some(clip) = track.instrumental.as_mut().and_then(|t| t.clip.as_mut())
             && let Ok(relative) = clip.path.strip_prefix(parent)
             && !relative.as_os_str().is_empty()
+            && let Some(relative) = portable_relative_path(relative)
         {
-            clip.path = portable_relative_path(relative);
+            clip.path = relative;
         }
     }
     for group in ordered
@@ -94,16 +95,10 @@ pub fn save(path: &Path, project: &Project) -> Result<(), String> {
     {
         group.notes.sort_by_key(|n| n.onset);
     }
-    let bytes = serde_json::to_vec_pretty(&ordered).map_err(|e| e.to_string())?;
-    check_project_size(bytes.len() as u64)?;
-    atomic_write(path, &bytes)
-}
-
-fn check_project_size(bytes: u64) -> Result<(), String> {
-    if bytes > MAX_PROJECT_BYTES {
-        return Err(format!("工程超过 {MAX_PROJECT_MIB} MiB 文件大小上限"));
-    }
-    Ok(())
+    atomic_write_with(path, |writer| {
+        serde_json::to_writer_pretty(ProjectWriter::new(writer), &ordered)
+            .map_err(|error| error.to_string())
+    })
 }
 
 pub fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), String> {
@@ -154,17 +149,16 @@ pub fn atomic_write_with(
     result.map_err(|e| format!("写入 {} 失败：{e}", path.display()))
 }
 
-fn portable_relative_path(path: &Path) -> std::path::PathBuf {
-    let mut parts = Vec::new();
-    for component in path.components() {
-        if let std::path::Component::Normal(part) = component {
-            parts.push(part.to_string_lossy());
-        }
+fn portable_relative_path(path: &Path) -> Option<std::path::PathBuf> {
+    let text = path.to_str()?;
+    #[cfg(windows)]
+    {
+        Some(text.replace('\\', "/").into())
     }
-    if parts.is_empty() {
-        path.to_owned()
-    } else {
-        std::path::PathBuf::from(parts.join("/"))
+    #[cfg(not(windows))]
+    {
+        // The loader treats backslashes in relative paths as Windows separators.
+        (!text.contains('\\')).then(|| path.to_owned())
     }
 }
 
