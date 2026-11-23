@@ -20,10 +20,10 @@ impl PhoneTable {
         let mut table = Self::default();
         for line in source
             .lines()
-            .map(str::trim)
+            .map(|line| line.trim().trim_start_matches('\u{feff}'))
             .filter(|line| !line.is_empty() && !line.starts_with(['#', ';']))
         {
-            let mut fields = line.trim_start_matches('\u{feff}').split_whitespace();
+            let mut fields = line.split_whitespace();
             let Some(key) = fields.next() else {
                 continue;
             };
@@ -41,6 +41,9 @@ impl PhoneTable {
                     }
                 })
                 .collect();
+            if phones.is_empty() {
+                continue;
+            }
             let key = key.to_lowercase();
             table.max_key_bytes = table.max_key_bytes.max(key.len());
             let alternatives = table.entries.entry(key).or_default();

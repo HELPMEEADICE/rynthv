@@ -20,9 +20,27 @@ pub(super) fn scan(
             return Ok(());
         }
     };
-    for revision in revisions {
-        let revision = revision?;
-        if !revision.file_type()?.is_dir() {
+    for entry in revisions {
+        let revision = match entry {
+            Ok(entry) => entry,
+            Err(error) => {
+                catalog
+                    .warnings
+                    .push(format!("无法读取声库 {database_id}：{error}"));
+                continue;
+            }
+        };
+        let is_dir = match revision.file_type() {
+            Ok(kind) => kind.is_dir(),
+            Err(error) => {
+                catalog.warnings.push(format!(
+                    "无法读取声库版本 {}：{error}",
+                    revision.path().display()
+                ));
+                continue;
+            }
+        };
+        if !is_dir {
             continue;
         }
         let Ok(version) = revision.file_name().to_string_lossy().parse::<u32>() else {

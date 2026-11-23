@@ -91,6 +91,14 @@ impl ExplicitScore {
                 ))
             })
             .collect::<Result<Vec<_>>>()?;
+        for pair in sources.windows(2) {
+            if pair[1].0 < pair[0].0 {
+                return Err(VoiceError::new(format!(
+                    "Note {} starts before the preceding note after tNoteOffset",
+                    pair[1].2.lyrics
+                )));
+            }
+        }
         let visible_begin_seconds = seconds_at(&input.tempo, input.visible_begin)?;
         let visible_end_seconds = input
             .visible_end

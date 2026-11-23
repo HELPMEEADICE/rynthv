@@ -71,9 +71,27 @@ impl VoiceCatalog {
             catalog.entries.push(nofs::entry(&path)?);
         }
         let metadata = MetadataIndex::load(root);
-        for database in fs::read_dir(root)? {
-            let database = database?;
-            if !database.file_type()?.is_dir() {
+        for entry in fs::read_dir(root)? {
+            let database = match entry {
+                Ok(entry) => entry,
+                Err(error) => {
+                    catalog
+                        .warnings
+                        .push(format!("无法读取声库目录 {}：{error}", root.display()));
+                    continue;
+                }
+            };
+            let is_dir = match database.file_type() {
+                Ok(kind) => kind.is_dir(),
+                Err(error) => {
+                    catalog.warnings.push(format!(
+                        "无法读取声库目录 {}：{error}",
+                        database.path().display()
+                    ));
+                    continue;
+                }
+            };
+            if !is_dir {
                 continue;
             }
             if let Ok(database_id) = uuid::Uuid::parse_str(&database.file_name().to_string_lossy())

@@ -129,6 +129,9 @@ impl Planner {
                     continue;
                 };
                 let owner = OwnerId(reference.id);
+                if self.plan.output_controls.contains_key(&owner) {
+                    continue;
+                }
                 self.plan.output_controls.insert(
                     owner,
                     OwnerOutputControls {

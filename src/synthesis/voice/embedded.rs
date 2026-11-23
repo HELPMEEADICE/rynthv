@@ -109,7 +109,11 @@ fn open(bytes: &[u8], offset: &mut usize, version: u32) -> Result<Frame> {
     let children = if version == 1 {
         stored_count
     } else {
-        ((identity as u32 ^ (identity >> 32) as u32 ^ stored_count) ^ 0xac5e7bd5) / 3
+        let encoded = (identity as u32 ^ (identity >> 32) as u32 ^ stored_count) ^ 0xac5e7bd5;
+        if !encoded.is_multiple_of(3) {
+            return Err(VoiceError::new("Embedded DNNI child count is corrupted"));
+        }
+        encoded / 3
     } as usize;
     let length = u32_at(header, 16)? as usize;
     let payload_range = range(*offset + 20, length, bytes.len())?;

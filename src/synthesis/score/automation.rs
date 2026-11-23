@@ -63,8 +63,11 @@ impl PreparedAutomations {
         let acoustic_end = end
             .checked_add(QUARTER)
             .ok_or_else(|| VoiceError::new("Automation padding overflows"))?;
-        let settings =
-            VoiceSettings::resolve(&input.voice.instance_options).map_err(VoiceError::new)?;
+        let settings = VoiceSettings::resolve_with_defaults(
+            &input.voice.track_default_options,
+            &input.voice.instance_options,
+        )
+        .map_err(VoiceError::new)?;
         let mut parameters = BTreeMap::new();
         let parameter_names: BTreeSet<_> = input
             .automation
@@ -161,7 +164,7 @@ impl PreparedAutomations {
                             begin,
                             end,
                             step: PITCH_GRID,
-                            include_partial: false,
+                            include_partial: true,
                             multiply: false,
                         },
                     )?,

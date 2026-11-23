@@ -56,6 +56,14 @@ pub fn resolve_explicit<'a>(
     resolve_with_overrides(languages, unified, &[], language_query, token)
 }
 
+pub(crate) fn matches_language(table_name: &str, query: &str) -> bool {
+    !query.is_empty()
+        && (table_name == query
+            || table_name
+                .split_once('-')
+                .is_some_and(|(prefix, _)| prefix == query))
+}
+
 pub(crate) fn resolve_with_overrides<'a>(
     languages: &[&'a PhoneSet],
     unified: &'a PhoneSet,
@@ -67,7 +75,7 @@ pub(crate) fn resolve_with_overrides<'a>(
         .then(|| {
             languages
                 .iter()
-                .position(|table| table.name.contains(language_query))
+                .position(|table| matches_language(&table.name, language_query))
         })
         .flatten();
     let source = selected.map_or(unified, |index| {
@@ -158,9 +166,11 @@ impl PhoneSet {
         }
         validate_unique(symbols, "symbols")?;
         validate_unique(classes, "classes")?;
+        let class_set: std::collections::HashSet<&str> =
+            classes.iter().map(String::as_str).collect();
         if classes_by_symbol
             .iter()
-            .any(|class| !classes.contains(class))
+            .any(|class| !class_set.contains(class.as_str()))
         {
             return Err(VoiceError::new("Phone set references an absent class"));
         }
@@ -186,8 +196,9 @@ impl PhoneSet {
 }
 
 fn validate_unique(values: &[String], field: &str) -> Result<()> {
-    for (index, value) in values.iter().enumerate() {
-        if value.is_empty() || values[..index].contains(value) {
+    let mut seen = std::collections::HashSet::with_capacity(values.len());
+    for value in values {
+        if value.is_empty() || !seen.insert(value.as_str()) {
             return Err(VoiceError::new(format!(
                 "Phone set {field} contain an empty or duplicate entry"
             )));

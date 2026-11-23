@@ -49,19 +49,23 @@ impl PreparedPerformanceControls {
         let end = notes.iter().map(|note| note.1).max().unwrap();
         let count = end
             .checked_sub(begin)
-            .and_then(|span| usize::try_from(span / GRID).ok())
+            .and_then(|span| usize::try_from((span / GRID).max(1)).ok())
             .ok_or_else(|| VoiceError::new("Performance control range overflows"))?;
         let mut modulation = Vec::new();
         modulation
             .try_reserve_exact(count)
             .map_err(|_| VoiceError::new("Performance control range is too large"))?;
         modulation.resize(count, 0.0_f64);
-        for (onset, end, value) in notes {
-            // The note bounds use integer division on the original note grid.
-            // Gaps retain the neutral modulation, and the end is exclusive.
-            let first = ((onset - begin) / GRID) as usize;
-            let stop = ((end - begin) / GRID) as usize;
-            modulation[first..stop].fill(value - 1.0);
+        if end - begin < GRID {
+            modulation[0] = notes[0].2 - 1.0;
+        } else {
+            for (onset, end, value) in notes {
+                // The note bounds use integer division on the original note grid.
+                // Gaps retain the neutral modulation, and the end is exclusive.
+                let first = ((onset - begin) / GRID) as usize;
+                let stop = ((end - begin) / GRID) as usize;
+                modulation[first..stop].fill(value - 1.0);
+            }
         }
         let mut vibrato = Vec::new();
         vibrato
@@ -137,8 +141,7 @@ impl PreparedPerformanceControls {
                 right += 1;
             }
             let value = if self.vibrato.is_empty() {
-                // A span shorter than one musical-grid step has no points.
-                0.0
+                1.0
             } else if right == 0 {
                 self.vibrato[0].value
             } else if right == self.vibrato.len() {

@@ -253,7 +253,7 @@ fn validate_voice(value: &Value, scope: &str) -> Result<()> {
                 validate_vocal_modes(value, scope)?;
                 true
             }
-            "choirSeatingSeparation" => value.as_f64() == Some(f64::from(0.7_f32)),
+            "choirSeatingSeparation" => value.as_f64().is_some_and(|v| v as f32 == 0.7_f32),
             _ => false,
         };
         if !supported {

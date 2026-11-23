@@ -31,8 +31,11 @@ impl PreparedVoiceControls {
         family: VoiceFamily,
         automations: Option<Arc<PreparedAutomations>>,
     ) -> Result<Option<Self>> {
-        let settings =
-            VoiceSettings::resolve(&input.voice.instance_options).map_err(VoiceError::new)?;
+        let settings = VoiceSettings::resolve_with_defaults(
+            &input.voice.track_default_options,
+            &input.voice.instance_options,
+        )
+        .map_err(VoiceError::new)?;
         if family != VoiceFamily::Sv2
             && settings
                 .vocal_modes

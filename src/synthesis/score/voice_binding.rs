@@ -37,6 +37,8 @@ pub fn validate_voice(
     if let Some(selected) = selector(database.get("version"), "version")?
         && selected != "-2"
         && selected != version
+        && (selected.parse::<u32>().ok() != version.parse::<u32>().ok()
+            || version.parse::<u32>().is_err())
     {
         return Err(VoiceError::new(format!(
             "Selected voice version {selected:?} does not match loaded version {version:?}"

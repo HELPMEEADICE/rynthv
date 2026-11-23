@@ -148,7 +148,11 @@ impl ExplicitScore {
                 let resolved = phones.resolve(&phone.language, &phone.token)?;
                 if resolved.used_silence_fallback
                     || (!phone.language.is_empty()
-                        && !resolved.selected_phone_set.contains(&phone.language))
+                        && (resolved.selected_phone_set == "multiphone"
+                            || !crate::synthesis::voice::matches_language(
+                                resolved.selected_phone_set,
+                                &phone.language,
+                            )))
                 {
                     return Err(VoiceError::new(format!(
                         "Score record {index}: unsupported phone {:?} in language {:?}",

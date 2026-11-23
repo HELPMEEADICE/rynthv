@@ -30,10 +30,18 @@ impl PreparedPitchControls {
     }
 
     pub fn sample(&self, origin: f64, step: f64, count: usize) -> Result<Vec<f32>> {
-        if !origin.is_finite() || !step.is_finite() || step <= 0.0 {
+        if !origin.is_finite()
+            || !step.is_finite()
+            || step <= 0.0
+            || (count > 0 && !(origin + (count - 1) as f64 * step).is_finite())
+        {
             return Err(VoiceError::new("Invalid pitch control frame clock"));
         }
-        let mut result = vec![f32::NAN; count];
+        let mut result = Vec::new();
+        result
+            .try_reserve_exact(count)
+            .map_err(|_| VoiceError::new("Pitch control frame count is too large"))?;
+        result.resize(count, f32::NAN);
         // Apply curves first; later overlapping curves win. Points may
         // never overwrite a curve or a prior point.
         for control in &self.controls {

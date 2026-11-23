@@ -38,9 +38,9 @@ impl Frontend<'_> {
             // mapping to the unified neural vocabulary.
             let source = (!phone.language.is_empty())
                 .then(|| {
-                    self.languages
-                        .iter()
-                        .find(|table| table.name.contains(&phone.language))
+                    self.languages.iter().find(|table| {
+                        crate::synthesis::voice::matches_language(&table.name, &phone.language)
+                    })
                 })
                 .flatten()
                 .copied()

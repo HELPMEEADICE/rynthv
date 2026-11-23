@@ -93,9 +93,15 @@ impl TempoMapping {
     }
 
     pub fn seconds_at(&self, position: GlobalBlick) -> f64 {
+        let Some(first) = self.points.first() else {
+            return f64::NAN;
+        };
         let mut seconds = self.origin_seconds;
-        if position.0 < 0 {
-            return seconds + position.0 as f64 / QUARTER as f64 * 60.0 / self.points[0].bpm;
+        if position.0 <= first.position.0 {
+            return seconds
+                + (i128::from(position.0) - i128::from(first.position.0)) as f64 / QUARTER as f64
+                    * 60.0
+                    / first.bpm;
         }
         for (index, tempo) in self.points.iter().enumerate() {
             if position.0 <= tempo.position.0 {
@@ -105,30 +111,44 @@ impl TempoMapping {
                 .points
                 .get(index + 1)
                 .map_or(position.0, |p| p.position.0.min(position.0));
-            seconds += (end - tempo.position.0) as f64 / QUARTER as f64 * 60.0 / tempo.bpm;
+            seconds += (i128::from(end) - i128::from(tempo.position.0)) as f64 / QUARTER as f64
+                * 60.0
+                / tempo.bpm;
         }
         seconds
     }
 
     /// Inverse of this immutable render's tempo map, independent of later edits.
     pub fn position_at(&self, seconds: f64) -> GlobalBlick {
+        if !seconds.is_finite() {
+            return GlobalBlick(if seconds == f64::INFINITY {
+                i64::MAX
+            } else {
+                0
+            });
+        }
+        let Some(first) = self.points.first() else {
+            return GlobalBlick(0);
+        };
         let mut remaining = seconds - self.origin_seconds;
         if remaining < 0.0 {
-            return GlobalBlick((remaining * self.points[0].bpm / 60.0 * QUARTER as f64) as i64);
+            let offset = (remaining * first.bpm / 60.0 * QUARTER as f64) as i64;
+            return GlobalBlick(first.position.0.saturating_add(offset));
         }
         for (index, tempo) in self.points.iter().enumerate() {
             if let Some(next) = self.points.get(index + 1) {
-                let duration =
-                    (next.position.0 - tempo.position.0) as f64 / QUARTER as f64 * 60.0 / tempo.bpm;
+                let duration = (i128::from(next.position.0) - i128::from(tempo.position.0)) as f64
+                    / QUARTER as f64
+                    * 60.0
+                    / tempo.bpm;
                 if remaining >= duration {
                     remaining -= duration;
                     continue;
                 }
             }
             // Match TimeAxis's truncation toward zero.
-            return GlobalBlick(
-                tempo.position.0 + (remaining * tempo.bpm / 60.0 * QUARTER as f64) as i64,
-            );
+            let offset = (remaining * tempo.bpm / 60.0 * QUARTER as f64) as i64;
+            return GlobalBlick(tempo.position.0.saturating_add(offset));
         }
         GlobalBlick(0)
     }

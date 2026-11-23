@@ -123,7 +123,10 @@ impl PreparedTree {
     }
 
     fn prepare_embedded_records(records: Vec<super::embedded::Record>) -> Result<Self> {
-        let root = records.len() - 1;
+        let root = records
+            .len()
+            .checked_sub(1)
+            .ok_or_else(|| VoiceError::new("Embedded DNNI archive is empty"))?;
         let mut nodes = Vec::with_capacity(records.len());
         let mut resources = Vec::with_capacity(records.len());
         for (index, record) in records.into_iter().enumerate() {
