@@ -58,6 +58,12 @@ struct AudioFile {
 }
 
 fn import_clip(time: &TimeAxis, reference: &mut GroupRef) -> Result<Option<AudioClip>, String> {
+    if reference.blick_absolute_begin < 0
+        || (reference.blick_absolute_end != -1
+            && reference.blick_absolute_end < reference.blick_absolute_begin)
+    {
+        return Err("片段可见范围无效".into());
+    }
     let Some(audio) = reference.extra.remove("audio") else {
         return Ok(None);
     };
@@ -65,7 +71,8 @@ fn import_clip(time: &TimeAxis, reference: &mut GroupRef) -> Result<Option<Audio
     if audio.filename.as_os_str().is_empty() && audio.duration == 0.0 {
         return Ok(None);
     }
-    if audio.filename.as_os_str().is_empty() || audio.duration <= 0.0 {
+    if audio.filename.as_os_str().is_empty() || !audio.duration.is_finite() || audio.duration <= 0.0
+    {
         return Err("音频文件路径或时长无效".into());
     }
     let seconds_at = |position| {
@@ -76,14 +83,11 @@ fn import_clip(time: &TimeAxis, reference: &mut GroupRef) -> Result<Option<Audio
         }
     };
     let source_start = seconds_at(reference.blick_offset);
-    let begin = seconds_at(reference.blick_absolute_begin.max(0))
+    let begin = seconds_at(reference.blick_absolute_begin)
         .max(source_start)
         .max(0.0);
     let mut end = source_start + audio.duration;
     if reference.blick_absolute_end != -1 {
-        if reference.blick_absolute_end < reference.blick_absolute_begin {
-            return Err("片段可见范围无效".into());
-        }
         end = end.min(seconds_at(reference.blick_absolute_end));
     }
     if !begin.is_finite() || !end.is_finite() {

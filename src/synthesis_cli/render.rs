@@ -7,7 +7,7 @@ use rynthv::synthesis::{
     voice::{PreparedVoice, VoiceInventory, flat::FlatModelRegistry, session_identity},
 };
 use serde_json::{Value, json};
-use std::{fs, time::Instant};
+use std::time::Instant;
 
 pub fn run(
     args: &RenderArgs,
@@ -15,16 +15,9 @@ pub fn run(
     voice: &PreparedVoice,
     registry: Option<&FlatModelRegistry>,
 ) -> Result<Value, String> {
-    if fs::metadata(&args.input)
-        .map_err(|error| error.to_string())?
-        .len()
-        > 16 * 1024 * 1024
-    {
-        return Err("Explicit score JSON exceeds 16 MiB".into());
-    }
-    let score: ExplicitScore =
-        serde_json::from_slice(&fs::read(&args.input).map_err(|error| error.to_string())?)
-            .map_err(|error| format!("Invalid explicit score: {error}"))?;
+    let bytes = super::read_json_bounded(&args.input, 16 * 1024 * 1024, "Explicit score JSON")?;
+    let score: ExplicitScore = serde_json::from_slice(&bytes)
+        .map_err(|error| format!("Invalid explicit score: {error}"))?;
     let blend = args
         .blend
         .as_ref()
@@ -138,14 +131,18 @@ pub fn run(
         .samples()
         .iter()
         .fold(0.0_f32, |peak, value| peak.max(value.abs()));
-    let rms = (output
-        .audio
-        .samples()
-        .iter()
-        .map(|&value| f64::from(value).powi(2))
-        .sum::<f64>()
-        / output.audio.samples().len() as f64)
-        .sqrt();
+    let rms = if output.audio.samples().is_empty() {
+        0.0
+    } else {
+        (output
+            .audio
+            .samples()
+            .iter()
+            .map(|&value| f64::from(value).powi(2))
+            .sum::<f64>()
+            / output.audio.samples().len() as f64)
+            .sqrt()
+    };
     Ok(json!({
         "wav": args.wav,
         "sample_rate": output.audio.sample_rate(),

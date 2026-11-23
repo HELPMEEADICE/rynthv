@@ -1,4 +1,6 @@
-use rynthv::synthesis::{inference::compute::Backend, settings::SynthesisSettings};
+use rynthv::synthesis::{
+    inference::compute::Backend, settings::SynthesisSettings, voice::session_identity,
+};
 use std::{ffi::OsString, num::NonZeroUsize, path::PathBuf};
 
 use super::context::ContextImport;
@@ -67,9 +69,29 @@ pub enum Command {
     RenderScore,
 }
 
+pub enum VoiceTarget {
+    Explicit(PathBuf),
+    Default { flat_options: bool },
+}
+
+impl VoiceTarget {
+    pub fn resolve(self) -> Result<PathBuf, String> {
+        match self {
+            Self::Explicit(path) => Ok(path),
+            Self::Default { flat_options } => {
+                let path = SynthesisSettings::load()?.selected_directory()?;
+                if flat_options && !rynthv::synthesis::voice::flat::is_voice_path(&path) {
+                    return Err("--flat-dir and --model-dir require a Flat .sfpk voice".into());
+                }
+                Ok(path)
+            }
+        }
+    }
+}
+
 pub struct Args {
     pub command: Command,
-    pub voice: PathBuf,
+    pub voice: VoiceTarget,
     pub output: Option<PathBuf>,
     pub project: Option<PathBuf>,
     pub module: Option<ModuleArgs>,
@@ -180,18 +202,22 @@ impl Args {
         } else {
             None
         };
-        let voice = match values.remove("--voice") {
-            Some(path) => PathBuf::from(path),
-            None => SynthesisSettings::load()?.selected_directory()?,
-        };
+        let explicit_voice = values.remove("--voice").map(PathBuf::from);
         let output = values.remove("--output").map(PathBuf::from);
         let flat_directory = values.remove("--flat-dir").map(PathBuf::from);
         let model_directory = values.remove("--model-dir").map(PathBuf::from);
-        if (flat_directory.is_some() || model_directory.is_some())
-            && !rynthv::synthesis::voice::flat::is_voice_path(&voice)
+        let flat_options = flat_directory.is_some() || model_directory.is_some();
+        if flat_options
+            && explicit_voice
+                .as_deref()
+                .is_some_and(|path| !rynthv::synthesis::voice::flat::is_voice_path(path))
         {
             return Err("--flat-dir and --model-dir require a Flat .sfpk voice".into());
         }
+        let voice = match explicit_voice {
+            Some(path) => VoiceTarget::Explicit(path),
+            None => VoiceTarget::Default { flat_options },
+        };
         let project = if command == Command::Plan {
             Some(PathBuf::from(
                 values
@@ -234,8 +260,12 @@ impl Args {
                 (None, None) => None,
                 (Some(path), Some(weight)) => {
                     let path = PathBuf::from(path);
-                    if !rynthv::synthesis::voice::flat::is_voice_path(&voice)
-                        || !rynthv::synthesis::voice::flat::is_voice_path(&path)
+                    if !rynthv::synthesis::voice::flat::is_voice_path(&path)
+                        || matches!(
+                            &voice,
+                            VoiceTarget::Explicit(explicit)
+                                if !rynthv::synthesis::voice::flat::is_voice_path(explicit)
+                        )
                     {
                         return Err("Flat blending requires two .sfpk voices".into());
                     }
@@ -261,12 +291,7 @@ impl Args {
                 .remove("--duration-identity")
                 .map(|value| {
                     let text = value.to_str().ok_or("Identity must be UTF-8")?;
-                    if let Some(hex) = text.strip_prefix("0x") {
-                        u64::from_str_radix(hex, 16)
-                    } else {
-                        text.parse()
-                    }
-                    .map_err(|_| "Identity must be a u64 decimal or 0x-prefixed hexadecimal number")
+                    session_identity::parse_identity(text).map_err(|error| error.to_string())
                 })
                 .transpose()?;
             Some(RenderArgs {

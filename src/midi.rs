@@ -42,15 +42,16 @@ pub struct MidiNote {
 
 pub fn load(path: &Path) -> Result<MidiFile, String> {
     let file = File::open(path).map_err(|e| format!("无法打开 MIDI 文件：{e}"))?;
-    if file
+    let metadata = file
         .metadata()
-        .map_err(|e| format!("无法读取 MIDI 文件：{e}"))?
-        .len()
-        > MAX_BYTES
-    {
+        .map_err(|e| format!("无法读取 MIDI 文件：{e}"))?;
+    if !metadata.is_file() {
+        return Err(format!("MIDI 路径 {} 不是普通文件", path.display()));
+    }
+    if metadata.len() > MAX_BYTES {
         return Err("MIDI 文件不能超过 64 MiB".into());
     }
-    let mut bytes = Vec::new();
+    let mut bytes = Vec::with_capacity(metadata.len() as usize);
     file.take(MAX_BYTES + 1)
         .read_to_end(&mut bytes)
         .map_err(|e| format!("无法读取 MIDI 文件：{e}"))?;

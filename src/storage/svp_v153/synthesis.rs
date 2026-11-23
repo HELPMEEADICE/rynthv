@@ -7,7 +7,11 @@ pub(super) fn import_reference(reference: &mut GroupRef) {
     remove_takes(&mut reference.extra);
     // The previous renderer's generated pitch is rebuilt from the imported score.
     reference.extra.remove("systemPitchDelta");
-    if reference.extra.get("audio") == Some(&json!({"filename": "", "duration": 0})) {
+    if let Some(audio) = reference.extra.get("audio").and_then(Value::as_object)
+        && audio.len() == 2
+        && audio.get("filename").and_then(Value::as_str) == Some("")
+        && audio.get("duration").and_then(Value::as_f64) == Some(0.0)
+    {
         reference.extra.remove("audio");
     }
     if let Some(modes) = reference
@@ -51,6 +55,9 @@ pub(super) fn import_note(note: &mut Note) -> Result<(), String> {
     if let Some(value) = note.attributes.remove("dur") {
         let scales: Vec<f64> =
             serde_json::from_value(value).map_err(|error| format!("音素时长倍率无效：{error}"))?;
+        if scales.len() > 4096 {
+            return Err("音素时长倍率数量超出支持范围".into());
+        }
         for (index, scale) in scales.into_iter().enumerate() {
             if scale != 1.0 {
                 PhonemeAttributes::update_at(

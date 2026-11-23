@@ -21,6 +21,37 @@ use std::{
     time::Instant,
 };
 
+use std::io::Read;
+
+struct CliError {
+    usage: bool,
+    message: String,
+}
+
+impl CliError {
+    fn usage(message: impl Into<String>) -> Self {
+        Self {
+            usage: true,
+            message: message.into(),
+        }
+    }
+}
+
+impl From<String> for CliError {
+    fn from(message: String) -> Self {
+        Self {
+            usage: false,
+            message,
+        }
+    }
+}
+
+impl From<&str> for CliError {
+    fn from(message: &str) -> Self {
+        Self::from(message.to_owned())
+    }
+}
+
 fn main() -> ExitCode {
     let mut arguments = std::env::args_os().skip(1);
     let Some(command) = arguments.next() else {
@@ -33,8 +64,8 @@ fn main() -> ExitCode {
     match run(command, arguments) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
-            eprintln!("{error}");
-            ExitCode::FAILURE
+            eprintln!("{}", error.message);
+            ExitCode::from(if error.usage { 2 } else { 1 })
         }
     }
 }
@@ -42,20 +73,30 @@ fn main() -> ExitCode {
 fn run(
     command: std::ffi::OsString,
     arguments: impl Iterator<Item = std::ffi::OsString>,
-) -> Result<(), String> {
+) -> Result<(), CliError> {
     if command == "list-compute-devices" {
         return list_compute_devices(arguments);
     }
-    let Some(args) = Args::parse(command, arguments)? else {
+    let Some(args) = Args::parse(command, arguments).map_err(CliError::usage)? else {
         print!("{}", args::HELP);
         return Ok(());
     };
+    let voice = args.voice.resolve()?;
+    if let Some(blend) = args
+        .render
+        .as_ref()
+        .and_then(|render| render.blend.as_ref())
+        && (!rynthv::synthesis::voice::flat::is_voice_path(&voice)
+            || !rynthv::synthesis::voice::flat::is_voice_path(&blend.voice))
+    {
+        return Err("Flat blending requires two .sfpk voices".to_owned().into());
+    }
     let start = Instant::now();
-    let registry = if rynthv::synthesis::voice::flat::is_voice_path(&args.voice) {
+    let registry = if rynthv::synthesis::voice::flat::is_voice_path(&voice) {
         let mut registry = flat::registry(
             args.flat_directory.as_deref(),
             args.model_directory.as_deref(),
-            Some(&args.voice),
+            Some(&voice),
         )?;
         if let Some(blend) = args
             .render
@@ -69,14 +110,14 @@ fn run(
         None
     };
     let inventory = if let Some(registry) = &registry {
-        VoiceInventory::load_flat(&args.voice, registry)
+        VoiceInventory::load_flat(&voice, registry)
     } else {
-        VoiceInventory::load(&args.voice)
+        VoiceInventory::load(&voice)
     }
     .map_err(|e| e.to_string())?;
     let load_ms = start.elapsed().as_secs_f64() * 1000.0;
     if let Some(import) = args.context {
-        return write_report(args.output, &import.run(&inventory)?);
+        return write_report(args.output, &import.run(&inventory)?).map_err(Into::into);
     }
     let mut preparation_ms = None;
     let preparation = if matches!(
@@ -99,14 +140,9 @@ fn run(
         None
     };
     let execution = if let Some(module) = args.module {
-        let metadata = fs::metadata(&module.input).map_err(|e| e.to_string())?;
-        if metadata.len() > 16 * 1024 * 1024 {
-            return Err("Module input JSON exceeds 16 MiB".into());
-        }
-        let input: Vec<f32> = serde_json::from_slice(
-            &fs::read(&module.input).map_err(|e| e.to_string())?,
-        )
-        .map_err(|e| format!("Input must be a flat JSON array of finite f32 values: {e}"))?;
+        let bytes = read_json_bounded(&module.input, 16 * 1024 * 1024, "Module input JSON")?;
+        let input: Vec<f32> = serde_json::from_slice(&bytes)
+            .map_err(|e| format!("Input must be a flat JSON array of finite f32 values: {e}"))?;
         if input.is_empty() || input.iter().any(|value| !value.is_finite()) {
             return Err("Module input must be nonempty and finite".into());
         }
@@ -169,12 +205,35 @@ fn run(
         "audio_generated": audio.is_some(),
         "audio": audio,
     });
-    write_report(args.output, &report)
+    write_report(args.output, &report).map_err(Into::into)
+}
+
+pub(crate) fn read_json_bounded(
+    path: &std::path::Path,
+    limit: u64,
+    label: &str,
+) -> Result<Vec<u8>, String> {
+    let file = fs::File::open(path).map_err(|e| e.to_string())?;
+    let metadata = file.metadata().map_err(|e| e.to_string())?;
+    if !metadata.is_file() {
+        return Err(format!("{label} {} is not a regular file", path.display()));
+    }
+    if metadata.len() > limit {
+        return Err(format!("{label} exceeds {} MiB", limit / (1024 * 1024)));
+    }
+    let mut bytes = Vec::with_capacity(metadata.len() as usize);
+    file.take(limit + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| e.to_string())?;
+    if bytes.len() as u64 > limit {
+        return Err(format!("{label} exceeds {} MiB", limit / (1024 * 1024)));
+    }
+    Ok(bytes)
 }
 
 fn list_compute_devices(
     mut arguments: impl Iterator<Item = std::ffi::OsString>,
-) -> Result<(), String> {
+) -> Result<(), CliError> {
     let mut output = None;
     let mut validate = false;
     while let Some(option) = arguments.next() {
@@ -185,24 +244,26 @@ fn list_compute_devices(
                     arguments
                         .next()
                         .filter(|path| !path.to_string_lossy().starts_with("--"))
-                        .ok_or("Missing path for --output")?
+                        .ok_or_else(|| CliError::usage("Missing path for --output"))?
                         .into(),
                 );
             }
             _ => {
-                return Err(
-                    "Usage: list-compute-devices [--validate] [--output REPORT.json]".into(),
-                );
+                return Err(CliError::usage(
+                    "Usage: list-compute-devices [--validate] [--output REPORT.json]",
+                ));
             }
         }
     }
     let mut report = json!({ "cpu": true, "adapters": compute::list_devices() });
     if validate {
         let session = compute::Session::new(compute::Backend::WebGpu);
-        report["shader_validation"] =
-            json!({ "compiled": session.validate_shaders()?, "device": session.status().device });
+        report["shader_validation"] = json!({
+            "compiled": session.validate_shaders().map_err(CliError::from)?,
+            "device": session.status().device,
+        });
     }
-    write_report(output, &report)
+    write_report(output, &report).map_err(Into::into)
 }
 
 fn write_report(

@@ -19,8 +19,12 @@ pub struct LoadedProject {
 
 pub fn load(path: &Path) -> Result<LoadedProject, String> {
     let file = fs::File::open(path).map_err(|e| e.to_string())?;
-    check_project_size(file.metadata().map_err(|e| e.to_string())?.len())?;
-    let mut bytes = Vec::new();
+    let metadata = file.metadata().map_err(|e| e.to_string())?;
+    if !metadata.is_file() {
+        return Err(format!("工程路径 {} 不是普通文件", path.display()));
+    }
+    check_project_size(metadata.len())?;
+    let mut bytes = Vec::with_capacity(metadata.len() as usize);
     file.take(MAX_PROJECT_BYTES + 1)
         .read_to_end(&mut bytes)
         .map_err(|e| e.to_string())?;
@@ -43,11 +47,14 @@ pub fn load(path: &Path) -> Result<LoadedProject, String> {
     }
     validate_content(&project)?;
     let base = std::path::absolute(path).map_err(|e| e.to_string())?;
+    let parent = base
+        .parent()
+        .ok_or_else(|| format!("路径 {} 缺少父目录", path.display()))?;
     for track in &mut project.tracks {
         if let Some(clip) = track.instrumental.as_mut().and_then(|t| t.clip.as_mut())
             && clip.path.is_relative()
         {
-            clip.path = base.parent().unwrap().join(&clip.path);
+            clip.path = resolve_relative_clip(parent, &clip.path);
         }
     }
     project.tracks.sort_by_key(|t| t.disp_order);
@@ -69,11 +76,15 @@ pub fn save(path: &Path, project: &Project) -> Result<(), String> {
     validate_content(project)?;
     let mut ordered = project.clone();
     let base = std::path::absolute(path).map_err(|e| e.to_string())?;
+    let parent = base
+        .parent()
+        .ok_or_else(|| format!("路径 {} 缺少父目录", path.display()))?;
     for track in &mut ordered.tracks {
         if let Some(clip) = track.instrumental.as_mut().and_then(|t| t.clip.as_mut())
-            && let Ok(relative) = clip.path.strip_prefix(base.parent().unwrap())
+            && let Ok(relative) = clip.path.strip_prefix(parent)
+            && !relative.as_os_str().is_empty()
         {
-            clip.path = relative.to_owned();
+            clip.path = portable_relative_path(relative);
         }
     }
     for group in ordered
@@ -96,7 +107,19 @@ fn check_project_size(bytes: u64) -> Result<(), String> {
 }
 
 pub fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), String> {
-    let temp = path.with_extension(format!("{}.tmp", uuid::Uuid::new_v4()));
+    if path.as_os_str().to_string_lossy().ends_with(['/', '\\']) {
+        return Err(format!("写入 {} 失败：目标路径不是文件", path.display()));
+    }
+    let name = path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| format!("写入 {} 失败：路径缺少文件名", path.display()))?;
+    let parent = path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let temp = parent.join(format!(".{name}.{}.tmp", uuid::Uuid::new_v4()));
     let result = (|| {
         let mut file = fs::OpenOptions::new()
             .create_new(true)
@@ -105,12 +128,45 @@ pub fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), String> {
         file.write_all(bytes)?;
         file.sync_all()?;
         drop(file);
-        fs::rename(&temp, path)
+        fs::rename(&temp, path)?;
+        #[cfg(unix)]
+        if let Ok(dir) = fs::File::open(parent) {
+            dir.sync_all()?;
+        }
+        Ok::<(), std::io::Error>(())
     })();
     if result.is_err() {
         let _ = fs::remove_file(&temp);
     }
     result.map_err(|e| format!("写入 {} 失败：{e}", path.display()))
+}
+
+fn portable_relative_path(path: &Path) -> std::path::PathBuf {
+    let mut parts = Vec::new();
+    for component in path.components() {
+        if let std::path::Component::Normal(part) = component {
+            parts.push(part.to_string_lossy());
+        }
+    }
+    if parts.is_empty() {
+        path.to_owned()
+    } else {
+        std::path::PathBuf::from(parts.join("/"))
+    }
+}
+
+fn resolve_relative_clip(parent: &Path, clip_path: &Path) -> std::path::PathBuf {
+    #[cfg(not(windows))]
+    if let Some(text) = clip_path.to_str()
+        && text.contains('\\')
+    {
+        let mut resolved = parent.to_path_buf();
+        for segment in text.split(['/', '\\']).filter(|s| !s.is_empty()) {
+            resolved.push(segment);
+        }
+        return resolved;
+    }
+    parent.join(clip_path)
 }
 
 fn validate_time(time: &TimeAxis) -> Result<(), String> {
@@ -121,10 +177,9 @@ fn validate_time(time: &TimeAxis) -> Result<(), String> {
         return bad("时间轴必须从 0 开始");
     }
     if !time.start_time_seconds.is_finite()
-        || time
-            .tempo
-            .iter()
-            .any(|t| !t.bpm.is_finite() || t.bpm <= 0.0 || t.position < 0)
+        || time.tempo.iter().any(|t| {
+            !t.bpm.is_finite() || t.bpm <= 0.0 || !(60.0 / t.bpm).is_finite() || t.position < 0
+        })
         || time
             .tempo
             .windows(2)
@@ -234,8 +289,9 @@ fn validate_content(p: &Project) -> Result<(), String> {
             if group.notes.iter().any(|n| {
                 n.onset.checked_add(r.blick_offset).is_none()
                     || (n.onset + n.duration).checked_add(r.blick_offset).is_none()
+                    || n.pitch.checked_add(r.pitch_offset).is_none()
             }) {
-                return bad("实例时间溢出");
+                return bad("实例时间或音高溢出");
             }
             if group.pitch_controls.iter().any(|control| match control {
                 PitchControl::Point(point) => point.pos.checked_add(r.blick_offset).is_none(),

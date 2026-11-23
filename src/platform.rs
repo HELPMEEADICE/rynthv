@@ -26,9 +26,9 @@ pub fn config_directory() -> Result<PathBuf, String> {
 #[cfg(windows)]
 fn config_root() -> Result<PathBuf, String> {
     std::env::var_os("LOCALAPPDATA")
-        .filter(|value| !value.is_empty())
         .map(PathBuf::from)
-        .ok_or_else(|| "LOCALAPPDATA 未设置，无法定位用户配置目录。".into())
+        .filter(|path| path.is_absolute())
+        .ok_or_else(|| "LOCALAPPDATA 未设置为绝对路径，无法定位用户配置目录。".into())
 }
 
 #[cfg(target_os = "linux")]
