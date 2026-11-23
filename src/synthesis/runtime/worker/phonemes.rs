@@ -1,7 +1,4 @@
-use super::{
-    Event,
-    state::{WorkState, equivalent_owners},
-};
+use super::{Event, state::WorkState};
 use crate::synthesis::{
     plan::{OwnerId, RenderPlan},
     rendered::{PhonemeSnapshot, RenderedPhonemeTrack, VisualSnapshot},
@@ -28,7 +25,11 @@ impl WorkState<'_, '_> {
             })
             .collect();
         for (&owner, session) in &self.sessions {
-            snapshots.extend(mirrored(&self.plan, owner, session.visuals.phonemes()));
+            snapshots.extend(mirrored(
+                &self.plan,
+                self.mirrors(owner),
+                session.visuals.phonemes(),
+            ));
         }
         let _ = events.send(Event::Phonemes {
             revision: self.revision,
@@ -41,10 +42,10 @@ pub(super) fn publish(
     events: &Events,
     plan: &RenderPlan,
     revision: u64,
-    owner: OwnerId,
+    mirrors: &[OwnerId],
     data: &RenderedPhonemeTrack,
 ) {
-    let snapshots = mirrored(plan, owner, data);
+    let snapshots = mirrored(plan, mirrors, data);
     if !snapshots.is_empty() {
         let _ = events.send(Event::Phonemes {
             revision,
@@ -55,12 +56,12 @@ pub(super) fn publish(
 
 fn mirrored(
     plan: &RenderPlan,
-    owner: OwnerId,
+    mirrors: &[OwnerId],
     data: &RenderedPhonemeTrack,
 ) -> BTreeMap<OwnerId, PhonemeSnapshot> {
-    equivalent_owners(plan, owner)
-        .into_iter()
-        .map(|mirror| {
+    mirrors
+        .iter()
+        .map(|&mirror| {
             let request = &plan.requests[&mirror];
             (
                 mirror,

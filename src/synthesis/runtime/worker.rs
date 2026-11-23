@@ -11,7 +11,7 @@ use super::{
     events::{Events, WakeOnExit},
 };
 use crate::synthesis::{
-    audio::{LiveAudio, RenderedAudio},
+    audio::LiveAudio,
     inference::compute::Session,
     plan::{OwnerId, RenderPlan},
     render_cache::{CacheStats, PublishedOwner},
@@ -70,7 +70,7 @@ pub(super) enum Event {
     },
     Publication {
         revision: u64,
-        audio: Option<Arc<RenderedAudio>>,
+        audio_duration_seconds: Option<f64>,
         owners: Vec<PublishedOwner>,
         visuals: BTreeMap<OwnerId, VisualSnapshot>,
     },

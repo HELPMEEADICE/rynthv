@@ -1,7 +1,7 @@
 use super::{Command, visuals::SessionVisuals};
 use crate::synthesis::{
     engine::progressive::{Cursor, PreparedRender},
-    plan::{OwnerId, RenderPlan},
+    plan::{OwnerId, OwnerInput, RenderPlan},
     render_cache::{CacheStats, RenderCache, RenderJob},
     runtime::mixer::LiveMixer,
 };
@@ -38,6 +38,7 @@ impl<'network, 'tree> Session<'network, 'tree> {
 pub(super) struct WorkState<'network, 'tree> {
     pub cache: RenderCache,
     pub plan: RenderPlan,
+    pub mirrors: BTreeMap<OwnerId, Vec<OwnerId>>,
     pub revision: u64,
     pub sessions: BTreeMap<OwnerId, Session<'network, 'tree>>,
     pub live: Option<LiveMixer>,
@@ -58,6 +59,7 @@ impl<'network, 'tree> WorkState<'network, 'tree> {
         Self {
             cache: RenderCache::default(),
             plan: RenderPlan::default(),
+            mirrors: BTreeMap::new(),
             revision: 0,
             sessions: BTreeMap::new(),
             live: None,
@@ -87,6 +89,7 @@ impl<'network, 'tree> WorkState<'network, 'tree> {
                 self.sessions
                     .retain(|_, session| !session.job.is_cancelled());
                 self.plan = plan;
+                self.rebuild_mirrors();
                 self.rebuild_source = true;
                 self.force_publication = true;
             }
@@ -108,6 +111,7 @@ impl<'network, 'tree> WorkState<'network, 'tree> {
                 self.cache.reset();
                 self.sessions.clear();
                 self.plan = RenderPlan::default();
+                self.mirrors.clear();
                 self.solo_tracks.clear();
                 self.rebuild_source = true;
                 self.force_publication = true;
@@ -127,17 +131,31 @@ impl<'network, 'tree> WorkState<'network, 'tree> {
             self.apply(command);
         }
     }
-}
 
-/// Identical queued owners share one render job; they must also share its ready
-/// intervals, otherwise overlapping linked instances would hold playback until
-/// the whole shared owner completes. Input equality includes timeline mapping.
-pub(super) fn equivalent_owners(plan: &RenderPlan, owner: OwnerId) -> Vec<OwnerId> {
-    let Some(source) = plan.requests.get(&owner) else {
-        return Vec::new();
-    };
-    plan.requests
-        .iter()
-        .filter_map(|(&id, request)| (*request.input == *source.input).then_some(id))
-        .collect()
+    /// Identical queued owners share one render job; they must also share its
+    /// ready intervals, otherwise overlapping linked instances would hold
+    /// playback until the whole shared owner completes.
+    pub(super) fn mirrors(&self, owner: OwnerId) -> &[OwnerId] {
+        self.mirrors.get(&owner).map_or(&[][..], Vec::as_slice)
+    }
+
+    fn rebuild_mirrors(&mut self) {
+        self.mirrors.clear();
+        let mut groups: Vec<(&OwnerInput, Vec<OwnerId>)> = Vec::new();
+        for (&id, request) in &self.plan.requests {
+            if let Some((_, group)) = groups
+                .iter_mut()
+                .find(|(input, _)| **input == *request.input)
+            {
+                group.push(id);
+            } else {
+                groups.push((&request.input, vec![id]));
+            }
+        }
+        for (_, group) in groups {
+            for &id in &group {
+                self.mirrors.insert(id, group.clone());
+            }
+        }
+    }
 }

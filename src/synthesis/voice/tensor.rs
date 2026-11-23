@@ -170,14 +170,47 @@ pub(super) fn is_known(prefix: &[u8]) -> bool {
 }
 
 pub(super) fn parse(bytes: &[u8]) -> Result<TensorLayout> {
+    parse_with_length(bytes, bytes.len())
+}
+
+pub(super) fn required_inspection_bytes(prefix: &[u8], total_len: usize) -> Result<usize> {
+    match array(prefix, 0)? {
+        FLOAT_MATRIX => Ok(24),
+        FLOAT_VECTOR => Ok(20),
+        QUANTIZED => {
+            let stored_bits = u32_at(prefix, 16)?;
+            if ![8, 16].contains(&stored_bits) || u32_at(prefix, 24)? != 0 {
+                return Err(VoiceError::new("Invalid observed integer matrix header"));
+            }
+            let scales = u32_at(prefix, 28)? as usize;
+            let matrix = sum(16, product(scales, 4)?)?;
+            let header = sum(16, sum(matrix, 8)?)?;
+            if header > total_len {
+                return Err(VoiceError::new(
+                    "Tensor storage does not exactly consume its resource",
+                ));
+            }
+            Ok(header)
+        }
+        _ => Err(VoiceError::new("Unknown tensor storage identity")),
+    }
+}
+
+pub(super) fn parse_with_length(bytes: &[u8], total_len: usize) -> Result<TensorLayout> {
+    if total_len < bytes.len() {
+        return Err(VoiceError::new(
+            "Tensor storage does not exactly consume its resource",
+        ));
+    }
     let kind: [u8; 16] = array(bytes, 0)?;
     let payload = &bytes[16..];
+    let payload_total = total_len - 16;
     match kind {
         FLOAT_MATRIX => {
             let rows = u32_at(payload, 0)? as usize;
             let columns = u32_at(payload, 4)? as usize;
             let elements = product(rows, columns)?;
-            exact_length(payload, sum(8, product(elements, 4)?)?)?;
+            exact_length(payload_total, sum(8, product(elements, 4)?)?)?;
             Ok(TensorLayout {
                 storage: "float32_matrix",
                 rows,
@@ -189,7 +222,7 @@ pub(super) fn parse(bytes: &[u8]) -> Result<TensorLayout> {
         }
         FLOAT_VECTOR => {
             let elements = u32_at(payload, 0)? as usize;
-            exact_length(payload, sum(4, product(elements, 4)?)?)?;
+            exact_length(payload_total, sum(4, product(elements, 4)?)?)?;
             Ok(TensorLayout {
                 storage: "float32_vector",
                 rows: 1,
@@ -213,7 +246,7 @@ pub(super) fn parse(bytes: &[u8]) -> Result<TensorLayout> {
             }
             let elements = product(rows, columns)?;
             exact_length(
-                payload,
+                payload_total,
                 sum(
                     sum(matrix, 8)?,
                     product(elements, stored_bits as usize / 8)?,
@@ -238,8 +271,8 @@ pub(super) fn parse(bytes: &[u8]) -> Result<TensorLayout> {
     }
 }
 
-fn exact_length(bytes: &[u8], expected: usize) -> Result<()> {
-    if bytes.len() != expected {
+fn exact_length(actual: usize, expected: usize) -> Result<()> {
+    if actual != expected {
         return Err(VoiceError::new(
             "Tensor storage does not exactly consume its resource",
         ));

@@ -22,6 +22,7 @@ struct Owner {
     coverage: Range<usize>,
     controls: Controls,
     ready: ReadySpans,
+    completed_audio: Option<Arc<RenderedAudio>>,
 }
 
 pub(crate) struct LiveMixer {
@@ -66,6 +67,7 @@ impl LiveMixer {
                     coverage,
                     controls,
                     ready: ReadySpans::default(),
+                    completed_audio: None,
                 },
             );
         }
@@ -94,6 +96,7 @@ impl LiveMixer {
             let Some(owner) = self.owners.get_mut(id) else {
                 continue;
             };
+            owner.completed_audio = None;
             let range = owner
                 .ready
                 .insert_audio(Arc::clone(&audio), &owner.coverage)?;
@@ -121,11 +124,19 @@ impl LiveMixer {
         let Some(owner) = self.owners.get_mut(&id) else {
             return Ok(());
         };
+        if owner
+            .completed_audio
+            .as_ref()
+            .is_some_and(|prev| Arc::ptr_eq(prev, &audio))
+        {
+            return Ok(());
+        }
         let range = owner.coverage.clone();
         let mut ready = ReadySpans::default();
         ready.insert_silence(range.clone());
-        ready.insert_audio(audio, &range)?;
+        ready.insert_audio(Arc::clone(&audio), &range)?;
         owner.ready = ready;
+        owner.completed_audio = Some(audio);
         self.publish_blocks(range)
     }
 
@@ -136,6 +147,7 @@ impl LiveMixer {
         let Some(owner) = self.owners.get_mut(&id) else {
             return Ok(());
         };
+        owner.completed_audio = None;
         if model.end < model.start {
             return Err(format!("音符组 {} 的模型采样范围无效", id.0));
         }
@@ -187,15 +199,17 @@ impl LiveMixer {
             return Ok(());
         }
         let end = dirty.end.min(source.total_frames());
+        let mut relevant = Vec::new();
         for index in dirty.start / LIVE_BLOCK_FRAMES..end.div_ceil(LIVE_BLOCK_FRAMES) {
             let start = index * LIVE_BLOCK_FRAMES;
             let frames = source.block_frames(index).ok_or("混音块超出项目范围")?;
             let range = start..start + frames;
-            let relevant = self
-                .owners
-                .values()
-                .filter(|owner| !intersection(&owner.coverage, &range).is_empty())
-                .collect::<Vec<_>>();
+            relevant.clear();
+            relevant.extend(
+                self.owners
+                    .values()
+                    .filter(|owner| !intersection(&owner.coverage, &range).is_empty()),
+            );
             if relevant.iter().any(|owner| {
                 owner
                     .ready
@@ -212,7 +226,7 @@ impl LiveMixer {
                 continue;
             }
             let mut samples = vec![0.0; frames * LIVE_CHANNELS];
-            for owner in relevant {
+            for owner in &relevant {
                 owner.ready.mix_into(&range, &owner.controls, &mut samples);
             }
             source

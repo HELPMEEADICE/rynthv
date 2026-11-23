@@ -1,5 +1,5 @@
 use super::{AudioError, ChannelLayout, RenderedAudio, conversion};
-use std::path::Path;
+use std::{io::Write, path::Path};
 
 #[derive(Clone, Copy)]
 pub struct WaveFormat {
@@ -49,47 +49,69 @@ fn encode(path: &Path, audio: &RenderedAudio, depth: u16) -> Result<(), AudioErr
         .ok_or_else(|| AudioError::Wave("PCM exceeds RIFF's 4 GiB limit".into()))?;
     let channels = audio.layout().channels() as u16;
     let block_align = channels * (depth / 8);
-    let mut bytes = Vec::new();
-    bytes
-        .try_reserve_exact(riff_bytes as usize + 8)
-        .map_err(|error| AudioError::Wave(error.to_string()))?;
-    bytes.extend_from_slice(b"RIFF");
-    bytes.extend_from_slice(&riff_bytes.to_le_bytes());
-    bytes.extend_from_slice(b"WAVEfmt ");
-    bytes.extend_from_slice(&(if float { 18u32 } else { 16u32 }).to_le_bytes());
-    bytes.extend_from_slice(&(if float { 3u16 } else { 1u16 }).to_le_bytes());
-    bytes.extend_from_slice(&channels.to_le_bytes());
-    bytes.extend_from_slice(&audio.sample_rate().to_le_bytes());
-    bytes.extend_from_slice(&(audio.sample_rate() * u32::from(block_align)).to_le_bytes());
-    bytes.extend_from_slice(&block_align.to_le_bytes());
-    bytes.extend_from_slice(&depth.to_le_bytes());
-    if float {
-        bytes.extend_from_slice(&0u16.to_le_bytes());
-        bytes.extend_from_slice(b"fact");
-        bytes.extend_from_slice(&4u32.to_le_bytes());
-        bytes.extend_from_slice(&(audio.frames() as u32).to_le_bytes());
-    }
-    bytes.extend_from_slice(b"data");
-    bytes.extend_from_slice(&data_bytes.to_le_bytes());
-    for &sample in audio.samples() {
-        match depth {
-            16 => bytes.extend_from_slice(
-                &((f64::from(sample) * 32768.0)
-                    .round()
-                    .clamp(-32768.0, 32767.0) as i16)
-                    .to_le_bytes(),
-            ),
-            24 => bytes.extend_from_slice(
-                &((f64::from(sample) * 8388608.0)
-                    .round()
-                    .clamp(-8388608.0, 8388607.0) as i32)
-                    .to_le_bytes()[..3],
-            ),
-            _ => bytes.extend_from_slice(&sample.to_le_bytes()),
+    crate::storage::atomic_write_with(path, |writer| {
+        let write = |writer: &mut std::io::BufWriter<std::fs::File>, bytes: &[u8]| {
+            writer.write_all(bytes).map_err(|e| e.to_string())
+        };
+        write(writer, b"RIFF")?;
+        write(writer, &riff_bytes.to_le_bytes())?;
+        write(writer, b"WAVEfmt ")?;
+        write(writer, &(if float { 18u32 } else { 16u32 }).to_le_bytes())?;
+        write(writer, &(if float { 3u16 } else { 1u16 }).to_le_bytes())?;
+        write(writer, &channels.to_le_bytes())?;
+        write(writer, &audio.sample_rate().to_le_bytes())?;
+        write(
+            writer,
+            &(audio.sample_rate() * u32::from(block_align)).to_le_bytes(),
+        )?;
+        write(writer, &block_align.to_le_bytes())?;
+        write(writer, &depth.to_le_bytes())?;
+        if float {
+            write(writer, &0u16.to_le_bytes())?;
+            write(writer, b"fact")?;
+            write(writer, &4u32.to_le_bytes())?;
+            write(writer, &(audio.frames() as u32).to_le_bytes())?;
         }
-    }
-    if padding != 0 {
-        bytes.push(0);
-    }
-    crate::storage::atomic_write(path, &bytes).map_err(AudioError::Wave)
+        write(writer, b"data")?;
+        write(writer, &data_bytes.to_le_bytes())?;
+        let mut chunk = [0u8; 4096];
+        let mut cursor = 0usize;
+        let sample_bytes = usize::from(depth / 8);
+        for &sample in audio.samples() {
+            if cursor + sample_bytes > chunk.len() {
+                write(writer, &chunk[..cursor])?;
+                cursor = 0;
+            }
+            match depth {
+                16 => {
+                    let encoded = ((f64::from(sample) * 32768.0)
+                        .round()
+                        .clamp(-32768.0, 32767.0) as i16)
+                        .to_le_bytes();
+                    chunk[cursor..cursor + 2].copy_from_slice(&encoded);
+                    cursor += 2;
+                }
+                24 => {
+                    let encoded = ((f64::from(sample) * 8388608.0)
+                        .round()
+                        .clamp(-8388608.0, 8388607.0) as i32)
+                        .to_le_bytes();
+                    chunk[cursor..cursor + 3].copy_from_slice(&encoded[..3]);
+                    cursor += 3;
+                }
+                _ => {
+                    chunk[cursor..cursor + 4].copy_from_slice(&sample.to_le_bytes());
+                    cursor += 4;
+                }
+            }
+        }
+        if cursor > 0 {
+            write(writer, &chunk[..cursor])?;
+        }
+        if padding != 0 {
+            write(writer, &[0])?;
+        }
+        Ok(())
+    })
+    .map_err(AudioError::Wave)
 }

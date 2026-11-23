@@ -1,11 +1,11 @@
 //! Display publication follows stable PCM intervals, independent of complete
 //! owner history. Cached disjoint patches survive a metadata-only plan rebuild.
 
-use super::{Event, state::equivalent_owners};
+use super::Event;
 use crate::synthesis::{
     audio::RenderedAudio,
     engine::progressive::PreparedRender,
-    plan::{OwnerId, OwnerInput, RenderPlan},
+    plan::{OwnerId, OwnerInput},
     rendered::{PitchTrack, RenderVisuals, RenderedPhonemeTrack, VisualPatch, Waveform},
     runtime::events::Events,
     score::SAMPLE_RATE,
@@ -120,16 +120,15 @@ impl SessionVisuals {
 
 pub(super) fn publish(
     events: &Events,
-    plan: &RenderPlan,
     revision: u64,
-    owner: OwnerId,
+    mirrors: &[OwnerId],
     patches: Vec<VisualPatch>,
 ) {
     if patches.is_empty() {
         return;
     }
-    let mut mirrored = Vec::new();
-    for mirror in equivalent_owners(plan, owner) {
+    let mut mirrored = Vec::with_capacity(mirrors.len() * patches.len());
+    for &mirror in mirrors {
         mirrored.extend(patches.iter().cloned().map(|patch| (mirror, patch)));
     }
     if !mirrored.is_empty() {

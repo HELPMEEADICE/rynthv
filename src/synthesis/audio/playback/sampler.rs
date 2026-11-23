@@ -65,6 +65,7 @@ pub(super) struct MixSampler<'a> {
     source: &'a PlaybackSource,
     vocals: smallvec::SmallVec<[Sampler<'a>; 8]>,
     metronome: Option<MetronomeSampler<'a>>,
+    pending_cursor: usize,
 }
 
 impl<'a> MixSampler<'a> {
@@ -73,13 +74,29 @@ impl<'a> MixSampler<'a> {
             source,
             vocals: source.vocals.iter().map(|v| Sampler::new(v)).collect(),
             metronome: source.metronome.as_deref().map(MetronomeSampler::new),
+            pending_cursor: 0,
         }
     }
 
     pub fn sample(&mut self, position: f64) -> Option<[f32; 2]> {
-        let frame = position.floor() as usize;
-        if self.source.pending.iter().any(|r| r.contains(&frame)) {
-            return None;
+        let pending = &self.source.pending;
+        if !pending.is_empty() {
+            let frame = position.floor() as usize;
+            if self.pending_cursor > 0 && pending[self.pending_cursor - 1].end > frame {
+                self.pending_cursor = pending.partition_point(|r| r.end <= frame);
+            } else {
+                while self.pending_cursor < pending.len()
+                    && pending[self.pending_cursor].end <= frame
+                {
+                    self.pending_cursor += 1;
+                }
+            }
+            if pending
+                .get(self.pending_cursor)
+                .is_some_and(|r| frame >= r.start)
+            {
+                return None;
+            }
         }
         let mut output = [0.0; 2];
         for vocals in &mut self.vocals {

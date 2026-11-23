@@ -63,32 +63,26 @@ pub fn splice_tail(
     let span = boundary as f64 - 10.0;
     let cubic = ((2.0 * f64::from(shift) / span) / span) / span;
     let square = (3.0 * f64::from(shift) / span) / span;
-    let mut samples: [Vec<f32>; 2] =
-        std::array::from_fn(|channel| old[channel][..published].to_vec());
-    for channel in 0..2 {
-        let mut warped = Vec::with_capacity(end);
-        for index in 0..end {
-            let value = if index < 10 {
-                fresh[channel][index]
-            } else if index >= boundary {
-                fresh[channel][(index as i64 - i64::from(shift)) as usize]
-            } else {
-                let time = index as f64 - 10.0;
-                let squared = f64::from((time * time) as f32);
-                let position = (cubic * time * squared - squared * square + index as f64) as f32;
-                interpolate::sample(fresh[channel], position)?
-            };
-            warped.push(value);
+    let mut samples: [Vec<f32>; 2] = std::array::from_fn(|_| Vec::new());
+    for (channel, out) in samples.iter_mut().enumerate() {
+        out.reserve_exact(published);
+        out.extend_from_slice(&fresh[channel][..10]);
+        for index in 10..boundary {
+            let time = index as f64 - 10.0;
+            let squared = f64::from((time * time) as f32);
+            let position = (cubic * time * squared - squared * square + index as f64) as f32;
+            out.push(interpolate::sample(fresh[channel], position)?);
         }
-        samples[channel][..boundary].copy_from_slice(&warped[..boundary]);
         let step = 1.0_f32 / fade as f32;
         let mut old_gain = 0.0_f32;
         let mut new_gain = 1.0_f32;
         for index in boundary..end {
-            samples[channel][index] = old[channel][index] * old_gain + warped[index] * new_gain;
+            let warped = fresh[channel][(index as i64 - i64::from(shift)) as usize];
+            out.push(old[channel][index] * old_gain + warped * new_gain);
             old_gain += step;
             new_gain -= step;
         }
+        out.extend_from_slice(&old[channel][end..published]);
     }
     Ok(TailSplice {
         samples,

@@ -2,7 +2,7 @@ use crate::model::*;
 use std::{
     collections::HashMap,
     fs,
-    io::{Read, Write},
+    io::{BufWriter, Read, Write},
     path::Path,
 };
 
@@ -107,6 +107,15 @@ fn check_project_size(bytes: u64) -> Result<(), String> {
 }
 
 pub fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    atomic_write_with(path, |writer| {
+        writer.write_all(bytes).map_err(|e| e.to_string())
+    })
+}
+
+pub fn atomic_write_with(
+    path: &Path,
+    write: impl FnOnce(&mut BufWriter<fs::File>) -> Result<(), String>,
+) -> Result<(), String> {
     if path.as_os_str().to_string_lossy().ends_with(['/', '\\']) {
         return Err(format!("写入 {} 失败：目标路径不是文件", path.display()));
     }
@@ -120,20 +129,24 @@ pub fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), String> {
         .filter(|p| !p.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
     let temp = parent.join(format!(".{name}.{}.tmp", uuid::Uuid::new_v4()));
-    let result = (|| {
-        let mut file = fs::OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .open(&temp)?;
-        file.write_all(bytes)?;
-        file.sync_all()?;
-        drop(file);
-        fs::rename(&temp, path)?;
+    let result: Result<(), String> = (|| {
+        {
+            let file = fs::OpenOptions::new()
+                .create_new(true)
+                .write(true)
+                .open(&temp)
+                .map_err(|e| e.to_string())?;
+            let mut writer = BufWriter::with_capacity(64 * 1024, file);
+            write(&mut writer)?;
+            writer.flush().map_err(|e| e.to_string())?;
+            writer.get_ref().sync_all().map_err(|e| e.to_string())?;
+        }
+        fs::rename(&temp, path).map_err(|e| e.to_string())?;
         #[cfg(unix)]
         if let Ok(dir) = fs::File::open(parent) {
-            dir.sync_all()?;
+            dir.sync_all().map_err(|e| e.to_string())?;
         }
-        Ok::<(), std::io::Error>(())
+        Ok(())
     })();
     if result.is_err() {
         let _ = fs::remove_file(&temp);

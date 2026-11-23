@@ -92,30 +92,17 @@ impl TempoMapping {
         }
     }
 
+    pub fn cursor(&self) -> TempoCursor<'_> {
+        TempoCursor {
+            origin_seconds: self.origin_seconds,
+            points: &self.points,
+            segment: 0,
+            segment_start_seconds: self.origin_seconds,
+        }
+    }
+
     pub fn seconds_at(&self, position: GlobalBlick) -> f64 {
-        let Some(first) = self.points.first() else {
-            return f64::NAN;
-        };
-        let mut seconds = self.origin_seconds;
-        if position.0 <= first.position.0 {
-            return seconds
-                + (i128::from(position.0) - i128::from(first.position.0)) as f64 / QUARTER as f64
-                    * 60.0
-                    / first.bpm;
-        }
-        for (index, tempo) in self.points.iter().enumerate() {
-            if position.0 <= tempo.position.0 {
-                break;
-            }
-            let end = self
-                .points
-                .get(index + 1)
-                .map_or(position.0, |p| p.position.0.min(position.0));
-            seconds += (i128::from(end) - i128::from(tempo.position.0)) as f64 / QUARTER as f64
-                * 60.0
-                / tempo.bpm;
-        }
-        seconds
+        self.cursor().seconds_at(position)
     }
 
     /// Inverse of this immutable render's tempo map, independent of later edits.
@@ -151,6 +138,47 @@ impl TempoMapping {
             return GlobalBlick(tempo.position.0.saturating_add(offset));
         }
         GlobalBlick(0)
+    }
+}
+
+pub struct TempoCursor<'a> {
+    origin_seconds: f64,
+    points: &'a [TempoPoint],
+    segment: usize,
+    segment_start_seconds: f64,
+}
+
+impl TempoCursor<'_> {
+    pub fn seconds_at(&mut self, position: GlobalBlick) -> f64 {
+        let Some(first) = self.points.first() else {
+            return f64::NAN;
+        };
+        if position.0 <= first.position.0 {
+            self.segment = 0;
+            self.segment_start_seconds = self.origin_seconds;
+            return self.origin_seconds
+                + (i128::from(position.0) - i128::from(first.position.0)) as f64 / QUARTER as f64
+                    * 60.0
+                    / first.bpm;
+        }
+        if position.0 <= self.points[self.segment].position.0 {
+            self.segment = 0;
+            self.segment_start_seconds = self.origin_seconds;
+        }
+        while let Some(next) = self.points.get(self.segment + 1)
+            && position.0 > next.position.0
+        {
+            let cur = &self.points[self.segment];
+            self.segment_start_seconds +=
+                (i128::from(next.position.0) - i128::from(cur.position.0)) as f64 / QUARTER as f64
+                    * 60.0
+                    / cur.bpm;
+            self.segment += 1;
+        }
+        let cur = &self.points[self.segment];
+        self.segment_start_seconds
+            + (i128::from(position.0) - i128::from(cur.position.0)) as f64 / QUARTER as f64 * 60.0
+                / cur.bpm
     }
 }
 

@@ -83,6 +83,7 @@ impl PreparedPerformanceControls {
             .map(|curve| curve.sampler(1.0))
             .transpose()
             .map_err(VoiceError::new)?;
+        let mut tempo = input.tempo.cursor();
         for (index, modulation) in modulation.into_iter().enumerate() {
             let local = begin
                 .checked_add(index as i64 * GRID)
@@ -90,7 +91,7 @@ impl PreparedPerformanceControls {
             let position = local
                 .checked_add(input.content_offset.0)
                 .ok_or_else(|| VoiceError::new("Performance control position overflows"))?;
-            let seconds = input.tempo.seconds_at(GlobalBlick(position));
+            let seconds = tempo.seconds_at(GlobalBlick(position));
             if !seconds.is_finite()
                 || vibrato
                     .last()

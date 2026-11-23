@@ -34,60 +34,58 @@ struct Span<'a> {
     right: f64,
 }
 
-/// Mix current publications using the complete project's solo set, including
-/// solo tracks whose synthesis has not finished. Frame zero remains project
-/// time zero; silence before the first owner is retained for transport seeks.
-pub(super) fn mix(
+/// Validate owners and compute the mixed duration in seconds without
+/// allocating or mixing PCM samples.
+pub(super) fn mixed_duration_seconds(
     owners: &[PublishedOwner],
     solo_tracks: &BTreeSet<u64>,
-) -> Result<Option<Arc<RenderedAudio>>, String> {
-    mix_with_recordings(owners, solo_tracks, &[])
+) -> Result<Option<f64>, String> {
+    Ok(visit_audible_owners(owners, solo_tracks, None, |_| {})?
+        .map(|frames| frames as f64 / f64::from(NATIVE_SAMPLE_RATE)))
+}
+
+pub(super) fn can_mix_with_recordings(
+    owners: &[PublishedOwner],
+    solo_tracks: &BTreeSet<u64>,
+    recordings: &[AudioLayer],
+    track_id: Option<u64>,
+) -> Result<bool, String> {
+    let owner_frames = visit_audible_owners(owners, solo_tracks, track_id, |_| {})?;
+    let mut recording_frames = false;
+    for layer in recordings {
+        if track_id.is_some_and(|track| layer.track_id != track) {
+            continue;
+        }
+        let _ = layer
+            .start_frame
+            .checked_add(layer.frames)
+            .ok_or("伴奏混音结束位置溢出")?;
+        recording_frames = true;
+    }
+    Ok(owner_frames.is_some() || recording_frames)
 }
 
 pub(super) fn mix_with_recordings(
     owners: &[PublishedOwner],
     solo_tracks: &BTreeSet<u64>,
     recordings: &[AudioLayer],
+    track_id: Option<u64>,
 ) -> Result<Option<Arc<RenderedAudio>>, String> {
     let mut spans = Vec::new();
     spans
         .try_reserve_exact(owners.len())
         .map_err(|error| format!("无法分配混音片段：{error}"))?;
-    let mut output_frames = 0;
-    for owner in owners {
-        if owner.audio.sample_rate() != NATIVE_SAMPLE_RATE {
-            return Err(format!(
-                "音符组 {} 的 PCM 采样率为 {} Hz，混音要求所有音符组使用 48000 Hz",
-                owner.owner.0,
-                owner.audio.sample_rate()
-            ));
-        }
-        let controls = Controls::read(&owner.controls.mixer)
-            .map_err(|error| format!("音轨 {}：{error}", owner.controls.track_id))?;
-        if controls.solo != solo_tracks.contains(&owner.controls.track_id) {
-            return Err(format!(
-                "音轨 {} 的独奏状态与项目混音快照不一致",
-                owner.controls.track_id
-            ));
-        }
-        if owner.controls.reference_muted
-            || controls.mute
-            || (!solo_tracks.is_empty() && !controls.solo)
-        {
-            continue;
-        }
-        let Some(span) = prepare_span(owner, controls)? else {
-            continue;
-        };
-        output_frames = output_frames.max(
-            span.output_start
-                .checked_add(span.frames)
-                .ok_or("混音结束位置溢出")?,
-        );
-        spans.push(span);
-    }
+    let mut output_frames =
+        visit_audible_owners(owners, solo_tracks, track_id, |span| spans.push(span))?.unwrap_or(0);
     for layer in recordings {
-        output_frames = output_frames.max(layer.end_frame());
+        if track_id.is_some_and(|track| layer.track_id != track) {
+            continue;
+        }
+        let end = layer
+            .start_frame
+            .checked_add(layer.frames)
+            .ok_or("伴奏混音结束位置溢出")?;
+        output_frames = output_frames.max(end);
         spans.push(Span {
             audio: &layer.audio,
             output_start: layer.start_frame,
@@ -125,6 +123,51 @@ pub(super) fn mix_with_recordings(
         .map(Arc::new)
         .map(Some)
         .map_err(|error| format!("混音输出无效：{error}"))
+}
+
+fn visit_audible_owners<'a>(
+    owners: &'a [PublishedOwner],
+    solo_tracks: &BTreeSet<u64>,
+    track_id: Option<u64>,
+    mut visit: impl FnMut(Span<'a>),
+) -> Result<Option<usize>, String> {
+    let mut output_frames: Option<usize> = None;
+    for owner in owners {
+        if track_id.is_some_and(|track| owner.controls.track_id != track) {
+            continue;
+        }
+        if owner.audio.sample_rate() != NATIVE_SAMPLE_RATE {
+            return Err(format!(
+                "音符组 {} 的 PCM 采样率为 {} Hz，混音要求所有音符组使用 48000 Hz",
+                owner.owner.0,
+                owner.audio.sample_rate()
+            ));
+        }
+        let controls = Controls::read(&owner.controls.mixer)
+            .map_err(|error| format!("音轨 {}：{error}", owner.controls.track_id))?;
+        if controls.solo != solo_tracks.contains(&owner.controls.track_id) {
+            return Err(format!(
+                "音轨 {} 的独奏状态与项目混音快照不一致",
+                owner.controls.track_id
+            ));
+        }
+        if owner.controls.reference_muted
+            || controls.mute
+            || (!solo_tracks.is_empty() && !controls.solo)
+        {
+            continue;
+        }
+        let Some(span) = prepare_span(owner, controls)? else {
+            continue;
+        };
+        let end = span
+            .output_start
+            .checked_add(span.frames)
+            .ok_or("混音结束位置溢出")?;
+        output_frames = Some(output_frames.map_or(end, |prev| prev.max(end)));
+        visit(span);
+    }
+    Ok(output_frames)
 }
 
 fn prepare_span(owner: &PublishedOwner, controls: Controls) -> Result<Option<Span<'_>>, String> {

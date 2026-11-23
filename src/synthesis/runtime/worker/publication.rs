@@ -1,7 +1,7 @@
 //! Audio and display publication for the current worker revision.
 use super::{
     Event, phonemes,
-    state::{Session, WorkState, equivalent_owners},
+    state::{Session, WorkState},
     visuals,
 };
 use crate::synthesis::{
@@ -30,8 +30,8 @@ impl<'network, 'tree> WorkState<'network, 'tree> {
                     live.complete(owner.owner, Arc::clone(&owner.audio))?;
                 }
                 for (&owner, session) in &self.sessions {
-                    let mirrors = equivalent_owners(&self.plan, owner);
-                    for &mirror in &mirrors {
+                    let mirrors = self.mirrors.get(&owner).map_or(&[][..], Vec::as_slice);
+                    for &mirror in mirrors {
                         live.prepared(mirror, session.prepared.model_samples())?;
                     }
                     for audio in session
@@ -39,7 +39,7 @@ impl<'network, 'tree> WorkState<'network, 'tree> {
                         .ready_audio()
                         .map_err(|error| error.to_string())?
                     {
-                        live.publish_for(&mirrors, Arc::new(audio))?;
+                        live.publish_for(mirrors, Arc::new(audio))?;
                     }
                 }
                 Ok::<_, String>(live)
@@ -63,9 +63,8 @@ impl<'network, 'tree> WorkState<'network, 'tree> {
             for (&owner, session) in &self.sessions {
                 visuals::publish(
                     events,
-                    &self.plan,
                     self.revision,
-                    owner,
+                    self.mirrors.get(&owner).map_or(&[][..], Vec::as_slice),
                     session.visuals.snapshot(),
                 );
             }
@@ -85,13 +84,13 @@ impl<'network, 'tree> WorkState<'network, 'tree> {
             let stats = self.cache.stats();
             let complete = stats.queued == 0 && stats.running == 0 && stats.failed == 0;
             let owners = if complete {
-                self.cache.snapshot()
+                snapshot.unwrap_or_else(|| self.cache.snapshot())
             } else {
                 Vec::new()
             };
-            let audio = if complete {
-                match mixer::mix(&owners, &self.solo_tracks) {
-                    Ok(audio) => audio,
+            let audio_duration_seconds = if complete {
+                match mixer::mixed_duration_seconds(&owners, &self.solo_tracks) {
+                    Ok(duration) => duration,
                     Err(error) => {
                         let _ = events.send(Event::Error {
                             revision: Some(self.revision),
@@ -107,7 +106,7 @@ impl<'network, 'tree> WorkState<'network, 'tree> {
             self.publish_phonemes(events, &visuals);
             let _ = events.send(Event::Publication {
                 revision: self.revision,
-                audio,
+                audio_duration_seconds,
                 owners,
                 visuals,
             });
@@ -117,18 +116,18 @@ impl<'network, 'tree> WorkState<'network, 'tree> {
 
     pub fn publish_prepared(&mut self, owner: OwnerId, events: &Events) -> Result<(), String> {
         if let Some(session) = self.sessions.get_mut(&owner) {
+            let mirrors = self.mirrors.get(&owner).map_or(&[][..], Vec::as_slice);
             phonemes::publish(
                 events,
                 &self.plan,
                 self.revision,
-                owner,
+                mirrors,
                 session.visuals.phonemes(),
             );
-            let mirrors = equivalent_owners(&self.plan, owner);
             if !self.rebuild_source
                 && let Some(live) = &mut self.live
             {
-                for &mirror in &mirrors {
+                for &mirror in mirrors {
                     live.prepared(mirror, session.prepared.model_samples())?;
                 }
             }
@@ -141,16 +140,10 @@ impl<'network, 'tree> WorkState<'network, 'tree> {
                 if !self.rebuild_source
                     && let Some(live) = &mut self.live
                 {
-                    live.publish_for(&mirrors, Arc::new(audio))?;
+                    live.publish_for(mirrors, Arc::new(audio))?;
                 }
             }
-            visuals::publish(
-                events,
-                &self.plan,
-                self.revision,
-                owner,
-                session.visuals.snapshot(),
-            );
+            visuals::publish(events, self.revision, mirrors, session.visuals.snapshot());
         }
         Ok(())
     }
@@ -164,7 +157,7 @@ impl<'network, 'tree> WorkState<'network, 'tree> {
         // A plan arriving inside a numerical batch gets a new sparse source
         // from the retained prepared state after reinsertion, never old PCM.
         let owner = session.job.request.owner;
-        let mirrors = equivalent_owners(&self.plan, owner);
+        let mirrors = self.mirrors.get(&owner).map_or(&[][..], Vec::as_slice);
         let mut patches = Vec::new();
         for audio in chunks {
             if let Some(patch) = session.visuals.audio(&audio, true) {
@@ -173,10 +166,10 @@ impl<'network, 'tree> WorkState<'network, 'tree> {
             if !self.rebuild_source
                 && let Some(live) = &mut self.live
             {
-                live.publish_for(&mirrors, Arc::new(audio))?;
+                live.publish_for(mirrors, Arc::new(audio))?;
             }
         }
-        visuals::publish(events, &self.plan, self.revision, owner, patches);
+        visuals::publish(events, self.revision, mirrors, patches);
         Ok(())
     }
 

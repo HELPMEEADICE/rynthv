@@ -21,7 +21,14 @@ pub(super) fn file(path: &Path, archive: &Archive) -> Result<(VoiceFile, Vec<Loa
     for (index, resource) in archive.resources.iter().enumerate() {
         let prefix = archive.prefix(index, 32)?;
         if tensor::is_known(&prefix) {
-            count_tensor(&archive.read(index, None)?, resource.flag, &mut tensors)?;
+            let total_len = resource.range.len();
+            let required = tensor::required_inspection_bytes(&prefix, total_len)?;
+            if required > prefix.len() {
+                let header = archive.prefix(index, required)?;
+                count_tensor_with_length(&header, total_len, resource.flag, &mut tensors)?;
+            } else {
+                count_tensor_with_length(&prefix, total_len, resource.flag, &mut tensors)?;
+            }
         }
         if prefix.starts_with(&[0xff, 0, 0xca, 0x7f]) {
             let role = embedded_role(resource.id)
@@ -129,7 +136,16 @@ pub(super) fn count_tensor(
     flag: u32,
     tensors: &mut BTreeMap<&'static str, TensorSummary>,
 ) -> Result<()> {
-    let layout = tensor::parse(bytes)?;
+    count_tensor_with_length(bytes, bytes.len(), flag, tensors)
+}
+
+fn count_tensor_with_length(
+    bytes: &[u8],
+    total_len: usize,
+    flag: u32,
+    tensors: &mut BTreeMap<&'static str, TensorSummary>,
+) -> Result<()> {
+    let layout = tensor::parse_with_length(bytes, total_len)?;
     let summary = tensors.entry(layout.storage).or_default();
     summary.resources += 1;
     summary.borrowed_resources += usize::from(flag == 0);

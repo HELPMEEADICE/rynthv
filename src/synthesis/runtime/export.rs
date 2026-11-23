@@ -166,33 +166,23 @@ impl Runtime {
                 let sender = tx;
                 let result = (|| {
                     // Validate all selected sources before writing the first file.
-                    let mut sources = Vec::new();
-                    for (path, track) in request.outputs {
-                        let audio = if let Some(track) = track {
-                            let stems: Vec<_> = owners
-                                .iter()
-                                .filter(|owner| owner.controls.track_id == track)
-                                .cloned()
-                                .collect();
-                            let backing: Vec<_> = recordings
-                                .iter()
-                                .filter(|layer| layer.track_id == track)
-                                .cloned()
-                                .collect();
-                            mixer::mix_with_recordings(&stems, &solo, &backing)?
-                        } else {
-                            mixer::mix_with_recordings(&owners, &solo, &recordings)?
-                        };
-                        let audio = audio.ok_or_else(|| {
-                            format!(
+                    for (path, track) in &request.outputs {
+                        if !mixer::can_mix_with_recordings(&owners, &solo, &recordings, *track)? {
+                            return Err(format!(
                                 "{} 没有可导出的音频，请检查音轨是否为空、静音或被独奏排除",
                                 path.display()
-                            )
-                        })?;
-                        sources.push((path, audio));
+                            ));
+                        }
                     }
-                    let mut written = Vec::new();
-                    for (path, audio) in sources {
+                    let mut written = Vec::with_capacity(request.outputs.len());
+                    for (path, track) in request.outputs {
+                        let audio = mixer::mix_with_recordings(&owners, &solo, &recordings, track)?
+                            .ok_or_else(|| {
+                                format!(
+                                    "{} 没有可导出的音频，请检查音轨是否为空、静音或被独奏排除",
+                                    path.display()
+                                )
+                            })?;
                         audio::save_wav_as(&path, &audio, request.format)
                             .map_err(|e| format!("{e}（此前已完成 {} 个文件）", written.len()))?;
                         written.push(path);

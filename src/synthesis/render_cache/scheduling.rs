@@ -26,25 +26,53 @@ impl RenderCache {
     /// Only independently dispatchable owners: equivalent work already running
     /// remains queued until that owner publishes its complete cache baseline.
     pub fn queued_owners(&self) -> Vec<OwnerId> {
+        let running: Vec<_> = self
+            .owners
+            .values()
+            .filter_map(|owner| {
+                matches!(owner.state, State::Running(_)).then_some(&*owner.request.input)
+            })
+            .collect();
         self.owners
             .iter()
             .filter(|(_, owner)| {
                 matches!(owner.state, State::Queued)
-                    && !self.owners.values().any(|other| {
-                        matches!(other.state, State::Running(_))
-                            && *owner.request.input == *other.request.input
-                    })
+                    && !running.iter().any(|input| **input == *owner.request.input)
             })
             .map(|(&id, _)| id)
             .collect()
     }
 
+    fn is_dispatchable(&self, id: OwnerId) -> bool {
+        let Some(owner) = self.owners.get(&id) else {
+            return false;
+        };
+        matches!(owner.state, State::Queued)
+            && !self.owners.values().any(|other| {
+                matches!(other.state, State::Running(_))
+                    && *owner.request.input == *other.request.input
+            })
+    }
+
     /// The caller chooses demand priority; the job retains the same commit and
     /// cancellation identity throughout every bounded streaming batch.
     pub fn take_owner(&mut self, id: OwnerId) -> Option<RenderJob> {
-        if !self.queued_owners().contains(&id) {
+        if !self.is_dispatchable(id) {
             return None;
         }
+        self.dispatch_owner(id)
+    }
+
+    pub fn take_next(&mut self) -> Option<RenderJob> {
+        self.reuse_queued();
+        let id = self
+            .queued_owners()
+            .into_iter()
+            .min_by_key(|id| (self.owners[id].request.coverage.sample_start.0, *id))?;
+        self.dispatch_owner(id)
+    }
+
+    fn dispatch_owner(&mut self, id: OwnerId) -> Option<RenderJob> {
         self.next_serial = self
             .next_serial
             .checked_add(1)
@@ -59,14 +87,5 @@ impl RenderCache {
         };
         owner.state = State::Running(job.clone());
         Some(job)
-    }
-
-    pub fn take_next(&mut self) -> Option<RenderJob> {
-        self.reuse_queued();
-        let id = self
-            .queued_owners()
-            .into_iter()
-            .min_by_key(|id| (self.owners[id].request.coverage.sample_start.0, *id))?;
-        self.take_owner(id)
     }
 }

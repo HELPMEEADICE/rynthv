@@ -61,6 +61,7 @@ impl PlaybackSource {
         let total_frames = end
             .max(vocals.iter().map(|v| v.total_frames()).max().unwrap_or(0))
             .max(layers.iter().map(AudioLayer::end_frame).max().unwrap_or(0));
+        let pending = merge_ranges(pending);
         Self {
             metronome: None,
             vocals,
@@ -78,4 +79,23 @@ impl PlaybackSource {
         self.metronome = Some(metronome);
         self
     }
+}
+
+fn merge_ranges(mut ranges: Vec<Range<usize>>) -> Vec<Range<usize>> {
+    ranges.retain(|range| !range.is_empty());
+    if ranges.len() <= 1 {
+        return ranges;
+    }
+    ranges.sort_unstable_by_key(|range| (range.start, range.end));
+    let mut merged: Vec<Range<usize>> = Vec::with_capacity(ranges.len());
+    for range in ranges {
+        if let Some(last) = merged.last_mut()
+            && range.start <= last.end
+        {
+            last.end = last.end.max(range.end);
+        } else {
+            merged.push(range);
+        }
+    }
+    merged
 }

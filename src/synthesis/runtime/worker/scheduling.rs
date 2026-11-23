@@ -1,4 +1,4 @@
-use super::state::{WorkState, equivalent_owners};
+use super::state::WorkState;
 use crate::synthesis::plan::OwnerId;
 
 impl WorkState<'_, '_> {
@@ -13,13 +13,11 @@ impl WorkState<'_, '_> {
             let seconds = self.demand_seconds + f64::from(offset) * 0.5;
             for &owner in &owners {
                 if let Some(target) = self.live.as_ref().and_then(|live| {
-                    equivalent_owners(&self.plan, owner)
-                        .into_iter()
-                        .find_map(|mirror| {
-                            live.needs(mirror, seconds)
-                                .then(|| live.next_needed(mirror, seconds))
-                                .flatten()
-                        })
+                    self.mirrors(owner).iter().find_map(|&mirror| {
+                        live.needs(mirror, seconds)
+                            .then(|| live.next_needed(mirror, seconds))
+                            .flatten()
+                    })
                 }) {
                     return Some((owner, target));
                 }
@@ -41,9 +39,9 @@ impl WorkState<'_, '_> {
                     .live
                     .as_ref()
                     .and_then(|live| {
-                        equivalent_owners(&self.plan, owner)
-                            .into_iter()
-                            .find_map(|mirror| live.next_needed(mirror, self.demand_seconds))
+                        self.mirrors(owner)
+                            .iter()
+                            .find_map(|&mirror| live.next_needed(mirror, self.demand_seconds))
                     })
                     .unwrap_or(self.demand_seconds);
                 (owner, seconds)

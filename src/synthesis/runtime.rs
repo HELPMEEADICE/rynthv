@@ -224,7 +224,10 @@ impl Runtime {
             })
     }
     pub fn has_audio(&self) -> bool {
-        self.voices.values().any(|v| v.audio.is_some()) || !self.recordings.layers.is_empty()
+        self.voices
+            .values()
+            .any(|v| v.audio_duration_seconds.is_some())
+            || !self.recordings.layers.is_empty()
     }
     pub fn visuals(&self, owner: OwnerId) -> Option<&VisualTimeline> {
         self.visuals.get(&owner)
@@ -239,8 +242,7 @@ impl Runtime {
         let seconds = self
             .voices
             .values()
-            .filter_map(|v| v.audio.as_ref())
-            .map(|a| a.duration_seconds())
+            .filter_map(|v| v.audio_duration_seconds)
             .fold(self.recordings.end as f64 / 48_000.0, f64::max);
         (seconds > 0.0).then_some(seconds)
     }

@@ -63,6 +63,9 @@ impl PreparedAutomations {
         let acoustic_end = end
             .checked_add(QUARTER)
             .ok_or_else(|| VoiceError::new("Automation padding overflows"))?;
+        let mut acoustic_grid =
+            prepare::GridTimes::new(input, acoustic_begin, acoustic_end, ACOUSTIC_GRID, true);
+        let mut pitch_grid = prepare::GridTimes::new(input, begin, end, PITCH_GRID, true);
         let settings = VoiceSettings::resolve_with_defaults(
             &input.voice.track_default_options,
             &input.voice.instance_options,
@@ -96,17 +99,13 @@ impl PreparedAutomations {
             parameters.insert(
                 name.clone(),
                 prepare_curve(
-                    input,
+                    &mut acoustic_grid,
                     curve,
                     track_curve,
                     CurveGrid {
                         default: parameter.default_value(),
                         baseline: scalar_baseline(&settings, parameter),
                         range: parameter.range(),
-                        begin: acoustic_begin,
-                        end: acoustic_end,
-                        step: ACOUSTIC_GRID,
-                        include_partial: true,
                         multiply: parameter == Parameter::Voicing,
                     },
                 )?,
@@ -132,17 +131,13 @@ impl PreparedAutomations {
                 vocal_modes.insert(
                     name.clone(),
                     prepare_curve(
-                        input,
+                        &mut acoustic_grid,
                         curve,
                         track_curve,
                         CurveGrid {
                             default: 0.0,
                             baseline: 0.0,
                             range: (-150.0, 150.0),
-                            begin: acoustic_begin,
-                            end: acoustic_end,
-                            step: ACOUSTIC_GRID,
-                            include_partial: true,
                             multiply: false,
                         },
                     )?,
@@ -154,17 +149,13 @@ impl PreparedAutomations {
                 pitch_vocal_modes.insert(
                     name.clone(),
                     prepare_curve(
-                        input,
+                        &mut pitch_grid,
                         Some(curve),
                         None,
                         CurveGrid {
                             default: 0.0,
                             baseline: 0.0,
                             range: (f64::NEG_INFINITY, f64::INFINITY),
-                            begin,
-                            end,
-                            step: PITCH_GRID,
-                            include_partial: true,
                             multiply: false,
                         },
                     )?,

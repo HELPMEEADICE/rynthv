@@ -172,7 +172,7 @@ impl Runtime {
                     }
                     voice.waiting = false;
                     voice.live = None;
-                    voice.audio = None;
+                    voice.audio_duration_seconds = None;
                     voice.owners.clear();
                     voice.failures.clear();
                     voice.stats = Default::default();
@@ -240,7 +240,7 @@ impl Runtime {
             };
             voice.revision = self.request_serial;
             voice.live = None;
-            voice.audio = None;
+            voice.audio_duration_seconds = None;
             voice.owners.clear();
             voice.failures.clear();
             voice.stats = Default::default();

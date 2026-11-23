@@ -1,6 +1,6 @@
 use super::{Runtime, VoiceState, worker};
 use crate::synthesis::{
-    audio::{LiveAudio, RenderedAudio},
+    audio::LiveAudio,
     plan::RenderPlan,
     render_cache::{CacheStats, PublishedOwner},
     settings::VoiceSelection,
@@ -26,7 +26,7 @@ pub(super) struct VoiceSlot {
     pub stats: CacheStats,
     pub failures: Vec<(crate::synthesis::plan::OwnerId, String)>,
     pub live: Option<Arc<LiveAudio>>,
-    pub audio: Option<Arc<RenderedAudio>>,
+    pub audio_duration_seconds: Option<f64>,
     pub owners: Vec<PublishedOwner>,
 }
 impl VoiceSlot {
@@ -50,7 +50,7 @@ impl VoiceSlot {
             stats: CacheStats::default(),
             failures: Vec::new(),
             live: None,
-            audio: None,
+            audio_duration_seconds: None,
             owners: Vec::new(),
         }
     }
@@ -127,11 +127,11 @@ impl Runtime {
             }
             worker::Event::Publication {
                 revision,
-                audio,
+                audio_duration_seconds,
                 owners,
                 visuals,
             } if revision == v.revision => {
-                v.audio = audio;
+                v.audio_duration_seconds = audio_duration_seconds;
                 v.owners = owners;
                 self.complete_visuals(visuals);
             }

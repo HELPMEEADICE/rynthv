@@ -64,15 +64,17 @@ pub(super) fn run(
             }
             Err(RecvTimeoutError::Timeout) => {}
         }
-        if let Ok(mut status) = published.lock()
+        if let Some(player_ref) = player.as_ref()
+            && let Ok(mut status) = published.lock()
             && status.serial == pending.load(Ordering::Acquire)
         {
-            status.control = player.as_ref().and_then(Player::control);
-            status.ready = player.as_ref().and_then(Player::position_seconds).is_some();
-            status.playing = player.as_ref().is_some_and(Player::is_playing);
-            status.buffering = player.as_ref().is_some_and(Player::buffering);
-            status.position_seconds = player.as_ref().and_then(Player::position_seconds);
-            if let Some(error) = player.as_ref().and_then(Player::error) {
+            let position_seconds = player_ref.position_seconds();
+            status.control = player_ref.control();
+            status.ready = position_seconds.is_some();
+            status.playing = player_ref.is_playing();
+            status.buffering = player_ref.buffering();
+            status.position_seconds = position_seconds;
+            if let Some(error) = player_ref.error() {
                 let error = error.to_string();
                 if status.error.as_ref() != Some(&error) {
                     status.error = Some(error);
