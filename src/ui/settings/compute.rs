@@ -1,6 +1,9 @@
 use super::widgets::{row, section};
-use crate::{app::App, synthesis::inference::compute::Backend};
-use eframe::egui::{ComboBox, Ui};
+use crate::{
+    app::App,
+    synthesis::inference::compute::{AdapterId, Backend},
+};
+use eframe::egui::{ComboBox, Label, Ui};
 
 const BACKENDS: [(Backend, &str); 3] = [
     (Backend::Auto, "自动选择（Auto）"),
@@ -27,9 +30,9 @@ pub(super) fn settings(app: &mut App, ui: &mut Ui) {
                 }
             });
     });
-    if selected != current {
-        app.synthesis.set_compute_backend(selected);
-    }
+    let adapter = adapter_picker(app, ui, selected);
+    app.synthesis.set_compute_settings(selected, adapter);
+
     let Some(diagnostics) = app.synthesis.compute_diagnostics() else {
         ui.weak("正在初始化推理设备…");
         return;
@@ -45,8 +48,8 @@ pub(super) fn settings(app: &mut App, ui: &mut Ui) {
         ui.label(execution);
     });
     if let Some(device) = &status.device {
-        row(ui, "GPU", |ui| {
-            ui.label(format!("{} · {}", device.name, device.api));
+        row(ui, "当前显卡", |ui| {
+            ui.add(Label::new(device.id.to_string()).truncate());
         });
     }
     let initialization = match (status.requested, &status.device, &status.error) {
@@ -61,4 +64,39 @@ pub(super) fn settings(app: &mut App, ui: &mut Ui) {
     if let Some(error) = &status.error {
         ui.weak(error);
     }
+}
+
+fn adapter_picker(app: &App, ui: &mut Ui, backend: Backend) -> Option<AdapterId> {
+    const DEFAULT: &str = "自动选择（独显优先）";
+
+    let mut selected = app.synthesis.library.settings.compute_adapter.clone();
+    let adapters = app.synthesis.compute_adapters();
+    row(ui, "WebGPU 显卡", |ui| {
+        ui.add_enabled_ui(backend != Backend::Cpu && adapters.is_some(), |ui| {
+            let label = selected
+                .as_ref()
+                .map_or_else(|| DEFAULT.into(), ToString::to_string);
+            ComboBox::from_id_salt("inference-adapter")
+                .width(ui.available_width())
+                .truncate()
+                .selected_text(&label)
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut selected, None, DEFAULT);
+                    for info in adapters
+                        .unwrap_or_default()
+                        .iter()
+                        .filter(|info| info.is_selectable())
+                    {
+                        ui.selectable_value(
+                            &mut selected,
+                            Some(info.id.clone()),
+                            info.id.to_string(),
+                        );
+                    }
+                })
+                .response
+                .on_hover_text(label);
+        });
+    });
+    selected
 }

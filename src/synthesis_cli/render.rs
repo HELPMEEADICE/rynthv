@@ -57,7 +57,7 @@ pub fn run(
     } else {
         None
     };
-    let compute = compute::Session::new(args.backend);
+    let compute = compute::Session::new(args.backend, None);
     compute.check()?;
     #[cfg(feature = "synth-profile")]
     if args.profile.is_some() {

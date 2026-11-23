@@ -146,7 +146,7 @@ fn run(
         if input.is_empty() || input.iter().any(|value| !value.is_finite()) {
             return Err("Module input must be nonempty and finite".into());
         }
-        let compute = compute::Session::new(module.backend);
+        let compute = compute::Session::new(module.backend, None);
         compute.check()?;
         let start = Instant::now();
         let output = compute
@@ -257,7 +257,7 @@ fn list_compute_devices(
     }
     let mut report = json!({ "cpu": true, "adapters": compute::list_devices() });
     if validate {
-        let session = compute::Session::new(compute::Backend::WebGpu);
+        let session = compute::Session::new(compute::Backend::WebGpu, None);
         report["shader_validation"] = json!({
             "compiled": session.validate_shaders().map_err(CliError::from)?,
             "device": session.status().device,

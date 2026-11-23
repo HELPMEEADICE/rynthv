@@ -1,5 +1,6 @@
 //! Native surface-free WebGPU inference.
 
+mod adapter;
 mod attention;
 mod batch;
 mod cache;
@@ -13,12 +14,12 @@ mod linear;
 mod timestamps;
 mod validate;
 
+pub use adapter::{AdapterId, AdapterInfo, list_devices};
 pub(super) use attention::{attention, projected_attention};
 pub(super) use batch::Batch;
 pub(super) use chain::sequence;
 pub(super) use conditional::ConditionalGraph;
 pub(super) use convolution::{convolution, transpose};
-pub use device::{AdapterInfo, list_devices};
 pub(super) use device::{Device, open};
 pub(super) use elementwise::{Element, elementwise};
 pub(super) use gru::{bidirectional_gru, gru};

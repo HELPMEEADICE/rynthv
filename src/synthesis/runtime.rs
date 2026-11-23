@@ -77,7 +77,11 @@ pub struct Runtime {
 impl Runtime {
     pub fn new(repaint: eframe::egui::Context) -> Self {
         let library = VoiceLibrary::new(repaint.clone());
-        let compute = compute::State::new(library.settings.compute_backend, repaint.clone());
+        let compute = compute::State::new(
+            library.settings.compute_backend,
+            library.settings.compute_adapter.clone(),
+            repaint.clone(),
+        );
         Self {
             library,
             compute,

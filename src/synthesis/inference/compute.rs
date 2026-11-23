@@ -16,7 +16,7 @@ use std::{
     time::Instant,
 };
 
-pub use super::gpu::{AdapterInfo, list_devices};
+pub use super::gpu::{AdapterId, AdapterInfo, list_devices};
 pub use diagnostics::{Activity, Diagnostics};
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
@@ -33,6 +33,7 @@ pub struct Session(Arc<Inner>);
 
 struct Inner {
     requested: Backend,
+    adapters: Vec<AdapterInfo>,
     device: Option<Device>,
     initialization_error: Option<String>,
     initialization_ms: f64,
@@ -54,17 +55,21 @@ thread_local! {
 
 impl Session {
     /// May initialize a native device. Call from a synthesis or setup thread.
-    pub fn new(requested: Backend) -> Self {
+    pub fn new(requested: Backend, adapter: Option<&AdapterId>) -> Self {
         let started = Instant::now();
-        let (device, initialization_error) = match requested {
-            Backend::Cpu => (None, None),
-            Backend::Auto | Backend::WebGpu => match open() {
-                Ok(device) => (Some(device), None),
-                Err(error) => (None, Some(error)),
-            },
+        let (adapters, device, initialization_error) = match requested {
+            Backend::Cpu => (Vec::new(), None, None),
+            Backend::Auto | Backend::WebGpu => {
+                let (adapters, result) = open(adapter);
+                match result {
+                    Ok(device) => (adapters, Some(device), None),
+                    Err(error) => (adapters, None, Some(error)),
+                }
+            }
         };
         Self(Arc::new(Inner {
             requested,
+            adapters,
             device,
             initialization_error,
             initialization_ms: started.elapsed().as_secs_f64() * 1000.0,
@@ -76,12 +81,17 @@ impl Session {
     pub(crate) fn unavailable(requested: Backend, reason: String) -> Self {
         Self(Arc::new(Inner {
             requested,
+            adapters: Vec::new(),
             device: None,
             initialization_error: Some(reason),
             initialization_ms: 0.0,
             activity: Mutex::default(),
             timestamps: AtomicBool::new(false),
         }))
+    }
+
+    pub(crate) fn adapters(&self) -> &[AdapterInfo] {
+        &self.0.adapters
     }
 
     pub fn status(&self) -> Status {

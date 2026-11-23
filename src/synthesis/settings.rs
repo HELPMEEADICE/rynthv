@@ -1,7 +1,7 @@
 //! Portable resource locations and the selected voice relative to its library.
 
 use super::{
-    inference::compute::Backend,
+    inference::compute::{AdapterId, Backend},
     voice::{VoiceCatalog, flat::FlatModelRegistry},
 };
 use serde::{Deserialize, Serialize};
@@ -29,6 +29,7 @@ pub struct SynthesisSettings {
     pub selected_voice: Option<VoiceSelection>,
     #[serde(default)]
     pub compute_backend: Backend,
+    pub compute_adapter: Option<AdapterId>,
 }
 
 impl SynthesisSettings {
