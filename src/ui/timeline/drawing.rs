@@ -67,8 +67,11 @@ pub fn draw_ruler(ui: &Ui, rect: Rect, view: &Viewport, time: &TimeAxis, step: f
             if x < clip.left() - 96.0 || x > clip.right() {
                 return;
             }
-            let text =
-                painter.layout_no_wrap((index + 1).to_string(), FontId::proportional(12.0), TEXT);
+            let text = painter.layout_no_wrap(
+                (i64::from(index) + 1).to_string(),
+                FontId::proportional(12.0),
+                TEXT,
+            );
             let pos = pos2(x + 7.0, baseline - 25.0 - text.size().y / 2.0);
             if Rect::from_min_size(pos, text.size()).intersects(clip) {
                 painter.galley(pos, text, TEXT);

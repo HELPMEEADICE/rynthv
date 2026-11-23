@@ -71,7 +71,7 @@ impl Editor {
     }
     /// Only an actually empty track gains an automatic group on note creation.
     pub fn prepare_note_target(&mut self, global: i64) -> bool {
-        if self.current_track().is_instrumental() {
+        if global == i64::MAX || self.current_track().is_instrumental() {
             return false;
         }
         if let Some(id) = self.group_at(global) {
@@ -84,13 +84,11 @@ impl Editor {
         if self.current_track().visible_references().next().is_some() {
             return false;
         }
-        let start = self
-            .project
-            .time
-            .bars(beats(global))
-            .last()
-            .map_or(0, |b| ticks(b.0));
-        self.insert_group(self.track, start, 32 * QUARTER);
+        let (bar, start) = self.project.time.bar_at(global);
+        let duration = (32 * QUARTER)
+            .max(self.project.time.meter_at(bar).bar_length())
+            .max(global - start + 1);
+        self.insert_group(self.track, start, duration);
         true
     }
     /// Move translates the instance; resizing only changes its visible interval.

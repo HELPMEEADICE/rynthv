@@ -60,11 +60,8 @@ impl Default for TimeAxis {
 }
 impl TimeAxis {
     pub fn meter_at(&self, index: i32) -> &Meter {
-        self.meter
-            .iter()
-            .rev()
-            .find(|m| m.index <= index)
-            .expect("time axis begins at bar zero")
+        let next = self.meter.partition_point(|m| m.index <= index.max(0));
+        &self.meter[next - 1]
     }
     pub fn bar_position(&self, index: i32) -> i64 {
         let index = index.max(0);
@@ -99,10 +96,9 @@ impl TimeAxis {
         unreachable!("time axis has an initial meter")
     }
     pub fn bpm_at(&self, position: i64) -> f64 {
-        self.tempo
-            .iter()
-            .rev()
-            .find(|t| t.position <= position)
+        let next = self.tempo.partition_point(|t| t.position <= position);
+        next.checked_sub(1)
+            .map(|index| &self.tempo[index])
             .map_or(120.0, |t| t.bpm)
     }
     pub fn seconds_at(&self, position: i64) -> f64 {
@@ -142,36 +138,43 @@ impl TimeAxis {
         }
         0
     }
-    pub fn bars(&self, until: f64) -> Vec<(f64, i32, u32, u32)> {
-        let mut result = Vec::new();
-        self.for_each_bar_in(0.0, until, |beat, index, numerator, denominator| {
-            result.push((beat, index, numerator, denominator));
-        });
-        result
-    }
-
     pub fn for_each_bar_in(
         &self,
         start_beat: f64,
         until: f64,
         mut visit: impl FnMut(f64, i32, u32, u32),
     ) {
-        let (mut beat, mut index, mut current, mut next_meter, mut emitted) =
-            (0.0, 0, &self.meter[0], 1usize, 0usize);
-        while beat <= until && emitted < 10_000 {
+        if !start_beat.is_finite() || until.is_nan() || start_beat > until {
+            return;
+        }
+        let start = ticks(start_beat);
+        let (mut index, mut position) = self.bar_at(if beats(start) >= start_beat {
+            start.saturating_sub(1)
+        } else {
+            start
+        });
+        let mut next_meter = self.meter.partition_point(|m| m.index <= index);
+        let mut current = &self.meter[next_meter - 1];
+        for _ in 0..10_000 {
+            let beat = beats(position);
+            if beat > until {
+                break;
+            }
             if let Some(m) = self.meter.get(next_meter)
                 && m.index == index
             {
                 current = m;
                 next_meter += 1;
             }
-            let bar_len = current.numerator as f64 * 4.0 / current.denominator as f64;
-            if beat + bar_len >= start_beat {
-                visit(beat, index, current.numerator, current.denominator);
-            }
-            emitted += 1;
-            beat += bar_len;
-            index += 1;
+            visit(beat, index, current.numerator, current.denominator);
+            let (Some(next_index), Some(next_position)) = (
+                index.checked_add(1),
+                position.checked_add(current.bar_length()),
+            ) else {
+                break;
+            };
+            index = next_index;
+            position = next_position;
         }
     }
 }

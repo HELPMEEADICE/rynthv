@@ -37,8 +37,8 @@ impl Editor {
     }
 
     pub fn set_tempo(&mut self, position: i64, bpm: f64) -> Result<(), String> {
-        if position < 0 || !bpm.is_finite() || bpm <= 0.0 {
-            return Err("曲速位置必须非负，BPM 必须是大于 0 的有限数值".into());
+        if position < 0 || !bpm.is_finite() || bpm <= 0.0 || !(60.0 / bpm).is_finite() {
+            return Err("曲速位置必须非负，BPM 必须使每拍时长为有限正数".into());
         }
         let slot = self
             .project
