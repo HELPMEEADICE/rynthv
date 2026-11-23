@@ -8,15 +8,18 @@ pub(super) fn expression(ui: &mut Ui, value: &mut [f64; 2], mixed: bool) -> Resp
     let bounds = rect.shrink(9.0);
     if ui.is_enabled() {
         let original = *value;
-        if response.double_clicked() {
+        if response.double_clicked_by(PointerButton::Primary) {
             *value = [0.5; 2];
         } else if let Some(pointer) = response.interact_pointer_pos()
-            && (response.dragged() || response.clicked())
+            && (response.dragged_by(PointerButton::Primary)
+                || response.clicked_by(PointerButton::Primary))
         {
             value[0] = ((pointer.x - bounds.left()) / bounds.width()).clamp(0.0, 1.0) as f64;
             value[1] = ((bounds.bottom() - pointer.y) / bounds.height()).clamp(0.0, 1.0) as f64;
         }
-        if response.clicked() || response.drag_started() {
+        if response.clicked_by(PointerButton::Primary)
+            || response.drag_started_by(PointerButton::Primary)
+        {
             response.request_focus();
         }
         if response.has_focus() {
@@ -32,9 +35,11 @@ pub(super) fn expression(ui: &mut Ui, value: &mut [f64; 2], mixed: bool) -> Resp
         }
         value.iter_mut().for_each(|v| *v = v.clamp(0.0, 1.0));
         if *value != original
-            || response.double_clicked()
+            || response.double_clicked_by(PointerButton::Primary)
             || response.has_focus() && ui.input(|input| input.key_pressed(Key::Home))
-            || mixed && (response.clicked() || response.dragged())
+            || mixed
+                && (response.clicked_by(PointerButton::Primary)
+                    || response.dragged_by(PointerButton::Primary))
         {
             response.mark_changed();
         }
@@ -95,14 +100,17 @@ pub(super) fn slider(
     let bounds = rect.shrink2(vec2(9.0, 0.0));
     if ui.is_enabled() {
         let original = *value;
-        if response.double_clicked() {
+        if response.double_clicked_by(PointerButton::Primary) {
             *value = default;
         } else if let Some(pointer) = response.interact_pointer_pos()
-            && (response.dragged() || response.clicked())
+            && (response.dragged_by(PointerButton::Primary)
+                || response.clicked_by(PointerButton::Primary))
         {
             *value = ((pointer.x - bounds.left()) / bounds.width()).clamp(0.0, 1.0) as f64;
         }
-        if response.clicked() || response.drag_started() {
+        if response.clicked_by(PointerButton::Primary)
+            || response.drag_started_by(PointerButton::Primary)
+        {
             response.request_focus();
         }
         if response.has_focus() {
@@ -119,9 +127,11 @@ pub(super) fn slider(
         }
         *value = value.clamp(0.0, 1.0);
         if *value != original
-            || response.double_clicked()
+            || response.double_clicked_by(PointerButton::Primary)
             || response.has_focus() && ui.input(|input| input.key_pressed(Key::Home))
-            || mixed && (response.clicked() || response.dragged())
+            || mixed
+                && (response.clicked_by(PointerButton::Primary)
+                    || response.dragged_by(PointerButton::Primary))
         {
             response.mark_changed();
         }

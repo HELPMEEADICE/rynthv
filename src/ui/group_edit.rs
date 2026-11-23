@@ -67,6 +67,20 @@ pub fn finish(app: &mut App) {
     app.editor.finish();
     app.group_gesture = None;
 }
+pub fn end_frame(app: &mut App, ctx: &Context) {
+    if app.group_gesture.is_none() {
+        return;
+    }
+    let released = ctx.input(|input| !input.pointer.primary_down());
+    let interrupted =
+        app.pending.is_some() || app.error.is_some() || ctx.input(|input| !input.focused);
+    if released {
+        finish(app);
+    } else if interrupted {
+        app.editor.cancel();
+        app.group_gesture = None;
+    }
+}
 pub fn context_menu(app: &mut App, ui: &mut Ui, reference: &GroupRef) {
     if ui.button("重命名音符组…").clicked() {
         if let Some(group) = app.editor.project.group(&reference.group_id) {

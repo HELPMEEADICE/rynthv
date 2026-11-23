@@ -107,13 +107,17 @@ impl App {
                 self.audio_import = None;
                 self.gesture = None;
                 self.piano_anchor = crate::ui::piano::AnchorSelection::default();
+                self.parameter_lane = ui::lanes::ParameterSelection::default();
                 self.phoneme_editing = ui::phonemes::PhonemeEditing::default();
                 self.group_gesture = None;
                 self.audio_drag = None;
+                self.mixer_drag = None;
                 self.view_pan = ui::view_pan::ViewPan::default();
                 self.rename = None;
                 self.time_edit = None;
                 self.bpm_edit = None;
+                self.lyric = None;
+                self.phoneme_draft = ui::panels::PhonemeDraft::default();
                 self.fill_lyrics = None;
                 summary
             }

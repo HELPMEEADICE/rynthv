@@ -14,9 +14,12 @@ pub fn show(app: &mut App, ui: &mut Ui, timeline_left: f32, scroll: f32) {
             vec2(timeline_left - rect.left(), 56.0),
         );
         let body = Rect::from_min_max(pos2(timeline_left, y), pos2(rect.right(), y + 56.0));
-        track_rects.push((track.id, body));
         if !head.intersects(rect) {
             continue;
+        }
+        let visible_body = body.intersect(rect);
+        if !track.is_instrumental() && visible_body.is_positive() {
+            track_rects.push((track.id, visible_body));
         }
         ui.painter().rect_filled(
             head,
@@ -83,12 +86,15 @@ pub fn show(app: &mut App, ui: &mut Ui, timeline_left: f32, scroll: f32) {
         }
     }
     if app.group_gesture.as_ref().is_some_and(|g| g.arrangement) {
-        let target = ui.input(|i| i.pointer.interact_pos()).and_then(|p| {
-            track_rects
-                .iter()
-                .find(|(_, r)| r.contains(p))
-                .map(|(id, _)| *id)
-        });
+        let target = ui
+            .input(|i| i.pointer.interact_pos())
+            .filter(|p| rect.contains(*p))
+            .and_then(|p| {
+                track_rects
+                    .iter()
+                    .find(|(_, r)| r.contains(p))
+                    .map(|(id, _)| *id)
+            });
         group_edit::update(app, ui.ctx(), target);
     }
 }

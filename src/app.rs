@@ -47,12 +47,14 @@ pub struct App {
     pub gesture: Option<ui::piano::Gesture>,
     pub group_gesture: Option<ui::group_edit::GroupGesture>,
     pub audio_drag: Option<ui::instrumental::AudioDrag>,
+    pub mixer_drag: Option<(EntityId, &'static str, u64)>,
     pub audio_import: Option<instrumental::AudioImport>,
     pub midi_import: Option<MidiImport>,
     pub rename: Option<ui::rename::Rename>,
     pub time_edit: Option<ui::time_edit::TimeEdit>,
     pub bpm_edit: Option<ui::tempo_input::BpmEdit>,
     pub lyric: Option<ui::piano::LyricEdit>,
+    pub phoneme_draft: ui::panels::PhonemeDraft,
     pub fill_lyrics: Option<ui::fill_lyrics::FillLyrics>,
     pub pending: Option<FileAction>,
     pub allow_close: bool,
@@ -135,12 +137,14 @@ impl App {
             gesture: None,
             group_gesture: None,
             audio_drag: None,
+            mixer_drag: None,
             audio_import: None,
             midi_import: None,
             rename: None,
             time_edit: None,
             bpm_edit: None,
             lyric: None,
+            phoneme_draft: ui::panels::PhonemeDraft::default(),
             fill_lyrics: None,
             pending: None,
             allow_close: false,
@@ -175,12 +179,14 @@ impl App {
                 self.phoneme_editing = ui::phonemes::PhonemeEditing::default();
                 self.group_gesture = None;
                 self.audio_drag = None;
+                self.mixer_drag = None;
                 self.audio_import = None;
                 self.view_pan = ui::view_pan::ViewPan::default();
                 self.rename = None;
                 self.time_edit = None;
                 self.bpm_edit = None;
                 self.lyric = None;
+                self.phoneme_draft = ui::panels::PhonemeDraft::default();
                 self.fill_lyrics = None;
                 let reference = self.editor.active_ref();
                 let first = reference.and_then(|r| {
@@ -264,12 +270,14 @@ impl App {
         self.phoneme_editing = ui::phonemes::PhonemeEditing::default();
         self.group_gesture = None;
         self.audio_drag = None;
+        self.mixer_drag = None;
         self.audio_import = None;
         self.synthesis.instrumentals.finish_import();
         self.view_pan.cancel(ctx);
         self.rename = None;
         self.time_edit = None;
         self.lyric = None;
+        self.phoneme_draft = ui::panels::PhonemeDraft::default();
         self.fill_lyrics = None;
         self.bpm_edit = None;
         match action {
@@ -311,6 +319,29 @@ impl App {
     pub fn commit_lyric(&mut self) {
         if let Some(lyric) = self.lyric.take() {
             self.editor.set_lyric(lyric.id, lyric.text);
+        }
+        if self.phoneme_draft.dirty {
+            let draft = std::mem::take(&mut self.phoneme_draft);
+            let still_current = self
+                .editor
+                .project
+                .group(&draft.group)
+                .is_some_and(|group| {
+                    draft
+                        .selection
+                        .iter()
+                        .zip(&draft.source)
+                        .all(|(id, source)| {
+                            group
+                                .notes
+                                .iter()
+                                .any(|n| n.id == *id && n.phonemes == *source)
+                        })
+                });
+            if still_current && !self.editor.is_editing() {
+                self.editor
+                    .set_note_phonemes(&draft.group, &draft.selection, &draft.text);
+            }
         }
     }
     fn persist_layout(&mut self) {
@@ -456,11 +487,7 @@ impl eframe::App for App {
         );
         ui::workspace::show(self, &mut ui::child(ui, work, "workspace"));
         ui::instrumental::update_drag(self, &ctx);
-        if self.group_gesture.is_some()
-            && ctx.input(|i| i.pointer.button_released(PointerButton::Primary))
-        {
-            ui::group_edit::finish(self);
-        }
+        ui::group_edit::end_frame(self, &ctx);
         if self.preferences.show_status_bar {
             let mut status_ui = ui::child(ui, status.shrink2(vec2(8.0, 1.0)), "status");
             status_ui.horizontal(|ui| {
@@ -492,12 +519,14 @@ impl eframe::App for App {
         }
         self.view_pan.end_frame(&ctx);
         ui::piano::end_keyboard_frame(self, &ctx);
+        ui::piano::end_gesture_frame(self, &ctx);
         ui::piano::end_pitch_frame(self, &ctx);
         ui::piano::end_anchor_frame(self, &ctx);
         ui::lanes::end_parameter_frame(self, &ctx);
         ui::phonemes::end_phoneme_frame(self, &ctx);
         ui::panels::end_performance_frame(self, &ctx);
         ui::voice_library::end_parameter_frame(self, &ctx);
+        ui::track_header::end_frame(self, &ctx);
         if !self.editor.is_editing() {
             self.synthesis
                 .sync_project(&self.editor.project, self.editor.revision);

@@ -8,53 +8,61 @@ use crate::{
 use eframe::egui::*;
 
 pub(super) fn show(app: &mut App, ui: &mut Ui) {
-    let mut config = app.editor.project.render_config.clone();
-    let mut tracks: Vec<_> = app
-        .editor
-        .project
-        .tracks
-        .iter()
-        .map(|t| {
-            (
-                t.id,
-                t.name.clone(),
-                t.extra
-                    .get("renderEnabled")
-                    .and_then(serde_json::Value::as_bool)
-                    .unwrap_or(false),
-                TrackColors::new(t).accent,
-            )
-        })
-        .collect();
-    let original_tracks = tracks.clone();
+    let mut pending_config: Vec<(&'static str, serde_json::Value)> = Vec::new();
+    let mut pending_tracks: Vec<(u64, bool)> = Vec::new();
     let mut export_clicked = false;
+    let editable = !app.editor.is_editing();
+
     padded(ui, |ui| {
         ui.weak("目标文件夹");
-        let mut directory = string(&config, "destination");
+        let directory = string(&app.editor.project.render_config, "destination");
+        let dir_id = ui.make_persistent_id(("render-field", "destination"));
+        let mut dir_draft = ui
+            .ctx()
+            .data_mut(|d| d.get_temp::<RenderDraft>(dir_id))
+            .filter(|draft| draft.committed == directory)
+            .unwrap_or_else(|| RenderDraft::synced(&directory));
+        let mut dir_commit = false;
+        let mut dir_has_focus = false;
         ui.horizontal(|ui| {
             let width = (ui.available_width() - 34.0).max(20.0);
-            ui.add_sized(
+            let response = ui.add_sized(
                 vec2(width, 28.0),
-                TextEdit::singleline(&mut directory)
+                TextEdit::singleline(&mut dir_draft.text)
                     .vertical_align(Align::Center)
                     .margin(vec2(7.0, 5.0))
                     .background_color(BORDER),
             );
-            if folder_button(ui).clicked() {
+            dir_has_focus = response.has_focus();
+            if dir_draft.text != directory
+                && (response.lost_focus()
+                    || dir_has_focus && ui.input(|i| i.key_pressed(Key::Enter)))
+            {
+                dir_commit = true;
+            }
+            if folder_button(ui).clicked() && editable {
                 let mut picker = rfd::FileDialog::new().set_title("选择导出文件夹");
-                if !directory.is_empty() {
-                    picker = picker.set_directory(&directory);
+                if !dir_draft.text.is_empty() {
+                    picker = picker.set_directory(&dir_draft.text);
                 }
                 if let Some(path) = picker.pick_folder() {
-                    directory = path.display().to_string();
+                    dir_draft.text = path.display().to_string();
+                    dir_commit = true;
                 }
             }
         });
-        config.insert("destination".into(), directory.into());
         ui.weak("文件名称");
-        let mut name = string(&config, "filename");
-        field(ui, &mut name);
-        config.insert("filename".into(), name.into());
+        let name = string(&app.editor.project.render_config, "filename");
+        let name_id = ui.make_persistent_id(("render-field", "filename"));
+        let mut name_draft = ui
+            .ctx()
+            .data_mut(|d| d.get_temp::<RenderDraft>(name_id))
+            .filter(|draft| draft.committed == name)
+            .unwrap_or_else(|| RenderDraft::synced(&name));
+        let name_response = field(ui, &mut name_draft.text);
+        let name_commit = name_draft.text != name
+            && (name_response.lost_focus()
+                || name_response.has_focus() && ui.input(|i| i.key_pressed(Key::Enter)));
         ui.add_space(12.0);
         let ready = !app.editor.is_editing() && app.synthesis.export_ready(app.editor.revision);
         export_clicked = ui
@@ -69,6 +77,24 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
                     .unwrap_or("等待伴奏加载和当前歌声合成完成后导出"),
             )
             .clicked();
+        if editable && (dir_commit || (export_clicked && dir_draft.text != directory)) {
+            pending_config.push(("destination", dir_draft.text.clone().into()));
+            dir_draft.committed = dir_draft.text.clone();
+        }
+        if editable && (name_commit || (export_clicked && name_draft.text != name)) {
+            pending_config.push(("filename", name_draft.text.clone().into()));
+            name_draft.committed = name_draft.text.clone();
+        }
+        if dir_has_focus || dir_draft.text != dir_draft.committed {
+            ui.ctx().data_mut(|d| d.insert_temp(dir_id, dir_draft));
+        } else {
+            ui.ctx().data_mut(|d| d.remove::<RenderDraft>(dir_id));
+        }
+        if name_response.has_focus() || name_draft.text != name_draft.committed {
+            ui.ctx().data_mut(|d| d.insert_temp(name_id, name_draft));
+        } else {
+            ui.ctx().data_mut(|d| d.remove::<RenderDraft>(name_id));
+        }
         if app.synthesis.is_exporting() {
             ui.horizontal(|ui| {
                 ui.spinner();
@@ -92,10 +118,33 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
         }
     });
     section(ui, "音轨", |ui| {
-        let mut mix = config
+        let current_mix = app
+            .editor
+            .project
+            .render_config
             .get("exportMixDown")
-            .and_then(serde_json::Value::as_bool)
-            .unwrap_or(true);
+            .and_then(serde_json::Value::as_bool);
+        let mut mix = current_mix.unwrap_or(true);
+        let mut tracks: Vec<_> = app
+            .editor
+            .project
+            .tracks
+            .iter()
+            .map(|t| {
+                let current = t
+                    .extra
+                    .get("renderEnabled")
+                    .and_then(serde_json::Value::as_bool);
+                (
+                    t.id,
+                    t.name.clone(),
+                    current,
+                    current.unwrap_or(false),
+                    TrackColors::new(t).accent,
+                )
+            })
+            .collect();
+        let mut mix_changed = false;
         Frame::new()
             .fill(BACKGROUND)
             .inner_margin(4)
@@ -103,60 +152,79 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
                 ui.set_min_height(190.0);
                 ui.set_width(ui.available_width());
                 ui.spacing_mut().item_spacing.y = 3.0;
-                track_row(ui, &mut mix, "混音导出", TEXT);
-                for (_, name, enabled, color) in &mut tracks {
-                    track_row(ui, enabled, name, *color);
+                if track_row(ui, &mut mix, "混音导出", TEXT) {
+                    mix_changed = true;
+                }
+                for (id, name, _, enabled, color) in &mut tracks {
+                    if track_row(ui, enabled, name, *color) {
+                        pending_tracks.push((*id, *enabled));
+                    }
                 }
             });
-        config.insert("exportMixDown".into(), mix.into());
+        if mix_changed && current_mix != Some(mix) {
+            pending_config.push(("exportMixDown", mix.into()));
+        }
         pair(ui, |ui, width| {
             if ui
                 .add_sized(vec2(width, 28.0), Button::new("全选"))
                 .clicked()
             {
-                config.insert("exportMixDown".into(), true.into());
-                for (_, _, enabled, _) in &mut tracks {
-                    *enabled = true;
+                if current_mix != Some(true) {
+                    pending_config.push(("exportMixDown", true.into()));
+                }
+                for (id, _, current, _, _) in &tracks {
+                    if *current != Some(true) {
+                        pending_tracks.push((*id, true));
+                    }
                 }
             }
             if ui
                 .add_sized(vec2(width, 28.0), Button::new("取消全选"))
                 .clicked()
             {
-                config.insert("exportMixDown".into(), false.into());
-                for (_, _, enabled, _) in &mut tracks {
-                    *enabled = false;
+                if current_mix != Some(false) {
+                    pending_config.push(("exportMixDown", false.into()));
+                }
+                for (id, _, current, _, _) in &tracks {
+                    if *current != Some(false) {
+                        pending_tracks.push((*id, false));
+                    }
                 }
             }
         });
     });
     section(ui, "格式", |ui| {
-        numeric(
+        if let Some((key, value)) = numeric(
             ui,
-            &mut config,
+            &app.editor.project.render_config,
             "numChannels",
             "声道",
             &[(1, "单声道"), (2, "立体声")],
-        );
+        ) {
+            pending_config.push((key, value.into()));
+        }
         ui.weak("气声输出");
-        let mut aspiration = string(&config, "aspirationFormat");
-        combo(
+        let mut aspiration = string(&app.editor.project.render_config, "aspirationFormat");
+        if combo(
             ui,
             "aspiration-format",
             &mut aspiration,
             &[("noAspiration".to_owned(), "无")],
-        );
-        config.insert("aspirationFormat".into(), aspiration.into());
-        numeric(
+        ) {
+            pending_config.push(("aspirationFormat", aspiration.into()));
+        }
+        if let Some((key, value)) = numeric(
             ui,
-            &mut config,
+            &app.editor.project.render_config,
             "bitDepth",
             "位深度",
             &[(16, "16 位"), (24, "24 位"), (32, "32 位浮点")],
-        );
-        numeric(
+        ) {
+            pending_config.push((key, value.into()));
+        }
+        if let Some((key, value)) = numeric(
             ui,
-            &mut config,
+            &app.editor.project.render_config,
             "sampleRate",
             "采样率",
             &[
@@ -164,12 +232,16 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
                 (48000, "48000 Hz"),
                 (96000, "96000 Hz"),
             ],
-        );
+        ) {
+            pending_config.push((key, value.into()));
+        }
     });
-    if config != app.editor.project.render_config || tracks != original_tracks {
+    if editable && (!pending_config.is_empty() || !pending_tracks.is_empty()) {
         app.editor.begin("渲染设置");
-        app.editor.project.render_config = config;
-        for (id, _, enabled, _) in tracks {
+        for (key, value) in pending_config {
+            app.editor.project.render_config.insert(key.into(), value);
+        }
+        for (id, enabled) in pending_tracks {
             if let Some(track) = app.editor.project.tracks.iter_mut().find(|t| t.id == id) {
                 track.extra.insert("renderEnabled".into(), enabled.into());
             }
@@ -182,6 +254,21 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
     section(ui, "合成状态", |ui| {
         super::super::synthesis::render_status(app, ui)
     });
+}
+
+#[derive(Clone)]
+struct RenderDraft {
+    committed: String,
+    text: String,
+}
+
+impl RenderDraft {
+    fn synced(value: &str) -> Self {
+        Self {
+            committed: value.to_owned(),
+            text: value.to_owned(),
+        }
+    }
 }
 
 fn start_export(app: &mut App) {
@@ -221,16 +308,21 @@ fn string(config: &Extra, key: &str) -> String {
         .unwrap_or("")
         .to_owned()
 }
-fn numeric(ui: &mut Ui, config: &mut Extra, key: &str, label: &str, values: &[(u64, &str)]) {
+fn numeric(
+    ui: &mut Ui,
+    config: &Extra,
+    key: &'static str,
+    label: &str,
+    values: &[(u64, &str)],
+) -> Option<(&'static str, u64)> {
     ui.weak(label);
     let mut value = config
         .get(key)
         .and_then(serde_json::Value::as_u64)
         .unwrap_or(values[0].0);
-    combo(ui, key, &mut value, values);
-    config.insert(key.into(), value.into());
+    combo(ui, key, &mut value, values).then_some((key, value))
 }
-fn track_row(ui: &mut Ui, checked: &mut bool, name: &str, color: Color32) {
+fn track_row(ui: &mut Ui, checked: &mut bool, name: &str, color: Color32) -> bool {
     let row = Frame::new()
         .fill(PANEL)
         .corner_radius(2)
@@ -242,13 +334,14 @@ fn track_row(ui: &mut Ui, checked: &mut bool, name: &str, color: Color32) {
         })
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
-            ui.checkbox(checked, name);
+            ui.checkbox(checked, name).changed()
         });
     ui.painter().rect_filled(
         Rect::from_min_size(row.response.rect.min, vec2(3.0, row.response.rect.height())),
         0,
         color,
     );
+    row.inner
 }
 fn folder_button(ui: &mut Ui) -> Response {
     let (rect, response) = ui.allocate_exact_size(Vec2::splat(28.0), Sense::click());

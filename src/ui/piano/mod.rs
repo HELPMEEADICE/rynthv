@@ -14,6 +14,7 @@ mod toolbar;
 use crate::model::*;
 pub use canvas::show;
 use eframe::egui::Pos2;
+pub use gestures::end_gesture_frame;
 pub use keyboard::{KeyboardAudition, begin_keyboard_frame, cancel_audition, end_keyboard_frame};
 pub use pitch_anchor::{
     AnchorSelection, anchor_delete, anchor_keyboard, anchor_select_all, end_anchor_frame,

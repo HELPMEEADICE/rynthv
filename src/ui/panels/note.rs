@@ -10,13 +10,13 @@ use eframe::egui::*;
 pub(crate) use performance::end_frame as end_performance_frame;
 
 #[derive(Clone, Default)]
-struct PhonemeDraft {
-    group: String,
-    selection: Vec<u64>,
-    reference: Option<u64>,
-    source: Vec<String>,
-    text: String,
-    dirty: bool,
+pub struct PhonemeDraft {
+    pub group: String,
+    pub selection: Vec<u64>,
+    pub reference: Option<u64>,
+    pub source: Vec<String>,
+    pub text: String,
+    pub dirty: bool,
 }
 
 pub(super) fn show(app: &mut App, ui: &mut Ui) {
@@ -103,9 +103,7 @@ fn language(app: &mut App, ui: &mut Ui, notes: &[Note]) {
 
 fn phonemes(app: &mut App, ui: &mut Ui) {
     let id = ui.make_persistent_id("phoneme-draft");
-    let mut draft = ui
-        .ctx()
-        .data_mut(|d| d.get_temp::<PhonemeDraft>(id).unwrap_or_default());
+    let mut draft = std::mem::take(&mut app.phoneme_draft);
     let selection_changed = draft.reference != app.editor.reference
         || draft
             .selection
@@ -129,10 +127,13 @@ fn phonemes(app: &mut App, ui: &mut Ui) {
                 })
         });
         if still_current && !app.editor.is_editing() {
-            app.commit_lyric();
+            if let Some(lyric) = app.lyric.take() {
+                app.editor.set_lyric(lyric.id, lyric.text);
+            }
             app.editor
                 .set_note_phonemes(&draft.group, &draft.selection, &draft.text);
         }
+        draft.dirty = false;
     }
     let notes: Vec<_> = app
         .editor
@@ -188,7 +189,9 @@ fn phonemes(app: &mut App, ui: &mut Ui) {
         && (response.lost_focus()
             || response.has_focus() && ui.input(|i| i.key_pressed(Key::Enter)))
     {
-        app.commit_lyric();
+        if let Some(lyric) = app.lyric.take() {
+            app.editor.set_lyric(lyric.id, lyric.text);
+        }
         app.editor
             .set_note_phonemes(&draft.group, &draft.selection, &draft.text);
         draft.dirty = false;
@@ -205,6 +208,7 @@ fn phonemes(app: &mut App, ui: &mut Ui) {
     };
     let mut value = notes.first().is_none_or(even);
     let mixed = notes.iter().any(|note| even(note) != value);
+    app.phoneme_draft = draft;
     if ui
         .add(Checkbox::new(&mut value, "按音符时值均匀分配音节").indeterminate(mixed))
         .changed()
@@ -212,5 +216,4 @@ fn phonemes(app: &mut App, ui: &mut Ui) {
         app.commit_lyric();
         app.editor.set_even_syllables(value);
     }
-    ui.ctx().data_mut(|d| d.insert_temp(id, draft));
 }

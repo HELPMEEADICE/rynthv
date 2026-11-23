@@ -12,7 +12,7 @@ pub(super) fn pointer(
     state: &mut State,
     result: &mut ControlResponse,
 ) {
-    if response.drag_started() {
+    if response.drag_started_by(PointerButton::Primary) {
         let origin = ui.input(|input| input.pointer.press_origin());
         if let Some(origin) = origin {
             state.drag = Some(Drag {

@@ -44,44 +44,55 @@ pub fn menus(app: &mut App, ui: &mut Ui) {
                 app.request_file(FileAction::ImportMidi, &ctx);
             }
             if item(ui, "作为音轨导入…", "", true) {
+                app.commit_lyric();
                 app.begin_midi_import(MidiImportMode::Tracks, &ctx);
             }
             if item(ui, "导入音频…", "", true) {
+                app.commit_lyric();
                 app.import_audio(None, &ctx);
             }
             item(ui, "导出音频", "", false);
         });
         ui.menu_button("编辑", |ui| {
+            let idle = !app.editor.is_editing();
             if item(
                 ui,
                 &format!("撤销 {}", app.editor.undo_label()),
                 "Ctrl+Z",
-                app.editor.can_undo(),
+                idle && app.editor.can_undo(),
             ) {
+                app.commit_lyric();
                 app.editor.undo();
             }
-            if item(ui, "重做", "Ctrl+Y", app.editor.can_redo()) {
+            if item(ui, "重做", "Ctrl+Y", idle && app.editor.can_redo()) {
+                app.commit_lyric();
                 app.editor.redo();
             }
             ui.separator();
-            if item(ui, "全选", "Ctrl+A", true) {
+            if item(ui, "全选", "Ctrl+A", idle) {
+                app.commit_lyric();
                 edit::select_all(app);
             }
-            if item(ui, "取消选择", "Esc", true) {
+            if item(ui, "取消选择", "Esc", idle) {
+                app.commit_lyric();
                 edit::clear(app);
             }
-            let selected = edit::selected(app);
+            let selected = idle && edit::selected(app);
             if item(ui, "删除所选内容", "Delete", selected) {
+                app.commit_lyric();
                 edit::delete(app);
             }
             ui.separator();
             if item(ui, "复制", "Ctrl+C", selected) {
+                app.commit_lyric();
                 edit::copy(app, &ctx);
             }
             if item(ui, "剪切", "Ctrl+X", selected) {
+                app.commit_lyric();
                 edit::cut(app, &ctx);
             }
-            if item(ui, "粘贴", "Ctrl+V", edit::can_paste(app)) {
+            if item(ui, "粘贴", "Ctrl+V", idle && edit::can_paste(app)) {
+                app.commit_lyric();
                 edit::paste(app, &ctx);
             }
         });
@@ -107,21 +118,36 @@ pub fn menus(app: &mut App, ui: &mut Ui) {
             }
         });
         ui.menu_button("修改", |ui| {
-            let selected = !super::lanes::parameter_active(app)
+            let selected = !app.editor.is_editing()
+                && !super::lanes::parameter_active(app)
                 && !super::phonemes::phoneme_active(app)
                 && app.piano_tool != super::piano::Tool::PitchAnchor
                 && !app.editor.selected.is_empty();
             if item(ui, "填入歌词…", "Ctrl+L", selected) {
+                app.commit_lyric();
                 super::fill_lyrics::open(app);
             }
             if item(ui, "静音音符", "Ctrl+M", selected) {
+                app.commit_lyric();
                 app.editor.mute_selected();
             }
             ui.separator();
-            if item(ui, "升高八度", "Ctrl+↑", edit::can_transpose(app)) {
+            if item(
+                ui,
+                "升高八度",
+                "Ctrl+↑",
+                !app.editor.is_editing() && edit::can_transpose(app),
+            ) {
+                app.commit_lyric();
                 edit::transpose(app, true);
             }
-            if item(ui, "降低八度", "Ctrl+↓", edit::can_transpose(app)) {
+            if item(
+                ui,
+                "降低八度",
+                "Ctrl+↓",
+                !app.editor.is_editing() && edit::can_transpose(app),
+            ) {
+                app.commit_lyric();
                 edit::transpose(app, false);
             }
             item(ui, "智能量化", "", false);
@@ -130,7 +156,9 @@ pub fn menus(app: &mut App, ui: &mut Ui) {
         ui.menu_button("自动处理", |ui| {
             item(ui, "装饰所选音符", "", false);
             ui.add_enabled_ui(
-                !super::lanes::parameter_active(app) && !super::phonemes::phoneme_active(app),
+                !app.editor.is_editing()
+                    && !super::lanes::parameter_active(app)
+                    && !super::phonemes::phoneme_active(app),
                 |ui| {
                     super::retakes::commands(app, ui);
                 },
@@ -139,18 +167,22 @@ pub fn menus(app: &mut App, ui: &mut Ui) {
             item(ui, "检测曲速", "", false);
         });
         ui.menu_button("项目", |ui| {
-            if item(ui, "创建音轨", "", true) {
+            let idle = !app.editor.is_editing();
+            if item(ui, "创建音轨", "", idle) {
+                app.commit_lyric();
                 app.editor.add_track();
             }
             if item(
                 ui,
                 "在走带处插入新组",
                 "",
-                !app.editor.current_track().is_instrumental(),
+                idle && !app.editor.current_track().is_instrumental(),
             ) {
+                app.commit_lyric();
                 app.editor.add_group();
             }
-            if item(ui, "创建伴奏轨", "", true) {
+            if item(ui, "创建伴奏轨", "", idle) {
+                app.commit_lyric();
                 let id = app.editor.add_instrumental_track();
                 app.import_audio(Some(id), &ctx);
             }
@@ -251,6 +283,9 @@ pub fn shortcuts(app: &mut App, ctx: &Context) {
     }
     if command(Key::O, ctrl) {
         app.request_file(FileAction::Open, ctx);
+    }
+    if app.editor.is_editing() {
+        return;
     }
     if command(Key::Z, shift) || command(Key::Y, ctrl) {
         app.editor.redo();

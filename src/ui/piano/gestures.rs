@@ -5,6 +5,26 @@ use std::collections::BTreeSet;
 pub(super) fn pitch_at(app: &App, rect: Rect, y: f32) -> i32 {
     (app.view.top_pitch - (y - rect.top()) / app.view.row_height).ceil() as i32
 }
+pub fn end_gesture_frame(app: &mut App, ctx: &Context) {
+    if !matches!(
+        app.gesture,
+        Some(Gesture::Notes { .. } | Gesture::Create { .. } | Gesture::Select { .. })
+    ) {
+        return;
+    }
+    let released = ctx.input(|input| !input.pointer.primary_down());
+    let interrupted = app.piano_collapsed
+        || app.pending.is_some()
+        || app.error.is_some()
+        || ctx.input(|input| !input.focused);
+    if released {
+        app.editor.finish();
+        app.gesture = None;
+    } else if interrupted {
+        app.editor.cancel();
+        app.gesture = None;
+    }
+}
 pub(super) fn start_gesture(
     app: &mut App,
     ui: &Ui,
@@ -105,6 +125,7 @@ pub(super) fn update_gesture(app: &mut App, ui: &Ui, rect: Rect) {
     let snapping = app.view.snap && !(modifiers.ctrl && modifiers.alt);
     let minimum = ticks(if snapping { app.view.step() } else { 0.01 });
     let Some(reference) = app.editor.active_ref().cloned() else {
+        app.editor.cancel();
         return;
     };
     match &gesture {

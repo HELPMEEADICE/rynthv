@@ -106,11 +106,13 @@ pub fn show(app: &mut App, ui: &mut Ui, rect: Rect, track: &Track) {
             .and_then(serde_json::Value::as_f64)
             .unwrap_or(reset);
         let (value, response) = knob(ui, (track.id, field), center, old, min, max, reset);
-        let response = response.on_hover_text(format!("{label}  {old:.2}\n拖动调整，双击复位"));
-        if response.drag_started() || response.double_clicked() {
+        let response = response.on_hover_ui(|ui| {
+            ui.label(format!("{label}  {old:.2}\n拖动调整，双击复位"));
+        });
+        let frame = ui.ctx().cumulative_frame_nr();
+        if response.double_clicked_by(PointerButton::Primary) && !app.editor.is_editing() {
+            app.commit_lyric();
             app.editor.begin("调整混音");
-        }
-        if value != old {
             app.editor
                 .project
                 .tracks
@@ -118,10 +120,34 @@ pub fn show(app: &mut App, ui: &mut Ui, rect: Rect, track: &Track) {
                 .find(|t| t.id == track.id)
                 .unwrap()
                 .mixer
-                .insert(field.into(), value.into());
-        }
-        if response.drag_stopped() || response.double_clicked() {
+                .insert(field.into(), reset.into());
             app.editor.finish();
+        } else {
+            if response.drag_started_by(PointerButton::Primary) && !app.editor.is_editing() {
+                app.commit_lyric();
+                app.editor.begin("调整混音");
+                app.mixer_drag = Some((track.id, field, frame));
+            }
+            if let Some((drag_track, drag_field, drag_frame)) = app.mixer_drag.as_mut()
+                && *drag_track == track.id
+                && *drag_field == field
+            {
+                *drag_frame = frame;
+                if value != old {
+                    app.editor
+                        .project
+                        .tracks
+                        .iter_mut()
+                        .find(|t| t.id == track.id)
+                        .unwrap()
+                        .mixer
+                        .insert(field.into(), value.into());
+                }
+                if response.drag_stopped_by(PointerButton::Primary) {
+                    app.editor.finish();
+                    app.mixer_drag = None;
+                }
+            }
         }
         if field == "pan" {
             Icon::Pan.paint(
@@ -216,12 +242,26 @@ fn knob(
     let end = center + vec2(angle.cos(), angle.sin()) * 8.0;
     ui.painter()
         .line_segment([center, end], Stroke::new(1.0, MUTED));
-    let next = if response.double_clicked() {
+    let next = if response.double_clicked_by(PointerButton::Primary) {
         reset
-    } else if response.dragged() {
+    } else if response.dragged_by(PointerButton::Primary) {
         (value - response.drag_delta().y as f64 * (max - min) / 160.0).clamp(min, max)
     } else {
         value
     };
     (next, response)
+}
+
+pub fn end_frame(app: &mut App, ctx: &Context) {
+    let Some((_, _, frame)) = app.mixer_drag else {
+        return;
+    };
+    let inactive = frame != ctx.cumulative_frame_nr()
+        || app.pending.is_some()
+        || app.error.is_some()
+        || ctx.input(|input| !input.focused || !input.pointer.primary_down());
+    if inactive {
+        app.editor.finish();
+        app.mixer_drag = None;
+    }
 }

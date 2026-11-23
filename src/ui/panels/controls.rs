@@ -50,7 +50,8 @@ pub(super) fn combo<T: PartialEq + Clone>(
     id: &str,
     value: &mut T,
     options: &[(T, &str)],
-) {
+) -> bool {
+    let mut changed = false;
     let label = options
         .iter()
         .find(|(v, _)| v == value)
@@ -60,7 +61,8 @@ pub(super) fn combo<T: PartialEq + Clone>(
         .selected_text(label)
         .show_ui(ui, |ui| {
             for (v, label) in options {
-                ui.selectable_value(value, v.clone(), *label);
+                changed |= ui.selectable_value(value, v.clone(), *label).changed();
             }
         });
+    changed
 }

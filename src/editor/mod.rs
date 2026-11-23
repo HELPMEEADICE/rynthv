@@ -165,9 +165,7 @@ impl Editor {
         }
     }
     pub fn redo(&mut self) {
-        self.finish_performance_edit();
-        self.finish_voice_edit();
-        self.finish_phoneme_edit();
+        self.finish();
         let selection = self.selection();
         if let Some(selection) = self.history.redo(&mut self.project, selection) {
             self.revision += 1;

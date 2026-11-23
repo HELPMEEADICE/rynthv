@@ -217,7 +217,7 @@ fn piano_stack(app: &mut App, ui: &mut Ui) {
         if response.dragged()
             && let Some(l) = app.view.lanes.iter_mut().find(|l| l.id == lane.id)
         {
-            l.height = (l.height - response.drag_delta().y).clamp(64.0, 500.0);
+            l.height = (l.height - response.drag_delta().y / scale.max(0.01)).clamp(64.0, 500.0);
         }
         super::lanes::show(app, &mut child(ui, r, ("lane", lane.id)), lane.id);
         if let Some(payload) = DragAndDrop::payload::<DragPayload>(ui.ctx())
