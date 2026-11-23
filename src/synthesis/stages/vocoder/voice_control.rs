@@ -1,5 +1,7 @@
 //! Frame-aligned source-shape and spectral-envelope controls.
 
+use std::sync::Arc;
+
 use crate::synthesis::voice::{Result, VoiceError};
 
 use super::{fourier::Complex, voice_control_tension};
@@ -56,11 +58,11 @@ pub(crate) enum Component {
 
 /// Scratch belongs to each filter so frame-window latency never changes which
 /// control record is paired with a learned frequency response.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(super) struct SpectralControlFilter {
     component: Component,
     nyquist_hz: f32,
-    frequencies: Vec<f32>,
+    frequencies: Arc<[f32]>,
     magnitudes: Vec<f32>,
     warped: Vec<f32>,
 }

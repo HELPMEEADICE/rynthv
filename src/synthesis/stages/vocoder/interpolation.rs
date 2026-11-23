@@ -80,7 +80,7 @@ impl SpectralFilterConfig {
 
 /// The childless adapter's parameter stage preserves each parameter frame.
 /// Its downstream mode-1 filter owns the cepstral conversion and overlap state.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct SpectralFilterStream {
     filter: DynamicFilter,
 }

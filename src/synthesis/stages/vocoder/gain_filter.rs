@@ -11,11 +11,12 @@ use crate::synthesis::{
     voice::{PreparedTree, Result, TensorStorage, VoiceError},
 };
 
+#[derive(Clone)]
 pub struct GainFilter {
     factors: Arc<[f32]>,
     hop: usize,
     effective_sample_rate: f32,
-    window: Vec<f32>,
+    window: Arc<[f32]>,
     overlap: Vec<f32>,
     work: Vec<f32>,
     first: bool,
@@ -61,7 +62,7 @@ impl GainFilter {
         let length = hop * 2;
         // Root construction passes scale = 1.0. The period is exactly 2H,
         // rather than the symmetric-window alternative 2H - 1.
-        let window = (0..length)
+        let window: Arc<[f32]> = (0..length)
             .map(|sample| (1.0 - (sample as f32 / length as f32 * TAU).cos()) * 0.5)
             .collect();
         Ok(Self {
@@ -142,17 +143,22 @@ impl GainFilter {
                 if !amplitude.is_finite() || !phase.is_finite() {
                     return Err(VoiceError::new("Harmonic amplitude or phase overflow"));
                 }
-                for (sample, target) in self.work.iter_mut().enumerate() {
-                    let angle =
-                        ((sample as i32 - self.hop as i32) as f32 * frequency_hz[frame] * factor
-                            / self.effective_sample_rate)
-                            * TAU
-                            + phase;
-                    *target += angle.cos() * amplitude;
+                let step = f64::from(frequency_hz[frame]) * f64::from(factor) * f64::from(TAU)
+                    / f64::from(self.effective_sample_rate);
+                let start_angle = f64::from(phase) - f64::from(self.hop as f32) * step;
+                let (mut sin_cur, mut cos_cur) = start_angle.sin_cos();
+                let (sin_step, cos_step) = step.sin_cos();
+                let amp = f64::from(amplitude);
+                for target in &mut self.work {
+                    *target += (cos_cur * amp) as f32;
+                    let next_cos = cos_cur * cos_step - sin_cur * sin_step;
+                    let next_sin = sin_cur * cos_step + cos_cur * sin_step;
+                    cos_cur = next_cos;
+                    sin_cur = next_sin;
                 }
             }
             for ((target, &value), &weight) in
-                self.overlap.iter_mut().zip(&self.work).zip(&self.window)
+                self.overlap.iter_mut().zip(&self.work).zip(&*self.window)
             {
                 *target += value * weight;
                 if !target.is_finite() {

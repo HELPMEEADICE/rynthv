@@ -94,6 +94,10 @@ impl RelativeAttention {
         Ok(Self { positions })
     }
 
+    pub(in crate::synthesis::inference) fn positions(&self) -> Option<&RelativePositions> {
+        self.positions.as_ref()
+    }
+
     /// Inputs and output are frame-major with contiguous heads within a frame.
     /// Key and value frame counts must match; an optional padding mask has one
     /// float per key frame. Appended extra keys are handled by the calling stage.

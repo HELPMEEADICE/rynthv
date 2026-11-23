@@ -22,9 +22,9 @@ pub struct VocoderStream<'a> {
 
 impl<'a> VocoderStage<'a> {
     pub fn into_stream(self) -> Result<VocoderStream<'a>> {
-        let signals = SignalStream::new(&self)?;
+        let signals = SignalStream::new(&self.params, self.signals)?;
         Ok(VocoderStream {
-            parameters: ParameterStream::new(self)?,
+            parameters: ParameterStream::new(self.params)?,
             signals,
             metadata: VecDeque::new(),
             input_frames: 0,

@@ -26,6 +26,7 @@ const CONDITION_CHANNELS: usize = 72;
 const INPUT_CHANNELS: usize = 2 * BANDS;
 const MAX_BATCH_FRAMES: usize = 256;
 
+#[derive(Clone)]
 pub struct Postfilter {
     analysis: AnalysisBank,
     synthesis: SynthesisBank,

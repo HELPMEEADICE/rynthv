@@ -51,6 +51,44 @@ impl<'a> Batch<'a> {
         self.upload(bytemuck::cast_slice(values), BufferUsages::STORAGE)
     }
 
+    pub(super) fn staging_input(&mut self, len: usize) -> Buffer {
+        self.buffer(
+            len as u64 * 4,
+            BufferUsages::STORAGE | BufferUsages::COPY_DST,
+        )
+    }
+
+    pub(super) fn write_slice(&mut self, buffer: &Buffer, offset_floats: usize, values: &[f32]) {
+        if values.is_empty() {
+            return;
+        }
+        let bytes = bytemuck::cast_slice(values);
+        self.device
+            .queue
+            .write_buffer(buffer, offset_floats as u64 * 4, bytes);
+        self.activity.upload_count += 1;
+        self.activity.upload_bytes += bytes.len() as u64;
+    }
+
+    pub(super) fn copy_floats(
+        &mut self,
+        source: &Buffer,
+        destination: &Buffer,
+        dst_offset_floats: usize,
+        len_floats: usize,
+    ) {
+        if len_floats == 0 {
+            return;
+        }
+        self.encoder.as_mut().unwrap().copy_buffer_to_buffer(
+            source,
+            0,
+            destination,
+            dst_offset_floats as u64 * 4,
+            len_floats as u64 * 4,
+        );
+    }
+
     pub(super) fn output(&mut self, len: usize) -> Buffer {
         self.buffer(
             len as u64 * 4,

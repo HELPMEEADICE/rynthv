@@ -9,19 +9,39 @@ use super::{
     condition::VocoderCondition,
     configuration::{Configuration, Modules},
     excitation::ExcitationFrame,
+    gain_filter::GainFilter,
+    interpolation::{SpectralFilterConfig, SpectralFilterStream},
     output::FrameMetadata,
+    postfilter::Postfilter,
     sampling::PositionalGru,
+    spectral_heads::SpectralHeads,
     stream_parameters::ParameterStream,
-    voice_control::{SpectralControl, VoiceControl},
+    voice_control::{Component, SpectralControl, VoiceControl},
 };
 
 #[derive(Clone)]
-pub struct VocoderStage<'a> {
+pub(crate) struct VocoderParameterStage<'a> {
     pub(crate) tree: &'a PreparedTree,
     pub(crate) config: Configuration,
     pub(crate) modules: Modules,
     pub(crate) condition: VocoderCondition,
     pub(crate) positional: Option<PositionalGru>,
+    pub(crate) heads: SpectralHeads,
+}
+
+#[derive(Clone)]
+pub(crate) struct VocoderSignalStage {
+    pub(crate) gain: GainFilter,
+    pub(crate) harmonic_filter: SpectralFilterStream,
+    pub(crate) modulated_filter: SpectralFilterStream,
+    pub(crate) noise_filter: SpectralFilterStream,
+    pub(crate) postfilter: Postfilter,
+}
+
+#[derive(Clone)]
+pub struct VocoderStage<'a> {
+    pub(crate) params: VocoderParameterStage<'a>,
+    pub(crate) signals: VocoderSignalStage,
 }
 
 /// Independently materialized neural outputs used by the signal processors.
@@ -77,12 +97,43 @@ impl<'a> VocoderStage<'a> {
         {
             return Err(VoiceError::new("Unexpected vocoder condition dimensions"));
         }
+        let heads = SpectralHeads::prepare(tree, modules.spectral_heads)?;
+        if heads.head_count() != 3 || heads.channels() != 512 {
+            return Err(VoiceError::new(
+                "Vocoder requires three 512-channel spectral heads",
+            ));
+        }
+        let hop = condition.frame_samples;
+        let period = condition.frame_seconds;
+        let make_filter = |node, component| {
+            SpectralFilterStream::new(
+                SpectralFilterConfig::prepare(tree, node)?,
+                hop,
+                condition.sample_rate,
+                component,
+            )
+        };
+        let gain = GainFilter::prepare(tree, modules.coefficients, hop, period)?;
+        let harmonic_filter = make_filter(modules.harmonic_filter, Component::Primary)?;
+        let modulated_filter = make_filter(modules.third_filter, Component::Primary)?;
+        let noise_filter = make_filter(modules.noise_filter, Component::Secondary)?;
+        let postfilter = Postfilter::prepare(tree, &modules, hop, config.gate_postfilter_noise)?;
         Ok(Self {
-            tree,
-            config,
-            modules,
-            condition,
-            positional,
+            params: VocoderParameterStage {
+                tree,
+                config,
+                modules,
+                condition,
+                positional,
+                heads,
+            },
+            signals: VocoderSignalStage {
+                gain,
+                harmonic_filter,
+                modulated_filter,
+                noise_filter,
+                postfilter,
+            },
         })
     }
 
@@ -92,6 +143,6 @@ impl<'a> VocoderStage<'a> {
         controls: Option<&Sequence>,
         voice_controls: Option<&[VoiceControl]>,
     ) -> Result<VocoderParameters> {
-        ParameterStream::new(self.clone())?.process(physical, controls, voice_controls, true)
+        ParameterStream::new(self.params.clone())?.process(physical, controls, voice_controls, true)
     }
 }

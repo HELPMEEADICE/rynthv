@@ -10,11 +10,11 @@ use crate::synthesis::{
 use super::{
     excitation::Excitation,
     gain_filter::GainFilter,
-    interpolation::{SpectralFilterConfig, SpectralFilterStream},
+    interpolation::SpectralFilterStream,
     postfilter::Postfilter,
-    stage::{VocoderParameters, VocoderStage},
+    stage::{VocoderParameterStage, VocoderParameters, VocoderSignalStage},
     stream_queue::{FrameQueue, paired},
-    voice_control::{Component, SpectralControl},
+    voice_control::SpectralControl,
 };
 
 pub(crate) struct SignalStream {
@@ -39,29 +39,19 @@ pub(crate) struct SignalStream {
 }
 
 impl SignalStream {
-    pub(crate) fn new(stage: &VocoderStage<'_>) -> Result<Self> {
+    pub(crate) fn new(
+        stage: &VocoderParameterStage<'_>,
+        signals: VocoderSignalStage,
+    ) -> Result<Self> {
         let hop = stage.condition.frame_samples;
         let period = stage.condition.frame_seconds;
-        let make_filter = |node, component| {
-            SpectralFilterStream::new(
-                SpectralFilterConfig::prepare(stage.tree, node)?,
-                hop,
-                stage.condition.sample_rate,
-                component,
-            )
-        };
         Ok(Self {
             source: Excitation::new(hop, period, stage.config.excitation_log_gain.exp())?,
-            gain: GainFilter::prepare(stage.tree, stage.modules.coefficients, hop, period)?,
-            harmonic_filter: make_filter(stage.modules.harmonic_filter, Component::Primary)?,
-            modulated_filter: make_filter(stage.modules.third_filter, Component::Primary)?,
-            noise_filter: make_filter(stage.modules.noise_filter, Component::Secondary)?,
-            postfilter: Postfilter::prepare(
-                stage.tree,
-                &stage.modules,
-                hop,
-                stage.config.gate_postfilter_noise,
-            )?,
+            gain: signals.gain,
+            harmonic_filter: signals.harmonic_filter,
+            modulated_filter: signals.modulated_filter,
+            noise_filter: signals.noise_filter,
+            postfilter: signals.postfilter,
             hop,
             trailing_scalar: stage.config.trailing_scalar,
             spectra: std::array::from_fn(|_| FrameQueue::new(512)),

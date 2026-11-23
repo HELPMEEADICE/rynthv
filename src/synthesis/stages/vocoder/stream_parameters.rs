@@ -14,7 +14,7 @@ use super::{
     output::FrameMetadata,
     source,
     spectral_heads::SpectralHeads,
-    stage::{VocoderParameters, VocoderStage},
+    stage::{VocoderParameterStage, VocoderParameters},
     stream_queue::FrameQueue,
     voice_control::{SpectralControl, VoiceControl},
 };
@@ -22,7 +22,7 @@ use super::{
 /// All queues share input-frame zero. A branch may get ahead of another, but
 /// neither its local batch length nor its latency can change frame pairing.
 pub(crate) struct ParameterStream<'a> {
-    pub(crate) stage: VocoderStage<'a>,
+    pub(crate) stage: VocoderParameterStage<'a>,
     pub(crate) runtime: ModelRuntime<'a>,
     positional: Option<GruState>,
     heads: SpectralHeads,
@@ -40,13 +40,8 @@ pub(crate) struct ParameterStream<'a> {
 }
 
 impl<'a> ParameterStream<'a> {
-    pub(crate) fn new(stage: VocoderStage<'a>) -> Result<Self> {
-        let heads = SpectralHeads::prepare(stage.tree, stage.modules.spectral_heads)?;
-        if heads.head_count() != 3 || heads.channels() != 512 {
-            return Err(VoiceError::new(
-                "Vocoder requires three 512-channel spectral heads",
-            ));
-        }
+    pub(crate) fn new(stage: VocoderParameterStage<'a>) -> Result<Self> {
+        let heads = stage.heads.clone();
         let positional = stage.positional.as_ref().map(|model| model.new_state());
         let runtime = ModelRuntime::new(stage.tree);
         Ok(Self {

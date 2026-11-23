@@ -3,7 +3,7 @@
 //! Each branch predicts all heads in contiguous channel blocks. There is no
 //! sigmoid, exponential, or normalization at this boundary.
 
-use std::collections::VecDeque;
+use std::sync::Arc;
 
 use crate::synthesis::{
     execution::checkpoint,
@@ -19,19 +19,62 @@ pub const SPECTRAL_HEADS_TYPE_ID: [u8; 16] = [
 ];
 
 #[derive(Debug)]
-struct Band {
+struct BandSpec {
     node: usize,
     start: usize,
     end: usize,
-    weights: Vec<f32>,
-    pending: VecDeque<f32>,
+    weights: Arc<[f32]>,
 }
 
 #[derive(Debug)]
-pub struct SpectralHeads {
+struct SpectralHeadsSpec {
     head_count: usize,
     channels: usize,
-    bands: Vec<Band>,
+    bands: Vec<BandSpec>,
+}
+
+#[derive(Clone, Debug)]
+struct BandQueue {
+    values: Vec<f32>,
+    head: usize,
+}
+
+impl BandQueue {
+    fn new() -> Self {
+        Self {
+            values: Vec::new(),
+            head: 0,
+        }
+    }
+
+    fn available(&self) -> usize {
+        self.values.len() - self.head
+    }
+
+    fn extend(&mut self, values: &[f32]) {
+        self.values.extend_from_slice(values);
+    }
+
+    fn clear(&mut self) {
+        self.values.clear();
+        self.head = 0;
+    }
+
+    fn compact(&mut self) {
+        if self.head >= self.values.len() {
+            self.values.clear();
+            self.head = 0;
+        } else if self.head >= 64 * 1024 {
+            self.values.drain(..self.head);
+            self.head = 0;
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct SpectralHeads {
+    spec: Arc<SpectralHeadsSpec>,
+    queues: Vec<BandQueue>,
 }
 
 impl SpectralHeads {
@@ -102,7 +145,7 @@ impl SpectralHeads {
             let width = end - start;
             let fade_in = fade_in as usize;
             let fade_out = fade_out as usize;
-            let weights = (0..width)
+            let weights: Arc<[f32]> = (0..width)
                 .map(|bin| {
                     if bin < fade_in {
                         bin as f32 / (fade_in - 1) as f32
@@ -114,34 +157,37 @@ impl SpectralHeads {
                 })
                 .collect();
             channels = channels.max(end);
-            bands.push(Band {
+            bands.push(BandSpec {
                 node,
                 start,
                 end,
                 weights,
-                pending: VecDeque::new(),
             });
         }
+        let queues = vec![BandQueue::new(); bands.len()];
         Ok(Self {
-            head_count: head_count as usize,
-            channels,
-            bands,
+            spec: Arc::new(SpectralHeadsSpec {
+                head_count: head_count as usize,
+                channels,
+                bands,
+            }),
+            queues,
         })
     }
 
     pub fn head_count(&self) -> usize {
-        self.head_count
+        self.spec.head_count
     }
 
     pub fn channels(&self) -> usize {
-        self.channels
+        self.spec.channels
     }
 
     /// Clear these output queues together with the associated model runtime.
     /// Calling only one reset would combine frames from unrelated segments.
     pub fn reset(&mut self) {
-        for band in &mut self.bands {
-            band.pending.clear();
+        for queue in &mut self.queues {
+            queue.clear();
         }
     }
 
@@ -158,11 +204,11 @@ impl SpectralHeads {
         let _profile = crate::synthesis::profiling::span("vocoder.spectral_heads.execute");
         input.validate()?;
         let mut frames = usize::MAX;
-        for band in &mut self.bands {
+        for (band, queue) in self.spec.bands.iter().zip(&mut self.queues) {
             let result = runtime.execute(band.node, input, flush)?;
             result.validate()?;
             let expected = (band.end - band.start)
-                .checked_mul(self.head_count)
+                .checked_mul(self.spec.head_count)
                 .ok_or_else(|| VoiceError::new("Spectral band channels overflow"))?;
             if result.channels != expected {
                 return Err(VoiceError::new(
@@ -174,27 +220,33 @@ impl SpectralHeads {
                     "Spectral branch produced non-finite values",
                 ));
             }
-            band.pending.extend(result.values);
-            frames = frames.min(band.pending.len() / expected);
+            queue.extend(&result.values);
+            frames = frames.min(queue.available() / expected);
         }
-        let mut output = (0..self.head_count)
-            .map(|_| Sequence::zeros(frames, self.channels))
+        let mut output = (0..self.spec.head_count)
+            .map(|_| Sequence::zeros(frames, self.spec.channels))
             .collect::<Result<Vec<_>>>()?;
         for frame in 0..frames {
             checkpoint()?;
-            for band in &mut self.bands {
+            let frame_offset = frame * self.spec.channels;
+            for (band, queue) in self.spec.bands.iter().zip(&mut self.queues) {
+                let width = band.end - band.start;
                 for head in &mut output {
-                    let offset = frame * self.channels + band.start;
-                    for (bin, &weight) in band.weights.iter().enumerate() {
-                        let value = band.pending.pop_front().ok_or_else(|| {
-                            VoiceError::new("Spectral branch queue is incomplete")
-                        })?;
-                        head.values[offset + bin] += value * weight;
+                    let source = &queue.values[queue.head..queue.head + width];
+                    let dest = &mut head.values[frame_offset + band.start..][..width];
+                    for (target, (&value, &weight)) in
+                        dest.iter_mut().zip(source.iter().zip(&*band.weights))
+                    {
+                        *target += value * weight;
                     }
+                    queue.head += width;
                 }
             }
         }
-        if flush && self.bands.iter().any(|band| !band.pending.is_empty()) {
+        for queue in &mut self.queues {
+            queue.compact();
+        }
+        if flush && self.queues.iter().any(|queue| queue.available() != 0) {
             return Err(VoiceError::new(
                 "Spectral branches ended with unaligned frame counts",
             ));

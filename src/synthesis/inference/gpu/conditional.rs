@@ -146,7 +146,7 @@ impl<'a> ConditionalGraph<'a> {
         let ran = compute::accelerate(None, work, 1_048_576, &lengths, |batch| {
             let source = batch.input(&input.values);
             let cond = condition.map(|s| batch.input(&s.values));
-            let [projected, projected_condition, residual, gated, skip, state] =
+            let [projected, residual, aux_or_skip, gated, state] =
                 std::array::from_fn(|_| batch.output(capacity));
             let outputs = [batch.output(full_output_len), batch.output(full_output_len)];
             let project =
@@ -161,8 +161,8 @@ impl<'a> ConditionalGraph<'a> {
                 project(batch, layer.main, activation, &projected)?;
                 project(batch, layer.residual, activation, &residual)?;
                 let auxiliary = if let Some(op) = layer.condition {
-                    project(batch, op, cond.as_ref().unwrap(), &projected_condition)?;
-                    Some(&projected_condition)
+                    project(batch, op, cond.as_ref().unwrap(), &aux_or_skip)?;
+                    Some(&aux_or_skip)
                 } else {
                     None
                 };
@@ -178,7 +178,7 @@ impl<'a> ConditionalGraph<'a> {
                     frames * width,
                     auxiliary,
                 )?;
-                project(batch, layer.skip, &gated, &skip)?;
+                project(batch, layer.skip, &gated, &aux_or_skip)?;
                 let add = |batch: &mut super::Batch<'_>,
                            a: &Buffer,
                            b: &Buffer,
@@ -202,7 +202,7 @@ impl<'a> ConditionalGraph<'a> {
                 add(
                     batch,
                     &outputs[index % 2],
-                    &skip,
+                    &aux_or_skip,
                     &outputs[(index + 1) % 2],
                     full_output_len,
                     index != 0 || self.direct.is_some(),

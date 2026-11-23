@@ -171,6 +171,51 @@ impl MultiHeadAttention {
                 "key/value frame counts",
             ));
         }
+        if let Some(mask) = options.key_padding_mask
+            && mask.len() != key_frames
+        {
+            return Err(MultiHeadAttentionError::Operator(
+                "Invalid attention padding mask length".into(),
+            ));
+        }
+        if let Some(mask) = options.key_padding_mask
+            && mask.iter().any(|v| !v.is_finite())
+        {
+            return Err(MultiHeadAttentionError::Operator(
+                "Attention input contains a non-finite value".into(),
+            ));
+        }
+        if !queries
+            .iter()
+            .chain(keys)
+            .chain(values)
+            .any(|v| !v.is_finite())
+        {
+            let size = query_frames
+                .checked_mul(self.config.output_channels)
+                .ok_or(MultiHeadAttentionError::Configuration(
+                    "output size overflow",
+                ))?;
+            let mut projected_output = vec![0.0; size];
+            if super::super::gpu::projected_attention(
+                [&self.query, &self.key, &self.value, &self.output],
+                [queries, keys, values],
+                self.attention.positions(),
+                &mut projected_output,
+                [
+                    query_frames,
+                    key_frames,
+                    self.config.heads,
+                    self.config.key_head_channels,
+                    self.config.value_head_channels,
+                ],
+                options,
+            )
+            .map_err(|error| MultiHeadAttentionError::Operator(error.to_string()))?
+            {
+                return Ok(projected_output);
+            }
+        }
         let queries = project(&self.query, queries, query_frames)?;
         let keys = project(&self.key, keys, key_frames)?;
         let values = project(&self.value, values, key_frames)?;

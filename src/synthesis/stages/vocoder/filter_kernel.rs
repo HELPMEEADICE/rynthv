@@ -4,7 +4,7 @@
 //! becomes a complex exponential response applied to a centered Hann window.
 //! Window history, the overlap buffer and partial output frames survive calls.
 
-use std::{collections::VecDeque, f32::consts::TAU};
+use std::{collections::VecDeque, f32::consts::TAU, sync::Arc};
 
 use super::{
     fourier::{fft, multiply},
@@ -16,19 +16,83 @@ use crate::synthesis::{
     voice::{Result, VoiceError},
 };
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
+struct FlatQueue {
+    stride: usize,
+    values: Vec<f32>,
+    head: usize,
+}
+
+impl FlatQueue {
+    fn new(stride: usize) -> Self {
+        Self {
+            stride,
+            values: Vec::new(),
+            head: 0,
+        }
+    }
+
+    fn with_zero_frames(stride: usize, frames: usize) -> Self {
+        Self {
+            stride,
+            values: vec![0.0; stride * frames],
+            head: 0,
+        }
+    }
+
+    fn len_frames(&self) -> usize {
+        (self.values.len() - self.head)
+            .checked_div(self.stride)
+            .unwrap_or(0)
+    }
+
+    fn is_empty(&self) -> bool {
+        self.head >= self.values.len()
+    }
+
+    fn extend(&mut self, values: &[f32]) {
+        self.values.extend_from_slice(values);
+    }
+
+    fn push_zeros(&mut self) {
+        self.values.resize(self.values.len() + self.stride, 0.0);
+    }
+
+    fn front(&self) -> Option<&[f32]> {
+        (!self.is_empty()).then(|| &self.values[self.head..self.head + self.stride])
+    }
+
+    fn pop_front(&mut self) {
+        if !self.is_empty() {
+            self.head += self.stride;
+            if self.head >= self.values.len() {
+                self.values.clear();
+                self.head = 0;
+            } else if self.head >= 64 * self.stride {
+                self.values.drain(..self.head);
+                self.head = 0;
+            }
+        }
+    }
+
+    fn iter_frames(&self, count: usize) -> impl Iterator<Item = &[f32]> {
+        self.values[self.head..self.head + count * self.stride].chunks_exact(self.stride)
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct DynamicFilter {
     frame_samples: usize,
     window_frames: usize,
     fft_size: usize,
     parameter_channels: Option<usize>,
-    window: Vec<f32>,
-    roots: Vec<[f32; 2]>,
+    window: Arc<[f32]>,
+    roots: Arc<[[f32; 2]]>,
     spectrum: Vec<[f32; 2]>,
     response: Vec<[f32; 2]>,
     overlap: Vec<f32>,
-    excitation: VecDeque<Vec<f32>>,
-    parameters: VecDeque<Vec<f32>>,
+    excitation: FlatQueue,
+    parameters: FlatQueue,
     controls: VecDeque<SpectralControl>,
     control_filter: SpectralControlFilter,
     output_partial: Vec<f32>,
@@ -64,12 +128,12 @@ impl DynamicFilter {
             .step_by(frame_samples)
             .map(|sample| (1.0 - (sample as f32 / window_samples as f32 * TAU).cos()) * 0.5)
             .sum();
-        let window = (0..window_samples)
+        let window: Arc<[f32]> = (0..window_samples)
             .map(|sample| {
                 ((1.0 - (sample as f32 / window_samples as f32 * TAU).cos()) * 0.5) / normalization
             })
             .collect();
-        let roots = (0..fft_size / 2)
+        let roots: Arc<[[f32; 2]]> = (0..fft_size / 2)
             .map(|sample| {
                 let angle = -std::f64::consts::TAU * sample as f64 / fft_size as f64;
                 let (sin, cos) = angle.sin_cos();
@@ -86,10 +150,8 @@ impl DynamicFilter {
             spectrum: vec![[0.0; 2]; fft_size],
             response: vec![[0.0; 2]; fft_size],
             overlap: vec![0.0; fft_size],
-            excitation: (0..window_frames / 2)
-                .map(|_| vec![0.0; frame_samples])
-                .collect(),
-            parameters: VecDeque::new(),
+            excitation: FlatQueue::with_zero_frames(frame_samples, window_frames / 2),
+            parameters: FlatQueue::new(0),
             controls: VecDeque::new(),
             control_filter: SpectralControlFilter::new(component, sample_rate, fft_size),
             output_partial: Vec::with_capacity(frame_samples),
@@ -120,30 +182,24 @@ impl DynamicFilter {
             .accepted_frames
             .checked_add(parameters.frames)
             .ok_or_else(|| VoiceError::new("Vocoder filter frame count overflows"))?;
-        self.parameter_channels = Some(parameters.channels);
+        if self.parameter_channels.is_none() {
+            self.parameter_channels = Some(parameters.channels);
+            self.parameters = FlatQueue::new(parameters.channels);
+        }
         self.accepted_frames = accepted_frames;
-        self.parameters.extend(
-            parameters
-                .values
-                .chunks_exact(parameters.channels)
-                .map(<[f32]>::to_vec),
-        );
-        self.excitation.extend(
-            excitation
-                .values
-                .chunks_exact(self.frame_samples)
-                .map(<[f32]>::to_vec),
-        );
+        self.parameters.extend(&parameters.values);
+        self.excitation.extend(&excitation.values);
         let mut output = Vec::new();
         if final_batch {
             while self.emitted_frames < self.accepted_frames {
-                while self.excitation.len() < self.window_frames {
-                    self.excitation.push_back(vec![0.0; self.frame_samples]);
+                while self.excitation.len_frames() < self.window_frames {
+                    self.excitation.push_zeros();
                 }
                 self.process_window(&mut output)?;
             }
         } else {
-            while self.excitation.len() >= self.window_frames && !self.parameters.is_empty() {
+            while self.excitation.len_frames() >= self.window_frames && !self.parameters.is_empty()
+            {
                 self.process_window(&mut output)?;
             }
         }
@@ -191,7 +247,7 @@ impl DynamicFilter {
     fn process_window(&mut self, output: &mut Vec<f32>) -> Result<()> {
         checkpoint()?;
         self.response.fill([0.0; 2]);
-        if let Some(parameters) = self.parameters.pop_front() {
+        if let Some(parameters) = self.parameters.front() {
             let half = parameters.len() / 2;
             for (sample, &coefficient) in parameters[..=half].iter().enumerate() {
                 self.response[sample][0] = coefficient * 10.0 / (sample + 1) as f32;
@@ -200,6 +256,7 @@ impl DynamicFilter {
                 self.response[self.fft_size - half + 1 + sample][0] =
                     coefficient * 10.0 / (half - sample) as f32;
             }
+            self.parameters.pop_front();
         }
         fft(&mut self.response, &self.roots, false);
         for value in &mut self.response[..=self.fft_size / 2] {
@@ -216,7 +273,7 @@ impl DynamicFilter {
         }
         self.spectrum.fill([0.0; 2]);
         let padding = (self.fft_size - self.window.len()) / 2;
-        for (frame, excitation) in self.excitation.iter().take(self.window_frames).enumerate() {
+        for (frame, excitation) in self.excitation.iter_frames(self.window_frames).enumerate() {
             for (sample, &value) in excitation.iter().enumerate() {
                 let index = frame * self.frame_samples + sample;
                 self.spectrum[padding + index][0] = value * self.window[index];
