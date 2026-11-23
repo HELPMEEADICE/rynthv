@@ -1,25 +1,48 @@
 use super::{OwnerId, RenderCache, RenderJob, State};
-use std::sync::{Arc, atomic::AtomicBool};
+use std::{
+    collections::HashMap,
+    sync::{Arc, atomic::AtomicBool},
+};
 
 impl RenderCache {
     /// Share current ready results after reconciling the complete owner set,
     /// independently of scheduling priority. Pending owners' old baselines are
     /// reserved for their own incremental render, never for other owners.
     pub fn reuse_queued(&mut self) {
-        let queued: Vec<_> = self
+        if !std::mem::take(&mut self.reuse_pending) {
+            return;
+        }
+        let mut ready = HashMap::<&str, Vec<_>>::new();
+        for owner in self.owners.values() {
+            if let Some(completed) = owner.ready() {
+                ready
+                    .entry(&completed.input.group_id)
+                    .or_default()
+                    .push(completed);
+            }
+        }
+        if ready.is_empty() {
+            return;
+        }
+        let reused: Vec<_> = self
             .owners
             .iter()
             .filter(|(_, owner)| matches!(owner.state, State::Queued))
-            .map(|(&id, owner)| (id, Arc::clone(&owner.request.input)))
+            .filter_map(|(&id, owner)| {
+                let input = &owner.request.input;
+                let completed = ready
+                    .get(input.group_id.as_str())?
+                    .iter()
+                    .find(|completed| completed.input.as_ref() == input.as_ref())?;
+                Some((id, Arc::clone(&completed.clip)))
+            })
             .collect();
-        for (id, input) in queued {
-            if let Some(rendered) = self.reusable(&input) {
-                self.owners
-                    .get_mut(&id)
-                    .expect("queued owner")
-                    .complete(rendered);
-                self.advance_publication();
-            }
+        for (id, rendered) in reused {
+            self.owners
+                .get_mut(&id)
+                .expect("queued owner")
+                .complete(rendered);
+            self.advance_publication();
         }
     }
 

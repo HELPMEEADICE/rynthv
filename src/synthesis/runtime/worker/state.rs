@@ -38,7 +38,7 @@ impl<'network, 'tree> Session<'network, 'tree> {
 pub(super) struct WorkState<'network, 'tree> {
     pub cache: RenderCache,
     pub plan: RenderPlan,
-    pub mirrors: BTreeMap<OwnerId, Vec<OwnerId>>,
+    pub mirrors: BTreeMap<OwnerId, Arc<[OwnerId]>>,
     pub revision: u64,
     pub sessions: BTreeMap<OwnerId, Session<'network, 'tree>>,
     pub live: Option<LiveMixer>,
@@ -136,25 +136,27 @@ impl<'network, 'tree> WorkState<'network, 'tree> {
     /// ready intervals, otherwise overlapping linked instances would hold
     /// playback until the whole shared owner completes.
     pub(super) fn mirrors(&self, owner: OwnerId) -> &[OwnerId] {
-        self.mirrors.get(&owner).map_or(&[][..], Vec::as_slice)
+        self.mirrors.get(&owner).map_or(&[], AsRef::as_ref)
     }
 
     fn rebuild_mirrors(&mut self) {
         self.mirrors.clear();
-        let mut groups: Vec<(&OwnerInput, Vec<OwnerId>)> = Vec::new();
+        let mut groups: BTreeMap<&str, Vec<(&OwnerInput, Vec<OwnerId>)>> = BTreeMap::new();
         for (&id, request) in &self.plan.requests {
-            if let Some((_, group)) = groups
+            let variants = groups.entry(&request.input.group_id).or_default();
+            if let Some((_, group)) = variants
                 .iter_mut()
                 .find(|(input, _)| **input == *request.input)
             {
                 group.push(id);
             } else {
-                groups.push((&request.input, vec![id]));
+                variants.push((&request.input, vec![id]));
             }
         }
-        for (_, group) in groups {
-            for &id in &group {
-                self.mirrors.insert(id, group.clone());
+        for (_, group) in groups.into_values().flatten() {
+            let group = Arc::<[OwnerId]>::from(group);
+            for &id in group.iter() {
+                self.mirrors.insert(id, Arc::clone(&group));
             }
         }
     }

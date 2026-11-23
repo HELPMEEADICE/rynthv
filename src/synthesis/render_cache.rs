@@ -65,12 +65,14 @@ pub struct RenderCache {
     next_serial: u64,
     publication_revision: u64,
     discarded: u64,
+    reuse_pending: bool,
 }
 
 impl RenderCache {
     /// Consume the authoritative owner set, not only the last edit's delta.
     /// Repeated calls with the same plan leave running/completed work intact.
     pub fn reconcile(&mut self, plan: &RenderPlan) -> CacheUpdate {
+        self.reuse_pending = true;
         let mut update = CacheUpdate::default();
         let mut previous = std::mem::take(&mut self.owners);
         for (&id, request) in &plan.requests {
@@ -140,6 +142,7 @@ impl RenderCache {
             owner.cancel();
         }
         self.owners.clear();
+        self.reuse_pending = false;
         self.generation = self
             .generation
             .checked_add(1)
@@ -152,14 +155,6 @@ impl RenderCache {
             .publication_revision
             .checked_add(1)
             .expect("render publication revision exhausted");
-    }
-
-    fn reusable(&self, input: &OwnerInput) -> Option<Arc<RenderedClip>> {
-        self.owners.values().find_map(|owner| {
-            let completed = owner.ready()?;
-            (*owner.request.input == *input && *completed.input == *input)
-                .then(|| Arc::clone(&completed.clip))
-        })
     }
 }
 

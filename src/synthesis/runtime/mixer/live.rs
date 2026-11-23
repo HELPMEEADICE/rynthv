@@ -195,22 +195,33 @@ impl LiveMixer {
         let Some(source) = &self.source else {
             return Ok(());
         };
-        if dirty.is_empty() {
+        let end = dirty.end.min(source.total_frames());
+        if dirty.start >= end {
             return Ok(());
         }
-        let end = dirty.end.min(source.total_frames());
-        let mut relevant = Vec::new();
-        for index in dirty.start / LIVE_BLOCK_FRAMES..end.div_ceil(LIVE_BLOCK_FRAMES) {
+        let first_block = dirty.start / LIVE_BLOCK_FRAMES;
+        let end_block = end.div_ceil(LIVE_BLOCK_FRAMES);
+        let affected = first_block * LIVE_BLOCK_FRAMES..end_block.saturating_mul(LIVE_BLOCK_FRAMES);
+        let mut upcoming: Vec<_> = self
+            .owners
+            .iter()
+            .filter(|(_, owner)| !intersection(&owner.coverage, &affected).is_empty())
+            .collect();
+        upcoming.sort_unstable_by_key(|(_, owner)| owner.coverage.start);
+        let mut upcoming = upcoming.into_iter().peekable();
+        // Keep the original owner-ID accumulation order for PCM rounding.
+        let mut active = BTreeMap::<OwnerId, &Owner>::new();
+        for index in first_block..end_block {
             let start = index * LIVE_BLOCK_FRAMES;
             let frames = source.block_frames(index).ok_or("混音块超出项目范围")?;
             let range = start..start + frames;
-            relevant.clear();
-            relevant.extend(
-                self.owners
-                    .values()
-                    .filter(|owner| !intersection(&owner.coverage, &range).is_empty()),
-            );
-            if relevant.iter().any(|owner| {
+            active.retain(|_, owner| owner.coverage.end > range.start);
+            while let Some((id, owner)) =
+                upcoming.next_if(|(_, owner)| owner.coverage.start < range.end)
+            {
+                active.insert(*id, owner);
+            }
+            if active.values().any(|owner| {
                 owner
                     .ready
                     .first_missing(intersection(&owner.coverage, &range))
@@ -218,15 +229,15 @@ impl LiveMixer {
             }) {
                 continue;
             }
-            if relevant
-                .iter()
+            if active
+                .values()
                 .all(|owner| !owner.ready.has_audio(range.clone()))
             {
                 source.silence(index).map_err(|error| error.to_string())?;
                 continue;
             }
             let mut samples = vec![0.0; frames * LIVE_CHANNELS];
-            for owner in &relevant {
+            for owner in active.values() {
                 owner.ready.mix_into(&range, &owner.controls, &mut samples);
             }
             source

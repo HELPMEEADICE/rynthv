@@ -30,7 +30,7 @@ impl<'network, 'tree> WorkState<'network, 'tree> {
                     live.complete(owner.owner, Arc::clone(&owner.audio))?;
                 }
                 for (&owner, session) in &self.sessions {
-                    let mirrors = self.mirrors.get(&owner).map_or(&[][..], Vec::as_slice);
+                    let mirrors = self.mirrors(owner);
                     for &mirror in mirrors {
                         live.prepared(mirror, session.prepared.model_samples())?;
                     }
@@ -64,7 +64,7 @@ impl<'network, 'tree> WorkState<'network, 'tree> {
                 visuals::publish(
                     events,
                     self.revision,
-                    self.mirrors.get(&owner).map_or(&[][..], Vec::as_slice),
+                    self.mirrors(owner),
                     session.visuals.snapshot(),
                 );
             }
@@ -116,7 +116,7 @@ impl<'network, 'tree> WorkState<'network, 'tree> {
 
     pub fn publish_prepared(&mut self, owner: OwnerId, events: &Events) -> Result<(), String> {
         if let Some(session) = self.sessions.get_mut(&owner) {
-            let mirrors = self.mirrors.get(&owner).map_or(&[][..], Vec::as_slice);
+            let mirrors = self.mirrors.get(&owner).map_or(&[][..], AsRef::as_ref);
             phonemes::publish(
                 events,
                 &self.plan,
@@ -157,7 +157,7 @@ impl<'network, 'tree> WorkState<'network, 'tree> {
         // A plan arriving inside a numerical batch gets a new sparse source
         // from the retained prepared state after reinsertion, never old PCM.
         let owner = session.job.request.owner;
-        let mirrors = self.mirrors.get(&owner).map_or(&[][..], Vec::as_slice);
+        let mirrors = self.mirrors.get(&owner).map_or(&[][..], AsRef::as_ref);
         let mut patches = Vec::new();
         for audio in chunks {
             if let Some(patch) = session.visuals.audio(&audio, true) {

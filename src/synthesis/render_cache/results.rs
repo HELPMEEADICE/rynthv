@@ -36,6 +36,7 @@ impl RenderCache {
         match result {
             Ok(rendered) => {
                 owner.complete(rendered);
+                self.reuse_pending = true;
                 self.advance_publication();
                 Completion::Published
             }
@@ -51,6 +52,7 @@ impl RenderCache {
             && matches!(owner.state, State::Failed(_))
         {
             owner.state = State::Queued;
+            self.reuse_pending = true;
             true
         } else {
             false
