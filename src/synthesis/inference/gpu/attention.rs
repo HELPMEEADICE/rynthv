@@ -73,29 +73,33 @@ pub(in super::super) fn projected_attention(
     ops: [&Affine; 4],
     inputs: [&[f32]; 3],
     relative: Option<&RelativePositions>,
-    output: &mut [f32],
+    output_len: usize,
     dims: [usize; 5],
     options: AttentionOptions<'_>,
-) -> Result<bool, MatrixError> {
+) -> Result<Option<Vec<f32>>, MatrixError> {
     let [query_frames, key_frames, heads, keys, values] = dims;
     let [query_op, key_op, value_op, output_op] = ops;
     let [raw_query, raw_key, raw_value] = inputs;
     if query_frames == 0 || key_frames == 0 {
-        return Ok(false);
+        return Ok(None);
     }
-    let rows = query_frames * heads;
-    let score_len = rows.saturating_mul(key_frames);
+    let score_len = query_frames
+        .saturating_mul(heads)
+        .saturating_mul(key_frames);
     if !attention_within_budget(relative, query_frames, key_frames, score_len, options) {
-        return Ok(false);
+        return Ok(None);
     }
     let mask = options.key_padding_mask.unwrap_or_default();
-    let q_len = query_frames * heads * keys;
-    let k_len = key_frames * heads * keys;
-    let v_len = key_frames * heads * values;
-    let context_len = query_frames * heads * values;
-    let qkv_mask_len = q_len + k_len + v_len + mask.len();
+    let q_len = query_frames.saturating_mul(query_op.output_channels());
+    let k_len = key_frames.saturating_mul(key_op.output_channels());
+    let v_len = key_frames.saturating_mul(value_op.output_channels());
+    let context_len = query_frames.saturating_mul(output_op.input_channels());
+    let qkv_mask_len = q_len
+        .saturating_add(k_len)
+        .saturating_add(v_len)
+        .saturating_add(mask.len());
     if u32::try_from(qkv_mask_len).is_err() {
-        return Ok(false);
+        return Ok(None);
     }
     let work = query_frames
         .saturating_mul(query_op.matrix().values().len())
@@ -103,6 +107,7 @@ pub(in super::super) fn projected_attention(
         .saturating_add(key_frames.saturating_mul(value_op.matrix().values().len()))
         .saturating_add(score_len.saturating_mul(keys.saturating_add(values)))
         .saturating_add(query_frames.saturating_mul(output_op.matrix().values().len()));
+    let mut projected = None;
     compute::accelerate(
         None,
         work,
@@ -117,7 +122,7 @@ pub(in super::super) fn projected_attention(
             qkv_mask_len,
             score_len,
             context_len,
-            output.len(),
+            output_len,
             query_op.matrix().values().len(),
             key_op.matrix().values().len(),
             value_op.matrix().values().len(),
@@ -150,11 +155,15 @@ pub(in super::super) fn projected_attention(
                 [q_len, k_len, v_len, mask.len()],
                 options,
             )?;
-            let final_buf = batch.output(output.len());
+            let final_buf = batch.output(output_len);
             encode_affine(batch, output_op, query_frames, &context_buf, &final_buf)?;
-            batch.read(&final_buf, output)
+            let mut output = vec![0.0; output_len];
+            batch.read(&final_buf, &mut output)?;
+            projected = Some(output);
+            Ok(())
         },
-    )
+    )?;
+    Ok(projected)
 }
 
 fn attention_within_budget(

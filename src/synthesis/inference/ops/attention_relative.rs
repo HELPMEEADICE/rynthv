@@ -49,7 +49,7 @@ impl fmt::Display for AttentionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::RelativeShape => f.write_str(
-                "Relative attention requires two float matrices with matching odd position counts",
+                "Relative attention requires two float matrices with matching odd position counts and widths matching the attention heads",
             ),
             Self::InvalidDimensions => {
                 f.write_str("Attention dimensions are empty, unsupported, or overflow")
@@ -98,6 +98,20 @@ impl RelativeAttention {
         self.positions.as_ref()
     }
 
+    pub(super) fn validate_channels(
+        &self,
+        key_channels: usize,
+        value_channels: usize,
+    ) -> Result<(), AttentionError> {
+        if let Some(positions) = &self.positions
+            && (positions.key_channels != key_channels
+                || positions.value_channels != value_channels)
+        {
+            return Err(AttentionError::RelativeShape);
+        }
+        Ok(())
+    }
+
     /// Inputs and output are frame-major with contiguous heads within a frame.
     /// Key and value frame counts must match; an optional padding mask has one
     /// float per key frame. Appended extra keys are handled by the calling stage.
@@ -140,12 +154,7 @@ impl RelativeAttention {
         if query_frames > i32::MAX as usize || key_frames > i32::MAX as usize {
             return Err(AttentionError::InvalidDimensions);
         }
-        if let Some(positions) = &self.positions
-            && (positions.key_channels != key_channels
-                || positions.value_channels != value_channels)
-        {
-            return Err(AttentionError::RelativeShape);
-        }
+        self.validate_channels(key_channels, value_channels)?;
         if query.iter().chain(key).chain(value).any(|v| !v.is_finite()) {
             return Err(AttentionError::NonFiniteInput);
         }

@@ -6,7 +6,7 @@
 
 use std::fmt;
 
-use crate::synthesis::inference::affine::Affine;
+use crate::synthesis::inference::{affine::Affine, compute, gpu};
 
 use super::attention_relative::{AttentionOptions, RelativeAttention};
 
@@ -139,6 +139,9 @@ impl MultiHeadAttention {
                 return Err(MultiHeadAttentionError::ProjectionShape(name));
             }
         }
+        attention
+            .validate_channels(config.key_head_channels, config.value_head_channels)
+            .map_err(|error| MultiHeadAttentionError::Operator(error.to_string()))?;
         Ok(Self {
             config,
             query,
@@ -185,23 +188,23 @@ impl MultiHeadAttention {
                 "Attention input contains a non-finite value".into(),
             ));
         }
-        if !queries
-            .iter()
-            .chain(keys)
-            .chain(values)
-            .any(|v| !v.is_finite())
+        if compute::has_gpu()
+            && !queries
+                .iter()
+                .chain(keys)
+                .chain(values)
+                .any(|v| !v.is_finite())
         {
             let size = query_frames
                 .checked_mul(self.config.output_channels)
                 .ok_or(MultiHeadAttentionError::Configuration(
                     "output size overflow",
                 ))?;
-            let mut projected_output = vec![0.0; size];
-            if super::super::gpu::projected_attention(
+            if let Some(projected_output) = gpu::projected_attention(
                 [&self.query, &self.key, &self.value, &self.output],
                 [queries, keys, values],
                 self.attention.positions(),
-                &mut projected_output,
+                size,
                 [
                     query_frames,
                     key_frames,
