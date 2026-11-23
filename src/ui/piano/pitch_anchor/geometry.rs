@@ -77,7 +77,12 @@ pub(super) fn handles(rect: Rect) -> Vec<(Handle, Rect)> {
 }
 
 pub(super) fn selected_rect(app: &App, canvas: Rect, reference: &GroupRef) -> Option<Rect> {
-    let bounds = super::transform::bounds(&super::controls(app), &app.piano_anchor.ids)?;
+    let controls = app.editor.group().map_or(&[][..], |g| &g.pitch_controls);
+    let bounds = super::transform::bounds_with_candidates(
+        controls,
+        &app.piano_anchor.candidates,
+        &app.piano_anchor.ids,
+    )?;
     Some(rect(app, canvas, reference, bounds))
 }
 
@@ -91,8 +96,19 @@ pub(super) fn hit(app: &App, canvas: Rect, reference: &GroupRef, pos: Pos2) -> O
     if !clip_rect(reference, canvas, &app.view.piano).contains(pos) {
         return None;
     }
-    let controls = super::controls(app);
+    let controls = app.editor.group().map_or(&[][..], |g| &g.pitch_controls);
     // A point is more precise than the curve underneath it.
+    for point in app
+        .piano_anchor
+        .candidates
+        .iter()
+        .rev()
+        .filter(|point| super::editable_point(point, reference))
+    {
+        if screen(app, canvas, reference, point.pos, point.pitch).distance(pos) <= 7.0 {
+            return Some(point.id.clone());
+        }
+    }
     for control in controls
         .iter()
         .rev()

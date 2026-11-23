@@ -27,7 +27,7 @@ pub use voice_parameters::{VoiceEditParameter, VoiceParameterState};
 
 use crate::model::*;
 use history::History;
-use std::collections::BTreeSet;
+use std::{cell::Cell, collections::BTreeSet};
 
 #[derive(Clone)]
 pub struct SelectionState {
@@ -46,6 +46,7 @@ pub struct Editor {
     performance_edit: Option<performance::PerformanceEdit>,
     voice_edit: Option<voice_parameters::VoiceEdit>,
     phoneme_edit: Option<phoneme::PhonemeEdit>,
+    cached_end: Cell<Option<(u64, i64)>>,
 }
 impl Editor {
     pub fn new(project: Project) -> Self {
@@ -66,7 +67,21 @@ impl Editor {
             performance_edit: None,
             voice_edit: None,
             phoneme_edit: None,
+            cached_end: Cell::new(None),
         }
+    }
+    pub fn project_end(&self) -> i64 {
+        if self.is_editing() {
+            return self.project.end();
+        }
+        if let Some((revision, end)) = self.cached_end.get()
+            && revision == self.revision
+        {
+            return end;
+        }
+        let end = self.project.end();
+        self.cached_end.set(Some((self.revision, end)));
+        end
     }
     pub fn current_track(&self) -> &Track {
         self.project

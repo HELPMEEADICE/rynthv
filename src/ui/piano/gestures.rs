@@ -168,8 +168,10 @@ pub(super) fn update_gesture(app: &mut App, ui: &Ui, rect: Rect) {
                 }
                 NoteDrag::Right => delta.max(-max_shrink),
             };
+            let by_id: std::collections::HashMap<_, _> =
+                notes.iter().map(|old| (old.id, old)).collect();
             for n in &mut app.editor.group_mut().unwrap().notes {
-                if let Some(old) = notes.iter().find(|old| old.id == n.id) {
+                if let Some(&old) = by_id.get(&n.id) {
                     match kind {
                         NoteDrag::Move => {
                             n.onset = old.onset + delta;

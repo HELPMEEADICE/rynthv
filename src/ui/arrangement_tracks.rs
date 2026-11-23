@@ -4,10 +4,9 @@ use eframe::egui::*;
 
 pub fn show(app: &mut App, ui: &mut Ui, timeline_left: f32, scroll: f32) {
     let rect = ui.max_rect();
-    let tracks = app.editor.project.tracks.clone();
+    let track_count = app.editor.project.tracks.len();
     let mut track_rects = Vec::new();
-    for (index, track) in tracks.iter().enumerate() {
-        let colors = TrackColors::new(track);
+    for index in 0..track_count {
         let y = rect.top() + index as f32 * 56.0 - scroll;
         let head = Rect::from_min_size(
             pos2(rect.left(), y),
@@ -17,14 +16,24 @@ pub fn show(app: &mut App, ui: &mut Ui, timeline_left: f32, scroll: f32) {
         if !head.intersects(rect) {
             continue;
         }
+        let (track_id, colors, is_instrumental, references) = {
+            let track = &app.editor.project.tracks[index];
+            let colors = TrackColors::new(track);
+            let mut references = Vec::new();
+            if !track.is_instrumental() {
+                references.extend(track.visible_references().cloned());
+                references.sort_by_key(|r| app.editor.reference == Some(r.id));
+            }
+            (track.id, colors, track.is_instrumental(), references)
+        };
         let visible_body = body.intersect(rect);
-        if !track.is_instrumental() && visible_body.is_positive() {
-            track_rects.push((track.id, visible_body));
+        if !is_instrumental && visible_body.is_positive() {
+            track_rects.push((track_id, visible_body));
         }
         ui.painter().rect_filled(
             head,
             0,
-            if track.id == app.editor.track && !track.is_instrumental() {
+            if track_id == app.editor.track && !is_instrumental {
                 Color32::from_rgb(57, 55, 60)
             } else {
                 PANEL
@@ -35,12 +44,12 @@ pub fn show(app: &mut App, ui: &mut Ui, timeline_left: f32, scroll: f32) {
             0,
             colors.accent,
         );
-        super::track_header::show(app, ui, head, track);
-        if track.is_instrumental() {
-            super::instrumental::show(app, ui, body, track);
+        super::track_header::show(app, ui, head, index);
+        if is_instrumental {
+            super::instrumental::show(app, ui, body, index);
             continue;
         }
-        let response = ui.interact(body, Id::new(("track-body", track.id)), Sense::click());
+        let response = ui.interact(body, Id::new(("track-body", track_id)), Sense::click());
         let pointer = response.interact_pointer_pos();
         let at = pointer.map(|p| {
             ticks(
@@ -50,7 +59,7 @@ pub fn show(app: &mut App, ui: &mut Ui, timeline_left: f32, scroll: f32) {
             .max(0)
         });
         // The context position must survive while its popup owns the pointer.
-        let context_id = Id::new(("insert-group-position", track.id));
+        let context_id = Id::new(("insert-group-position", track_id));
         if response.secondary_clicked()
             && let Some(at) = at
         {
@@ -60,10 +69,10 @@ pub fn show(app: &mut App, ui: &mut Ui, timeline_left: f32, scroll: f32) {
             && let Some(at) = at
         {
             app.commit_lyric();
-            app.editor.add_group_at(track.id, at);
+            app.editor.add_group_at(track_id, at);
         } else if response.clicked() {
             app.commit_lyric();
-            app.editor.select_track(track.id);
+            app.editor.select_track(track_id);
         }
         response.context_menu(|ui| {
             if ui.button("插入新的音符组").clicked() {
@@ -72,17 +81,15 @@ pub fn show(app: &mut App, ui: &mut Ui, timeline_left: f32, scroll: f32) {
                     .data(|d| d.get_temp::<i64>(context_id))
                     .unwrap_or(0);
                 app.commit_lyric();
-                app.editor.add_group_at(track.id, at);
+                app.editor.add_group_at(track_id, at);
                 ui.close();
             }
             ui.separator();
             ui.add_enabled(false, Button::new("粘贴"));
             ui.add_enabled(false, Button::new("作为链接音符组粘贴"));
         });
-        let mut references: Vec<_> = track.visible_references().collect();
-        references.sort_by_key(|r| app.editor.reference == Some(r.id));
         for reference in references {
-            group(app, ui, body, track, reference);
+            group(app, ui, body, track_id, colors, &reference);
         }
     }
     if app.group_gesture.as_ref().is_some_and(|g| g.arrangement) {
@@ -98,8 +105,14 @@ pub fn show(app: &mut App, ui: &mut Ui, timeline_left: f32, scroll: f32) {
         group_edit::update(app, ui.ctx(), target);
     }
 }
-fn group(app: &mut App, ui: &mut Ui, body: Rect, track: &Track, reference: &GroupRef) {
-    let colors = TrackColors::new(track);
+fn group(
+    app: &mut App,
+    ui: &mut Ui,
+    body: Rect,
+    track_id: EntityId,
+    colors: TrackColors,
+    reference: &GroupRef,
+) {
     let Some(group) = app.editor.project.group(&reference.group_id) else {
         return;
     };
@@ -147,8 +160,13 @@ fn group(app: &mut App, ui: &mut Ui, body: Rect, track: &Track, reference: &Grou
         FontId::proportional(11.0),
         Color32::WHITE,
     );
+    let vis_begin = ticks(beat_at(body, &app.view.arrangement, clip.left()));
+    let vis_end = ticks(beat_at(body, &app.view.arrangement, clip.right()));
     for note in &group.notes {
-        if let Some((start, end)) = reference.note_range(note) {
+        if let Some((start, end)) = reference.note_range(note)
+            && end >= vis_begin
+            && start <= vis_end
+        {
             let y = (body.top() + 40.0 - (note.pitch + reference.pitch_offset - 60) as f32 * 0.6)
                 .clamp(body.top() + 22.0, body.bottom() - 5.0);
             content.line_segment(
@@ -172,7 +190,7 @@ fn group(app: &mut App, ui: &mut Ui, body: Rect, track: &Track, reference: &Grou
     );
     if response.clicked() || response.secondary_clicked() {
         app.commit_lyric();
-        app.editor.select_reference(track.id, reference.id);
+        app.editor.select_reference(track_id, reference.id);
     }
     let kind_at = |p: Pos2| {
         if (p.x - region.left()).abs() < 6.0 {
@@ -198,7 +216,7 @@ fn group(app: &mut App, ui: &mut Ui, body: Rect, track: &Track, reference: &Grou
         group_edit::start(
             app,
             reference,
-            track.id,
+            track_id,
             origin,
             kind_at(origin),
             app.view.arrangement.beat_width,

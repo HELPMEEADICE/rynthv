@@ -33,17 +33,22 @@ pub fn grid(ui: &Ui, rect: Rect, view: &Viewport, time: &TimeAxis, step: f64) {
             ),
         );
     }
-    for (beat, _, _, _) in time.bars(visible_end(rect, view) + 1.0) {
-        painter.vline(
-            x_at(rect, view, beat),
-            rect.y_range(),
-            Stroke::new(1.0, BAR_LINE),
-        );
-    }
+    time.for_each_bar_in(
+        view.start.max(0.0),
+        visible_end(rect, view) + 1.0,
+        |beat, _, _, _| {
+            painter.vline(
+                x_at(rect, view, beat),
+                rect.y_range(),
+                Stroke::new(1.0, BAR_LINE),
+            );
+        },
+    );
 }
 
 pub fn draw_ruler(ui: &Ui, rect: Rect, view: &Viewport, time: &TimeAxis, step: f64) {
     let painter = ui.painter().with_clip_rect(rect.intersect(ui.clip_rect()));
+    let clip = painter.clip_rect();
     // Anchor the ticks to the baseline, independently of the surrounding header height.
     let baseline = rect.bottom();
     for beat in visible_steps(rect, view, step) {
@@ -53,16 +58,23 @@ pub fn draw_ruler(ui: &Ui, rect: Rect, view: &Viewport, time: &TimeAxis, step: f
             Stroke::new(1.0, BEAT_LINE),
         );
     }
-    for (beat, index, _, _) in time.bars(visible_end(rect, view) + 1.0) {
-        let x = x_at(rect, view, beat);
-        painter.vline(x, baseline - 32.0..=baseline, Stroke::new(1.0, BAR_LINE));
-        let text =
-            painter.layout_no_wrap((index + 1).to_string(), FontId::proportional(12.0), TEXT);
-        let pos = pos2(x + 7.0, baseline - 25.0 - text.size().y / 2.0);
-        if Rect::from_min_size(pos, text.size()).intersects(painter.clip_rect()) {
-            painter.galley(pos, text, TEXT);
-        }
-    }
+    time.for_each_bar_in(
+        view.start.max(0.0),
+        visible_end(rect, view) + 1.0,
+        |beat, index, _, _| {
+            let x = x_at(rect, view, beat);
+            painter.vline(x, baseline - 32.0..=baseline, Stroke::new(1.0, BAR_LINE));
+            if x < clip.left() - 96.0 || x > clip.right() {
+                return;
+            }
+            let text =
+                painter.layout_no_wrap((index + 1).to_string(), FontId::proportional(12.0), TEXT);
+            let pos = pos2(x + 7.0, baseline - 25.0 - text.size().y / 2.0);
+            if Rect::from_min_size(pos, text.size()).intersects(clip) {
+                painter.galley(pos, text, TEXT);
+            }
+        },
+    );
     painter.hline(rect.x_range(), baseline, Stroke::new(1.0, EDGE));
 }
 

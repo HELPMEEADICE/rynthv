@@ -85,6 +85,16 @@ fn editable(control: &PitchControl, reference: &GroupRef) -> bool {
     }
 }
 
+fn editable_point(point: &PitchPoint, reference: &GroupRef) -> bool {
+    let begin = reference
+        .blick_absolute_begin
+        .saturating_sub(reference.blick_offset);
+    let end = reference
+        .visible_end()
+        .saturating_sub(reference.blick_offset);
+    point.valid() && point.pos >= begin && point.pos <= end
+}
+
 fn reconcile(app: &mut App) {
     let owner = app
         .editor
@@ -98,7 +108,7 @@ fn reconcile(app: &mut App) {
         app.piano_anchor.candidates.clear();
         app.piano_anchor.revision = app.editor.revision;
     }
-    let controls = controls(app);
+    let controls = app.editor.group().map_or(&[][..], |g| &g.pitch_controls);
     let valid: BTreeSet<_> = app
         .editor
         .active_ref()
@@ -108,6 +118,13 @@ fn reconcile(app: &mut App) {
                 .iter()
                 .filter(move |control| editable(control, reference))
                 .filter_map(id)
+                .chain(
+                    app.piano_anchor
+                        .candidates
+                        .iter()
+                        .filter(move |point| editable_point(point, reference))
+                        .map(|point| point.id.as_str()),
+                )
         })
         .map(str::to_owned)
         .collect();
@@ -147,7 +164,7 @@ fn can_add_points(app: &mut App) -> bool {
 
 pub fn anchor_select_all(app: &mut App) {
     reconcile(app);
-    let controls = controls(app);
+    let controls = app.editor.group().map_or(&[][..], |g| &g.pitch_controls);
     app.piano_anchor.ids = app
         .editor
         .active_ref()
@@ -157,6 +174,13 @@ pub fn anchor_select_all(app: &mut App) {
                 .iter()
                 .filter(move |control| editable(control, reference))
                 .filter_map(id)
+                .chain(
+                    app.piano_anchor
+                        .candidates
+                        .iter()
+                        .filter(move |point| editable_point(point, reference))
+                        .map(|point| point.id.as_str()),
+                )
         })
         .map(str::to_owned)
         .collect();

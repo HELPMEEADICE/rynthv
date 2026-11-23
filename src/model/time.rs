@@ -144,15 +144,34 @@ impl TimeAxis {
     }
     pub fn bars(&self, until: f64) -> Vec<(f64, i32, u32, u32)> {
         let mut result = Vec::new();
-        let (mut beat, mut index, mut current) = (0.0, 0, &self.meter[0]);
-        while beat <= until && result.len() < 10_000 {
-            if let Some(m) = self.meter.iter().find(|m| m.index == index) {
+        self.for_each_bar_in(0.0, until, |beat, index, numerator, denominator| {
+            result.push((beat, index, numerator, denominator));
+        });
+        result
+    }
+
+    pub fn for_each_bar_in(
+        &self,
+        start_beat: f64,
+        until: f64,
+        mut visit: impl FnMut(f64, i32, u32, u32),
+    ) {
+        let (mut beat, mut index, mut current, mut next_meter, mut emitted) =
+            (0.0, 0, &self.meter[0], 1usize, 0usize);
+        while beat <= until && emitted < 10_000 {
+            if let Some(m) = self.meter.get(next_meter)
+                && m.index == index
+            {
                 current = m;
+                next_meter += 1;
             }
-            result.push((beat, index, current.numerator, current.denominator));
-            beat += current.numerator as f64 * 4.0 / current.denominator as f64;
+            let bar_len = current.numerator as f64 * 4.0 / current.denominator as f64;
+            if beat + bar_len >= start_beat {
+                visit(beat, index, current.numerator, current.denominator);
+            }
+            emitted += 1;
+            beat += bar_len;
             index += 1;
         }
-        result
     }
 }

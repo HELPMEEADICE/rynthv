@@ -23,13 +23,20 @@ pub fn show(app: &mut App, ui: &mut Ui, rect: Rect) {
         let painter = ui.painter().with_clip_rect(row);
         let time = &app.editor.project.time;
         let mut markers = Vec::new();
+        let start_blick = ticks(beat_at(rect, &app.view.arrangement, row.left()) - 8.0).max(0);
+        let end_x = row.right();
         if row_index == 0 {
-            for meter in &time.meter {
+            let start_bar = time.bar_at(start_blick).0;
+            let first = time.meter.partition_point(|m| m.index < start_bar);
+            for meter in &time.meter[first..] {
                 let x = x_at(
                     rect,
                     &app.view.arrangement,
                     beats(time.bar_position(meter.index)),
                 );
+                if x > end_x {
+                    break;
+                }
                 if let Some(hit) = marker(
                     &painter,
                     pos2(x + 5.0, rect.top() + ROW_HEIGHT / 2.0),
@@ -40,8 +47,12 @@ pub fn show(app: &mut App, ui: &mut Ui, rect: Rect) {
                 }
             }
         } else {
-            for tempo in &time.tempo {
+            let first = time.tempo.partition_point(|t| t.position < start_blick);
+            for tempo in &time.tempo[first..] {
                 let x = x_at(rect, &app.view.arrangement, beats(tempo.position));
+                if x > end_x {
+                    break;
+                }
                 if let Some(hit) = marker(
                     &painter,
                     pos2(x + 5.0, rect.top() + ROW_HEIGHT * 1.5),

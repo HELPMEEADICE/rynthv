@@ -89,7 +89,7 @@ impl TakeSet {
     }
 
     pub fn from_value(value: &Value) -> Result<Self, String> {
-        let set: Self = serde_json::from_value(value.clone())
+        let set = <Self as serde::Deserialize>::deserialize(value)
             .map_err(|error| format!("重录采样数据无效：{error}"))?;
         set.validate()?;
         Ok(set)

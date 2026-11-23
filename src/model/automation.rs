@@ -61,42 +61,52 @@ fn validate_points(points: &[(i64, f64)]) -> Result<(), String> {
 }
 
 pub(super) mod flat_points {
-    use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error};
-    use serde_json::Value;
+    use serde::{
+        Deserializer, Serializer,
+        de::{Error, SeqAccess, Visitor},
+        ser::SerializeSeq,
+    };
+    use std::fmt;
 
     pub fn serialize<S: Serializer>(
         points: &[(i64, f64)],
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
-        let values: Vec<Value> = points
-            .iter()
-            .flat_map(|(time, value)| [Value::from(*time), Value::from(*value)])
-            .collect();
-        values.serialize(serializer)
+        let mut seq = serializer.serialize_seq(Some(points.len() * 2))?;
+        for &(time, value) in points {
+            seq.serialize_element(&time)?;
+            seq.serialize_element(&value)?;
+        }
+        seq.end()
     }
 
     pub fn deserialize<'de, D: Deserializer<'de>>(
         deserializer: D,
     ) -> Result<Vec<(i64, f64)>, D::Error> {
-        let values = Vec::<Value>::deserialize(deserializer)?;
-        if !values.len().is_multiple_of(2) {
-            return Err(D::Error::custom("参数控制点必须为 time/value 对"));
+        struct FlatPointsVisitor;
+
+        impl<'de> Visitor<'de> for FlatPointsVisitor {
+            type Value = Vec<(i64, f64)>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("flat array of [time, value, ...] pairs")
+            }
+
+            fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+                let mut points = Vec::with_capacity(seq.size_hint().unwrap_or(0) / 2);
+                while let Some(time) = seq.next_element::<i64>()? {
+                    let Some(value) = seq.next_element::<f64>()? else {
+                        return Err(A::Error::custom("参数控制点必须为 time/value 对"));
+                    };
+                    if !value.is_finite() {
+                        return Err(A::Error::custom("控制点值必须为有限数"));
+                    }
+                    points.push((time, value));
+                }
+                Ok(points)
+            }
         }
-        values
-            .as_chunks::<2>()
-            .0
-            .iter()
-            .map(|point| {
-                Ok((
-                    point[0]
-                        .as_i64()
-                        .ok_or_else(|| D::Error::custom("控制点时间必须为 i64"))?,
-                    point[1]
-                        .as_f64()
-                        .filter(|value| value.is_finite())
-                        .ok_or_else(|| D::Error::custom("控制点值必须为有限数"))?,
-                ))
-            })
-            .collect()
+
+        deserializer.deserialize_seq(FlatPointsVisitor)
     }
 }

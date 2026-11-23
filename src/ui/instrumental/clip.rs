@@ -6,20 +6,28 @@ use crate::{
 };
 use eframe::egui::*;
 
-pub fn show(app: &mut App, ui: &mut Ui, body: Rect, track: &Track) {
-    let row = ui.interact(body, Id::new(("audio-row", track.id)), Sense::click());
+pub fn show(app: &mut App, ui: &mut Ui, body: Rect, track_index: usize) {
+    let (track_id, clip, colors) = {
+        let track = &app.editor.project.tracks[track_index];
+        (
+            track.id,
+            track.audio_clip().cloned(),
+            TrackColors::new(track),
+        )
+    };
+    let row = ui.interact(body, Id::new(("audio-row", track_id)), Sense::click());
     row.context_menu(|ui| {
         if ui.button("导入 / 替换音频…").clicked() {
             ui.close();
-            app.import_audio(Some(track.id), ui.ctx());
+            app.import_audio(Some(track_id), ui.ctx());
         }
     });
-    let Some(clip) = track.audio_clip() else {
-        let response = ui.interact(body, Id::new(("empty-audio", track.id)), Sense::click());
+    let Some(clip) = clip else {
+        let response = ui.interact(body, Id::new(("empty-audio", track_id)), Sense::click());
         let loading = app
             .audio_import
             .as_ref()
-            .is_some_and(|import| import.track == track.id);
+            .is_some_and(|import| import.track == track_id);
         ui.painter().text(
             body.left_center() + vec2(12.0, 0.0),
             Align2::LEFT_CENTER,
@@ -32,12 +40,12 @@ pub fn show(app: &mut App, ui: &mut Ui, body: Rect, track: &Track) {
             MUTED,
         );
         if response.double_clicked() {
-            app.import_audio(Some(track.id), ui.ctx());
+            app.import_audio(Some(track_id), ui.ctx());
         }
         response.context_menu(|ui| {
             if ui.button("导入音频…").clicked() {
                 ui.close();
-                app.import_audio(Some(track.id), ui.ctx());
+                app.import_audio(Some(track_id), ui.ctx());
             }
         });
         return;
@@ -58,7 +66,6 @@ pub fn show(app: &mut App, ui: &mut Ui, body: Rect, track: &Track) {
     if !visible.is_positive() {
         return;
     }
-    let colors = TrackColors::new(track);
     let fill = colors.note;
     let painter = ui.painter().with_clip_rect(body.intersect(ui.clip_rect()));
     painter.rect_filled(region, 3, fill);
@@ -82,18 +89,23 @@ pub fn show(app: &mut App, ui: &mut Ui, body: Rect, track: &Track) {
     if let Some(asset) = asset {
         let height = (region.height() - 21.0) / asset.waveforms.len() as f32;
         let pixel = ui.ctx().pixels_per_point().recip();
+        let columns = (visible.width() / pixel).ceil() as usize;
+        let to_seconds = |x| {
+            time.seconds_at(ticks(beat_at(body, &app.view.arrangement, x))) - clip.onset_seconds
+                + clip.source_offset_seconds
+        };
+        let mut times = Vec::with_capacity(columns + 1);
+        for column in 0..=columns {
+            let x = (visible.left() + column as f32 * pixel).min(visible.right());
+            times.push((x, to_seconds(x)));
+        }
         for (channel, wave) in asset.waveforms.iter().enumerate() {
             let center = region.top() + 20.0 + height * (channel as f32 + 0.5);
             let mut mesh = Mesh::default();
-            for column in 0..(visible.width() / pixel).ceil() as usize {
-                let left = visible.left() + column as f32 * pixel;
-                let right = (left + pixel).min(visible.right());
-                let seconds = |x| {
-                    time.seconds_at(ticks(beat_at(body, &app.view.arrangement, x)))
-                        - clip.onset_seconds
-                        + clip.source_offset_seconds
-                };
-                if let Some((min, max)) = wave.peak_range(seconds(left), seconds(right)) {
+            for pair in times.windows(2) {
+                let (left, start_sec) = pair[0];
+                let (right, end_sec) = pair[1];
+                if let Some((min, max)) = wave.peak_range(start_sec, end_sec) {
                     let top = center - max.clamp(-1.0, 1.0) * height * 0.46;
                     let bottom = center - min.clamp(-1.0, 1.0) * height * 0.46;
                     mesh.add_colored_rect(
@@ -108,29 +120,35 @@ pub fn show(app: &mut App, ui: &mut Ui, body: Rect, track: &Track) {
             painter.add(Shape::mesh(mesh));
         }
     }
-    let hover = error.map_or_else(
-        || {
-            format!(
-                "{}\n{:.2} 秒 · 拖动调整位置，双击替换音频",
-                clip.path.display(),
-                clip.duration_seconds
-            )
-        },
-        str::to_owned,
-    );
+    let path_display = clip.path.clone();
+    let duration_seconds = clip.duration_seconds;
+    let onset_seconds = clip.onset_seconds;
+    let error = error.map(str::to_owned);
     let response = ui
         .interact(
             visible,
-            Id::new(("audio-clip", track.id)),
+            Id::new(("audio-clip", track_id)),
             Sense::click_and_drag(),
         )
-        .on_hover_cursor(CursorIcon::Grab)
-        .on_hover_text(hover);
+        .on_hover_cursor(CursorIcon::Grab);
+    if response.hovered() {
+        response.clone().on_hover_ui(|ui| {
+            if let Some(error) = &error {
+                ui.label(error);
+            } else {
+                ui.label(format!(
+                    "{}\n{:.2} 秒 · 拖动调整位置，双击替换音频",
+                    path_display.display(),
+                    duration_seconds
+                ));
+            }
+        });
+    }
     if response.clicked() || response.secondary_clicked() {
         app.commit_lyric();
     }
     if response.double_clicked() {
-        app.import_audio(Some(track.id), ui.ctx());
+        app.import_audio(Some(track_id), ui.ctx());
     }
     if response.drag_started_by(PointerButton::Primary)
         && let Some(pointer) = ui.input(|i| i.pointer.press_origin())
@@ -138,29 +156,29 @@ pub fn show(app: &mut App, ui: &mut Ui, body: Rect, track: &Track) {
         app.commit_lyric();
         app.editor.begin("移动伴奏");
         app.audio_drag = Some(AudioDrag {
-            track: track.id,
+            track: track_id,
             pointer_x: pointer.x,
-            beat: beats(app.editor.project.time.position_at(clip.onset_seconds)),
+            beat: beats(app.editor.project.time.position_at(onset_seconds)),
             beat_width: app.view.arrangement.beat_width,
         });
     }
     response.context_menu(|ui| {
         if ui.button("替换音频…").clicked() {
             ui.close();
-            app.import_audio(Some(track.id), ui.ctx());
+            app.import_audio(Some(track_id), ui.ctx());
         }
         if ui.button("重新加载音频").clicked() {
-            app.reload_audio(track.id, ui.ctx());
+            app.reload_audio(track_id, ui.ctx());
             ui.close();
         }
         if ui.button("移到工程开头").clicked() {
             app.editor.begin("移动伴奏");
-            app.editor.move_audio_clip(track.id, 0.0);
+            app.editor.move_audio_clip(track_id, 0.0);
             app.editor.finish();
             ui.close();
         }
         if ui.button("移除音频").clicked() {
-            app.editor.set_audio_clip(track.id, None);
+            app.editor.set_audio_clip(track_id, None);
             ui.close();
         }
     });

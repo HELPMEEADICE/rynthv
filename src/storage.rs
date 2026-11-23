@@ -1,6 +1,6 @@
 use crate::model::*;
 use std::{
-    collections::HashSet,
+    collections::HashMap,
     fs,
     io::{Read, Write},
     path::Path,
@@ -218,24 +218,38 @@ fn validate_content(p: &Project) -> Result<(), String> {
             return bad("发音词典的字词或音素无效");
         }
     }
-    let mut ids = HashSet::new();
+    struct GroupBounds {
+        notes: Option<(i64, i64)>,
+        pitches: Option<(i32, i32)>,
+        pitch_controls: Option<(i64, i64)>,
+    }
+
+    let mut groups = HashMap::new();
     for g in p
         .library
         .iter()
         .chain(p.tracks.iter().map(|t| &t.main_group))
     {
-        if g.uuid.is_empty() || !ids.insert(g.uuid.as_str()) {
+        if g.uuid.is_empty() {
             return bad("音符组 UUID 缺失或重复");
         }
-        if g.notes.iter().any(|n| {
-            n.duration <= 0
-                || n.onset.checked_add(n.duration).is_none()
-                || !(0..=127).contains(&n.pitch)
-                || !n.detune.is_finite()
-        }) {
-            return bad("音符时间或 MIDI 音高无效");
-        }
+        let mut note_bounds: Option<(i64, i64)> = None;
+        let mut pitch_bounds: Option<(i32, i32)> = None;
         for note in &g.notes {
+            let Some(note_end) = note.onset.checked_add(note.duration) else {
+                return bad("音符时间或 MIDI 音高无效");
+            };
+            if note.duration <= 0 || !(0..=127).contains(&note.pitch) || !note.detune.is_finite() {
+                return bad("音符时间或 MIDI 音高无效");
+            }
+            note_bounds = Some(match note_bounds {
+                Some((min_o, max_e)) => (min_o.min(note.onset), max_e.max(note_end)),
+                None => (note.onset, note_end),
+            });
+            pitch_bounds = Some(match pitch_bounds {
+                Some((min_p, max_p)) => (min_p.min(note.pitch), max_p.max(note.pitch)),
+                None => (note.pitch, note.pitch),
+            });
             NotePerformance::from_note(note)
                 .map_err(|error| format!("工程校验失败：音符 {}：{error}", note.lyrics))?;
             PhonemeAttributes::read(&note.attributes)
@@ -251,16 +265,42 @@ fn validate_content(p: &Project) -> Result<(), String> {
                 .validate()
                 .map_err(|error| format!("工程校验失败：参数 {name}：{error}"))?;
         }
+        let mut control_bounds: Option<(i64, i64)> = None;
         for control in &g.pitch_controls {
             match control {
-                PitchControl::Point(point) if !point.valid() => {
-                    return bad("音高控制点的音高或标识无效");
+                PitchControl::Point(point) => {
+                    if !point.valid() {
+                        return bad("音高控制点的音高或标识无效");
+                    }
+                    control_bounds = Some(match control_bounds {
+                        Some((min_t, max_t)) => (min_t.min(point.pos), max_t.max(point.pos)),
+                        None => (point.pos, point.pos),
+                    });
                 }
-                PitchControl::Curve(curve) if !curve.valid() => {
-                    return bad("手绘音高曲线必须包含至少两个按时间递增的有效控制点");
+                PitchControl::Curve(curve) => {
+                    let Some((start, end)) = curve.valid().then(|| curve.range()).flatten() else {
+                        return bad("手绘音高曲线必须包含至少两个按时间递增的有效控制点");
+                    };
+                    control_bounds = Some(match control_bounds {
+                        Some((min_t, max_t)) => (min_t.min(start), max_t.max(end)),
+                        None => (start, end),
+                    });
                 }
-                _ => {}
+                PitchControl::Unsupported(_) => {}
             }
+        }
+        if groups
+            .insert(
+                g.uuid.as_str(),
+                GroupBounds {
+                    notes: note_bounds,
+                    pitches: pitch_bounds,
+                    pitch_controls: control_bounds,
+                },
+            )
+            .is_some()
+        {
+            return bad("音符组 UUID 缺失或重复");
         }
     }
     for track in &p.tracks {
@@ -278,7 +318,7 @@ fn validate_content(p: &Project) -> Result<(), String> {
         for r in track.references() {
             TakeSet::from_extra(&r.extra)
                 .map_err(|error| format!("工程校验失败：音轨 {}：{error}", track.name))?;
-            let Some(group) = p.group(&r.group_id) else {
+            let Some(bounds) = groups.get(r.group_id.as_str()) else {
                 return bad("存在悬空音符组引用");
             };
             if r.blick_absolute_begin < 0
@@ -286,20 +326,22 @@ fn validate_content(p: &Project) -> Result<(), String> {
             {
                 return bad("片段可见范围无效");
             }
-            if group.notes.iter().any(|n| {
-                n.onset.checked_add(r.blick_offset).is_none()
-                    || (n.onset + n.duration).checked_add(r.blick_offset).is_none()
-                    || n.pitch.checked_add(r.pitch_offset).is_none()
-            }) {
+            if let Some((min_o, max_e)) = bounds.notes
+                && (min_o.checked_add(r.blick_offset).is_none()
+                    || max_e.checked_add(r.blick_offset).is_none())
+            {
                 return bad("实例时间或音高溢出");
             }
-            if group.pitch_controls.iter().any(|control| match control {
-                PitchControl::Point(point) => point.pos.checked_add(r.blick_offset).is_none(),
-                PitchControl::Curve(curve) => curve
-                    .absolute_points()
-                    .any(|(time, _)| time.checked_add(r.blick_offset).is_none()),
-                PitchControl::Unsupported(_) => false,
-            }) {
+            if let Some((min_p, max_p)) = bounds.pitches
+                && (min_p.checked_add(r.pitch_offset).is_none()
+                    || max_p.checked_add(r.pitch_offset).is_none())
+            {
+                return bad("实例时间或音高溢出");
+            }
+            if let Some((min_t, max_t)) = bounds.pitch_controls
+                && (min_t.checked_add(r.blick_offset).is_none()
+                    || max_t.checked_add(r.blick_offset).is_none())
+            {
                 return bad("实例音高控制时间溢出");
             }
         }

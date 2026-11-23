@@ -21,10 +21,7 @@ pub(super) fn show(app: &mut App, ui: &mut Ui, canvas: Rect, groups: &[SceneGrou
     let idle_color = colors.accent.lerp_to_gamma(CANVAS, 0.30);
     for group in groups {
         for note in &group.notes {
-            let Ok(takes) = TakeSet::from_extra(&note.extra) else {
-                continue;
-            };
-            if takes.takes.len() < 2 {
+            if !note.extra.contains_key("takes") {
                 continue;
             }
             let Some(note_rect) = visible_note_rect(
@@ -37,6 +34,12 @@ pub(super) fn show(app: &mut App, ui: &mut Ui, canvas: Rect, groups: &[SceneGrou
             ) else {
                 continue;
             };
+            let Ok(takes) = TakeSet::from_extra(&note.extra) else {
+                continue;
+            };
+            if takes.takes.len() < 2 {
+                continue;
+            }
             let text = if takes.active_take_id == 0 {
                 String::new()
             } else {

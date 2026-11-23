@@ -213,7 +213,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
             rect.max - vec2(2.0, 0.0),
         ),
         &mut app.view.arrangement,
-        beats(app.editor.project.end()) + 32.0,
+        beats(app.editor.project_end()) + 32.0,
     );
     playhead(
         ui,

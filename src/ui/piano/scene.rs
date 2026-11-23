@@ -15,11 +15,19 @@ pub struct SceneGroup {
     pub reference: GroupRef,
     pub notes: Vec<Note>,
 }
-pub fn snapshot(app: &App) -> Vec<SceneGroup> {
+pub fn snapshot(app: &App, canvas: Rect) -> Vec<SceneGroup> {
+    let start_blick = crate::model::ticks(app.view.piano.start) - 8 * crate::model::QUARTER;
+    let end_blick = crate::model::ticks(
+        app.view.piano.start + canvas.width() as f64 / app.view.piano.beat_width as f64,
+    ) + 8 * crate::model::QUARTER;
     let mut groups: Vec<_> = app
         .editor
         .current_track()
         .visible_references()
+        .filter(|r| {
+            app.editor.reference == Some(r.id)
+                || (r.visible_end() > start_blick && r.blick_absolute_begin < end_blick)
+        })
         .filter_map(|r| {
             app.editor.project.group(&r.group_id).map(|g| SceneGroup {
                 reference: r.clone(),

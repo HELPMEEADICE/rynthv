@@ -1,21 +1,55 @@
 mod source;
 
 use super::{icons::Icon, theme::*};
-use crate::{app::App, model::Track};
+use crate::app::App;
 use eframe::egui::*;
 
-pub fn show(app: &mut App, ui: &mut Ui, rect: Rect, track: &Track) {
-    let response = ui.interact(rect, Id::new(("track", track.id)), Sense::click());
-    if response.clicked() && !track.is_instrumental() {
+pub fn show(app: &mut App, ui: &mut Ui, rect: Rect, track_index: usize) {
+    let (track_id, track_name, track_color, is_instrumental, mixer_values, mute_solo) = {
+        let track = &app.editor.project.tracks[track_index];
+        (
+            track.id,
+            track.name.clone(),
+            track.disp_color,
+            track.is_instrumental(),
+            [
+                track
+                    .mixer
+                    .get("gainDecibel")
+                    .and_then(serde_json::Value::as_f64)
+                    .unwrap_or(0.0),
+                track
+                    .mixer
+                    .get("pan")
+                    .and_then(serde_json::Value::as_f64)
+                    .unwrap_or(0.0),
+            ],
+            [
+                track
+                    .mixer
+                    .get("mute")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(false),
+                track
+                    .mixer
+                    .get("solo")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(false),
+            ],
+        )
+    };
+    let track_count = app.editor.project.tracks.len();
+    let response = ui.interact(rect, Id::new(("track", track_id)), Sense::click());
+    if response.clicked() && !is_instrumental {
         app.commit_lyric();
-        app.editor.select_track(track.id);
+        app.editor.select_track(track_id);
     }
     if response.double_clicked() {
-        app.rename = Some(super::rename::Rename::track(track.id, &track.name));
+        app.rename = Some(super::rename::Rename::track(track_id, &track_name));
     }
     response.context_menu(|ui| {
         if ui.button("重命名音轨…").clicked() {
-            app.rename = Some(super::rename::Rename::track(track.id, &track.name));
+            app.rename = Some(super::rename::Rename::track(track_id, &track_name));
             ui.close();
         }
         if ui.button("新增音轨").clicked() {
@@ -27,40 +61,33 @@ pub fn show(app: &mut App, ui: &mut Ui, rect: Rect, track: &Track) {
             ui.close();
             app.import_audio(Some(id), ui.ctx());
         }
-        let index = app
-            .editor
-            .project
-            .tracks
-            .iter()
-            .position(|t| t.id == track.id)
-            .unwrap();
-        if ui.add_enabled(index > 0, Button::new("上移音轨")).clicked() {
-            app.editor.reorder_track(track.id, -1);
+        if ui
+            .add_enabled(track_index > 0, Button::new("上移音轨"))
+            .clicked()
+        {
+            app.editor.reorder_track(track_id, -1);
             ui.close();
         }
         if ui
-            .add_enabled(
-                index + 1 < app.editor.project.tracks.len(),
-                Button::new("下移音轨"),
-            )
+            .add_enabled(track_index + 1 < track_count, Button::new("下移音轨"))
             .clicked()
         {
-            app.editor.reorder_track(track.id, 1);
+            app.editor.reorder_track(track_id, 1);
             ui.close();
         }
         ui.separator();
         if ui
-            .add_enabled(app.editor.project.tracks.len() > 1, Button::new("删除音轨"))
+            .add_enabled(track_count > 1, Button::new("删除音轨"))
             .clicked()
         {
             app.commit_lyric();
-            app.editor.delete_track(track.id);
+            app.editor.delete_track(track_id);
             ui.close();
         }
         ui.separator();
-        if let Some(color) = super::track_color::picker(ui, track.disp_color) {
+        if let Some(color) = super::track_color::picker(ui, track_color) {
             app.commit_lyric();
-            app.editor.set_track_color(track.id, color);
+            app.editor.set_track_color(track_id, color);
             ui.close();
         }
     });
@@ -74,15 +101,15 @@ pub fn show(app: &mut App, ui: &mut Ui, rect: Rect, track: &Track) {
     painter.text(
         rect.min + vec2(18.0, 17.0),
         Align2::LEFT_CENTER,
-        &track.name,
+        &track_name,
         FontId::proportional(12.0),
         TEXT,
     );
-    source::show(app, ui, rect, text_rect, track);
+    source::show(app, ui, rect, text_rect, track_index);
     if rect.width() < 210.0 {
         return;
     }
-    for (field, label, center, min, max, reset) in [
+    for (idx, (field, label, center, min, max, reset)) in [
         (
             "gainDecibel",
             "音量",
@@ -99,13 +126,12 @@ pub fn show(app: &mut App, ui: &mut Ui, rect: Rect, track: &Track) {
             1.0,
             0.0,
         ),
-    ] {
-        let old = track
-            .mixer
-            .get(field)
-            .and_then(serde_json::Value::as_f64)
-            .unwrap_or(reset);
-        let (value, response) = knob(ui, (track.id, field), center, old, min, max, reset);
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let old = mixer_values[idx];
+        let (value, response) = knob(ui, (track_id, field), center, old, min, max, reset);
         let response = response.on_hover_ui(|ui| {
             ui.label(format!("{label}  {old:.2}\n拖动调整，双击复位"));
         });
@@ -113,35 +139,36 @@ pub fn show(app: &mut App, ui: &mut Ui, rect: Rect, track: &Track) {
         if response.double_clicked_by(PointerButton::Primary) && !app.editor.is_editing() {
             app.commit_lyric();
             app.editor.begin("调整混音");
-            app.editor
+            if let Some(track) = app
+                .editor
                 .project
                 .tracks
                 .iter_mut()
-                .find(|t| t.id == track.id)
-                .unwrap()
-                .mixer
-                .insert(field.into(), reset.into());
+                .find(|t| t.id == track_id)
+            {
+                track.mixer.insert(field.into(), reset.into());
+            }
             app.editor.finish();
         } else {
             if response.drag_started_by(PointerButton::Primary) && !app.editor.is_editing() {
                 app.commit_lyric();
                 app.editor.begin("调整混音");
-                app.mixer_drag = Some((track.id, field, frame));
+                app.mixer_drag = Some((track_id, field, frame));
             }
             if let Some((drag_track, drag_field, drag_frame)) = app.mixer_drag.as_mut()
-                && *drag_track == track.id
+                && *drag_track == track_id
                 && *drag_field == field
             {
                 *drag_frame = frame;
-                if value != old {
-                    app.editor
+                if value != old
+                    && let Some(track) = app
+                        .editor
                         .project
                         .tracks
                         .iter_mut()
-                        .find(|t| t.id == track.id)
-                        .unwrap()
-                        .mixer
-                        .insert(field.into(), value.into());
+                        .find(|t| t.id == track_id)
+                {
+                    track.mixer.insert(field.into(), value.into());
                 }
                 if response.drag_stopped_by(PointerButton::Primary) {
                     app.editor.finish();
@@ -166,14 +193,13 @@ pub fn show(app: &mut App, ui: &mut Ui, rect: Rect, track: &Track) {
             }
         }
     }
-    for (field, text, y) in [("mute", "M", 10.0), ("solo", "S", 30.0)] {
-        let value = track
-            .mixer
-            .get(field)
-            .and_then(serde_json::Value::as_bool)
-            .unwrap_or(false);
+    for (idx, (field, text, y)) in [("mute", "M", 10.0), ("solo", "S", 30.0)]
+        .into_iter()
+        .enumerate()
+    {
+        let value = mute_solo[idx];
         let r = Rect::from_min_size(pos2(rect.right() - 27.0, rect.top() + y), vec2(16.0, 16.0));
-        let response = ui.interact(r, Id::new((track.id, field)), Sense::click());
+        let response = ui.interact(r, Id::new((track_id, field)), Sense::click());
         ui.painter().rect_filled(
             r,
             2,
@@ -201,14 +227,15 @@ pub fn show(app: &mut App, ui: &mut Ui, rect: Rect, track: &Track) {
             .clicked()
         {
             app.editor.begin("音轨混音");
-            app.editor
+            if let Some(track) = app
+                .editor
                 .project
                 .tracks
                 .iter_mut()
-                .find(|t| t.id == track.id)
-                .unwrap()
-                .mixer
-                .insert(field.into(), (!value).into());
+                .find(|t| t.id == track_id)
+            {
+                track.mixer.insert(field.into(), (!value).into());
+            }
             app.editor.finish();
         }
     }

@@ -18,19 +18,21 @@ impl Track {
                 self.diagnostics.dangling += 1;
             }
         }
-        let mut onsets: BTreeMap<u64, Vec<usize>> = BTreeMap::new();
-        for (index, note) in self.notes.iter().enumerate() {
-            if note.end.is_some_and(|end| end > note.onset) {
-                onsets.entry(note.onset).or_default().push(index);
+        if !self.lyrics.is_empty() {
+            let mut onsets: BTreeMap<u64, Vec<usize>> = BTreeMap::new();
+            for (index, note) in self.notes.iter().enumerate() {
+                if note.end.is_some_and(|end| end > note.onset) {
+                    onsets.entry(note.onset).or_default().push(index);
+                }
             }
-        }
-        // Lyrics carry an explicit MIDI timestamp. Match that onset exactly;
-        // do not silently shift unmatched lyrics to unrelated later notes.
-        for (onset, lyrics) in std::mem::take(&mut self.lyrics) {
-            let candidates = onsets.get(&onset).map(Vec::as_slice).unwrap_or_default();
-            self.diagnostics.unmatched_lyrics += lyrics.len().saturating_sub(candidates.len());
-            for (lyric, &note_index) in lyrics.into_iter().zip(candidates) {
-                self.notes[note_index].lyrics = Some(lyric);
+            // Lyrics carry an explicit MIDI timestamp. Match that onset exactly;
+            // do not silently shift unmatched lyrics to unrelated later notes.
+            for (onset, lyrics) in std::mem::take(&mut self.lyrics) {
+                let candidates = onsets.get(&onset).map(Vec::as_slice).unwrap_or_default();
+                self.diagnostics.unmatched_lyrics += lyrics.len().saturating_sub(candidates.len());
+                for (lyric, &note_index) in lyrics.into_iter().zip(candidates) {
+                    self.notes[note_index].lyrics = Some(lyric);
+                }
             }
         }
         let mut channels: BTreeMap<Channel, Vec<MidiNote>> = BTreeMap::new();

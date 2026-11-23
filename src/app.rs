@@ -62,6 +62,7 @@ pub struct App {
     settings_path: Option<PathBuf>,
     last_layout: String,
     last_preferences: String,
+    last_title: String,
     last_persist: Instant,
 }
 impl App {
@@ -77,6 +78,7 @@ impl App {
             }
         };
         let mut view = ViewState::default();
+        let mut last_layout = String::new();
         if let Some(path) = settings_path.as_ref().filter(|path| path.exists()) {
             match std::fs::read(path)
                 .map_err(|e| e.to_string())
@@ -86,6 +88,7 @@ impl App {
                     for l in &mut v.lanes {
                         l.id = new_id();
                     }
+                    last_layout = serde_json::to_string_pretty(&v).unwrap_or_default();
                     view = v;
                 }
                 Ok(_) => error = Some("保存的工作区尺寸或结构无效，已重置布局".into()),
@@ -150,8 +153,9 @@ impl App {
             allow_close: false,
             status: String::new(),
             settings_path,
-            last_layout: String::new(),
+            last_layout,
             last_preferences,
+            last_title: String::new(),
             last_persist: Instant::now(),
         };
         if let Some(path) = path {
@@ -434,7 +438,7 @@ impl eframe::App for App {
         let audio_seconds = self.synthesis.playback_clock(self.editor.transport.playing);
         let looped = self.editor.transport.update(
             &self.editor.project.time,
-            self.editor.project.end().max(32 * QUARTER),
+            self.editor.project_end().max(32 * QUARTER),
             audio_seconds,
         );
         let transport_position = self.editor.transport.position;
@@ -465,7 +469,10 @@ impl eframe::App for App {
                 .unwrap_or("未命名"),
             if self.editor.dirty() { " *" } else { "" }
         );
-        ctx.send_viewport_cmd(ViewportCommand::Title(title));
+        if title != self.last_title {
+            self.last_title = title.clone();
+            ctx.send_viewport_cmd(ViewportCommand::Title(title));
+        }
         let rect = ui.max_rect();
         ui.painter().rect_filled(rect, 0, ui::theme::BACKGROUND);
         let menu = Rect::from_min_max(rect.min, pos2(rect.right(), rect.top() + 27.0));

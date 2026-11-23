@@ -63,16 +63,24 @@ pub(in crate::ui::piano) fn draw(app: &App, ui: &Ui, canvas: Rect, groups: &[Sce
                 continue;
             }
             let mut points = Vec::new();
-            if let Some(pitch) = curve.sample(start as f64) {
+            if let Some(pitch) = curve.sample_tick(start) {
                 points.push(point(start, pitch));
             }
+            let local_start = start.saturating_sub(curve.pos);
+            let local_end = end.saturating_sub(curve.pos);
+            let first = curve.points.partition_point(|p| p.0 <= local_start);
+            let stop = curve.points.partition_point(|p| p.0 < local_end);
             points.extend(
-                curve
-                    .absolute_points()
-                    .filter(|(time, _)| *time > start && *time < end)
-                    .map(|(time, pitch)| point(time, pitch)),
+                curve.points[first..stop]
+                    .iter()
+                    .filter_map(|(offset, delta)| {
+                        curve
+                            .pos
+                            .checked_add(*offset)
+                            .map(|time| point(time, curve.pitch + delta))
+                    }),
             );
-            if let Some(pitch) = curve.sample(end as f64) {
+            if let Some(pitch) = curve.sample_tick(end) {
                 points.push(point(end, pitch));
             }
             if points.len() >= 2 {

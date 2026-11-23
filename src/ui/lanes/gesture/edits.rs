@@ -58,16 +58,16 @@ pub(super) fn update(app: &mut App, gesture: &mut ParameterGesture) -> Result<()
                 range.1 = range.1.max(right);
             }
             *last = point;
-            let mut points: BTreeMap<_, _> = gesture
-                .original
-                .iter()
-                .filter(|point| point.0 < range.0 || point.0 > range.1)
-                .copied()
-                .collect();
+            let prefix = gesture.original.partition_point(|p| p.0 < range.0);
+            let suffix = gesture.original.partition_point(|p| p.0 <= range.1);
+            let mut points =
+                Vec::with_capacity(prefix + samples.len() + (gesture.original.len() - suffix));
+            points.extend_from_slice(&gesture.original[..prefix]);
             points.extend(samples.iter().map(|(&time, &value)| (time, value)));
+            points.extend_from_slice(&gesture.original[suffix..]);
             app.parameter_lane.selected = samples.keys().copied().collect();
             app.editor
-                .replace_automation_points(&gesture.owner.target, points.into_iter().collect())?;
+                .replace_automation_points(&gesture.owner.target, points)?;
         }
         Kind::Erase { range, radius } => {
             let point = gesture.mapping.value_at(gesture.pointer);
@@ -76,17 +76,19 @@ pub(super) fn update(app: &mut App, gesture: &mut ParameterGesture) -> Result<()
             let (begin, end) = gesture.mapping.bounds();
             let left = range.0.saturating_sub(*radius).max(begin);
             let right = range.1.saturating_add(*radius).min(end);
-            let mut points: BTreeMap<_, _> = gesture
-                .original
-                .iter()
-                .filter(|point| point.0 < left || point.0 > right)
-                .copied()
-                .collect();
+            let prefix = gesture.original.partition_point(|p| p.0 < left);
+            let suffix = gesture.original.partition_point(|p| p.0 <= right);
             let default = gesture.owner.target.default_value();
-            points.insert(left, default);
-            points.insert(right, default);
+            let extra = if left < right { 2 } else { 1 };
+            let mut points = Vec::with_capacity(prefix + extra + (gesture.original.len() - suffix));
+            points.extend_from_slice(&gesture.original[..prefix]);
+            points.push((left, default));
+            if left < right {
+                points.push((right, default));
+            }
+            points.extend_from_slice(&gesture.original[suffix..]);
             app.editor
-                .replace_automation_points(&gesture.owner.target, points.into_iter().collect())?;
+                .replace_automation_points(&gesture.owner.target, points)?;
             app.parameter_lane
                 .selected
                 .retain(|time| *time < left || *time > right);

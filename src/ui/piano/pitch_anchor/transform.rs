@@ -1,4 +1,4 @@
-use crate::model::{GroupRef, PitchControl};
+use crate::model::{GroupRef, PitchControl, PitchPoint};
 use std::collections::BTreeSet;
 
 #[derive(Clone, Copy)]
@@ -18,16 +18,39 @@ pub(super) enum Transform {
 }
 
 pub(super) fn bounds(controls: &[PitchControl], selected: &BTreeSet<String>) -> Option<Bounds> {
+    bounds_with_candidates(controls, &[], selected)
+}
+
+pub(super) fn bounds_with_candidates(
+    controls: &[PitchControl],
+    candidates: &[PitchPoint],
+    selected: &BTreeSet<String>,
+) -> Option<Bounds> {
     controls
         .iter()
         .filter(|control| id(control).is_some_and(|id| selected.contains(id)))
         .filter_map(control_bounds)
+        .chain(
+            candidates
+                .iter()
+                .filter(|point| selected.contains(&point.id) && point.valid())
+                .map(point_bounds),
+        )
         .reduce(|a, b| Bounds {
             left: a.left.min(b.left),
             right: a.right.max(b.right),
             bottom: a.bottom.min(b.bottom),
             top: a.top.max(b.top),
         })
+}
+
+fn point_bounds(point: &PitchPoint) -> Bounds {
+    Bounds {
+        left: point.pos,
+        right: point.pos,
+        bottom: point.pitch,
+        top: point.pitch,
+    }
 }
 
 fn id(control: &PitchControl) -> Option<&String> {

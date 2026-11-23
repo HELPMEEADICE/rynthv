@@ -107,12 +107,19 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         &app.editor.project.time,
         app.view.step(),
     );
-    let groups = scene::snapshot(app);
+    let groups = scene::snapshot(app, canvas);
+    let mut changed_scene = false;
     if !app.editor.current_track().is_instrumental()
         && app.group_gesture.is_none()
         && !app.view_pan.is_active()
         && !phoneme_dragging
     {
+        let before = (
+            app.editor.revision,
+            app.editor.reference,
+            app.editor.selected.len(),
+            app.editor.is_editing(),
+        );
         if app.piano_tool == super::Tool::PitchDraw {
             super::pitch_edit::interaction(app, ui, &response, canvas);
         } else if app.piano_tool == super::Tool::PitchAnchor {
@@ -120,8 +127,20 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         } else {
             interaction(app, ui, &response, canvas, &groups);
         }
+        changed_scene = before
+            != (
+                app.editor.revision,
+                app.editor.reference,
+                app.editor.selected.len(),
+                app.editor.is_editing(),
+            )
+            || app.gesture.is_some();
     }
-    let groups = scene::snapshot(app);
+    let groups = if changed_scene {
+        scene::snapshot(app, canvas)
+    } else {
+        groups
+    };
     super::background_notes::draw(app, ui, canvas);
     super::rendered::waveforms(app, ui, canvas, &groups);
     scene::draw_notes(app, ui, canvas, &groups);
@@ -159,7 +178,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
             all.max - vec2(8.0, 0.0),
         ),
         &mut app.view.piano,
-        beats(app.editor.project.end()) + 32.0,
+        beats(app.editor.project_end()) + 32.0,
     );
     crate::ui::scrollbars::vertical(
         ui,
