@@ -38,11 +38,10 @@ impl ExportRequest {
             return Err("请选择有效的目标文件夹".into());
         }
         let name = text("filename").trim();
-        let stem = if name.len() >= 4 && name[name.len() - 4..].eq_ignore_ascii_case(".wav") {
-            &name[..name.len() - 4]
-        } else {
-            name
-        };
+        let stem = name
+            .rsplit_once('.')
+            .filter(|(_, extension)| extension.eq_ignore_ascii_case("wav"))
+            .map_or(name, |(stem, _)| stem);
         if name.is_empty()
             || name.ends_with(['.', ' '])
             || stem.is_empty()
