@@ -85,13 +85,7 @@ impl PhoneTable {
         let mut rest = token;
         let mut output = Vec::new();
         while !rest.is_empty() {
-            let end = rest
-                .char_indices()
-                .map(|(index, _)| index)
-                .chain(std::iter::once(rest.len()))
-                .take_while(|&end| end <= self.max_key_bytes)
-                .filter(|&end| end > 0 && self.contains(&rest[..end]))
-                .max()
+            let end = longest_prefix(rest, self.max_key_bytes, |prefix| self.contains(prefix))
                 .ok_or_else(|| unknown(rest))?;
             let phones = self.get(&rest[..end])?;
             if !phones.is_empty() {
@@ -101,6 +95,20 @@ impl PhoneTable {
         }
         Ok(output)
     }
+}
+
+fn longest_prefix(
+    text: &str,
+    max_bytes: usize,
+    mut predicate: impl FnMut(&str) -> bool,
+) -> Option<usize> {
+    let limit = max_bytes.min(text.len());
+    for end in (1..=limit).rev() {
+        if text.is_char_boundary(end) && predicate(&text[..end]) {
+            return Some(end);
+        }
+    }
+    None
 }
 
 pub(super) struct Dictionary {
@@ -228,16 +236,16 @@ impl WordReadings {
                         index + 1
                     ))
                 })?;
+            // Ignore Cantonese tone-only alternatives in a sung score.
+            let reading = reading
+                .split_whitespace()
+                .map(|s| s.trim_end_matches(['1', '2', '3', '4', '5', '6']))
+                .collect::<Vec<_>>()
+                .join(" ");
             for key in keys.split_whitespace() {
                 let values = result.entries.entry(key.to_owned()).or_default();
-                // Ignore Cantonese tone-only alternatives in a sung score.
-                let reading = reading
-                    .split_whitespace()
-                    .map(|s| s.trim_end_matches(['1', '2', '3', '4', '5', '6']))
-                    .collect::<Vec<_>>()
-                    .join(" ");
                 if !values.contains(&reading) {
-                    values.push(reading);
+                    values.push(reading.clone());
                 }
                 result.max_key_bytes = result.max_key_bytes.max(key.len());
             }
@@ -249,14 +257,10 @@ impl WordReadings {
         let mut rest = text;
         let mut result = Vec::new();
         while !rest.is_empty() {
-            let end = rest
-                .char_indices()
-                .map(|(index, _)| index)
-                .chain(std::iter::once(rest.len()))
-                .take_while(|&end| end <= self.max_key_bytes)
-                .filter(|&end| end > 0 && self.entries.contains_key(&rest[..end]))
-                .max()
-                .ok_or_else(|| unknown(rest))?;
+            let end = longest_prefix(rest, self.max_key_bytes, |prefix| {
+                self.entries.contains_key(prefix)
+            })
+            .ok_or_else(|| unknown(rest))?;
             let readings = &self.entries[&rest[..end]];
             if readings.len() != 1 {
                 return Err(VoiceError::new(format!(

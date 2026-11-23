@@ -21,6 +21,8 @@ pub struct FlatModelRegistry {
     entries: BTreeMap<(Option<ModelRole>, String), BTreeSet<ModelSource>>,
     pub packages: BTreeMap<PathBuf, FlatPackage>,
     pub warnings: Vec<String>,
+    scanned_voice_dirs: BTreeSet<PathBuf>,
+    scanned_package_dirs: BTreeSet<PathBuf>,
 }
 
 #[derive(Serialize)]
@@ -35,7 +37,7 @@ impl FlatModelRegistry {
     pub fn scan(voice_directory: Option<&Path>, model_directory: Option<&Path>) -> Self {
         let mut registry = Self::default();
         if let Some(path) = voice_directory {
-            registry.scan_voices(path);
+            registry.scan_voice_dir(path);
         }
         if let Some(path) = model_directory {
             registry.scan_model_folder(path, None, false);
@@ -68,6 +70,8 @@ impl FlatModelRegistry {
         }
         self.packages.extend(other.packages);
         self.warnings.extend(other.warnings);
+        self.scanned_voice_dirs.extend(other.scanned_voice_dirs);
+        self.scanned_package_dirs.extend(other.scanned_package_dirs);
     }
 
     pub(super) fn candidates(&self, role: ModelRole, id: &str) -> BTreeSet<ModelSource> {
@@ -79,13 +83,16 @@ impl FlatModelRegistry {
             .collect()
     }
 
-    fn scan_voices(&mut self, directory: &Path) {
+    pub fn scan_voice_dir(&mut self, directory: &Path) {
         let directory = if directory.as_os_str().is_empty() {
             Path::new(".")
         } else {
             directory
         };
         let directory = fs::canonicalize(directory).unwrap_or_else(|_| directory.to_owned());
+        if !self.scanned_voice_dirs.insert(directory.clone()) {
+            return;
+        }
         self.scan_package_folder(&directory, false);
         match super::library::import_directories(&directory) {
             Ok(folders) => {
@@ -100,6 +107,10 @@ impl FlatModelRegistry {
     }
 
     fn scan_package_folder(&mut self, directory: &Path, optional: bool) {
+        let canonical = fs::canonicalize(directory).unwrap_or_else(|_| directory.to_owned());
+        if !self.scanned_package_dirs.insert(canonical) {
+            return;
+        }
         for path in self
             .files(directory, optional)
             .into_iter()

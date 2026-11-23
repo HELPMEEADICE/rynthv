@@ -270,7 +270,7 @@ impl OwnerInput {
         if self.sample_rate == 0 {
             return None;
         }
-        let note_ends: Vec<_> = self
+        let last_note = self
             .notes
             .iter()
             .filter(|note| note.attributes.get("muted").and_then(Value::as_bool) != Some(true))
@@ -280,8 +280,7 @@ impl OwnerInput {
                 (end > self.visible_begin.0 && self.visible_end.is_none_or(|limit| start < limit.0))
                     .then_some(end)
             })
-            .collect();
-        let last_note = *note_ends.iter().max()?;
+            .max()?;
         let end = self.visible_end.unwrap_or(GlobalBlick(last_note));
         if end.0 <= self.visible_begin.0 {
             return None;

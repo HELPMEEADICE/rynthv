@@ -27,8 +27,9 @@ impl PreparedVoiceControls {
             self.sample_parameter(Parameter::Mouth, start_seconds, frame_seconds, frames)?;
         let mut values = control_buffer(frames)?;
         let mut active = false;
-        for (cents, mouth) in cents.into_iter().zip(mouth) {
-            let mouth = mouth as f32;
+        for i in 0..frames {
+            let cents = cents.get(i);
+            let mouth = mouth.get(i) as f32;
             let mouth = if (-0.01..0.01).contains(&mouth) {
                 0.0
             } else {
@@ -93,13 +94,13 @@ impl PreparedVoiceControls {
         let mut values = control_buffer(frames)?;
         let mut active = false;
         for i in 0..frames {
-            let loudness = loudness[i];
-            let tension = tension[i];
-            let breathiness = breathiness[i];
-            let gender = gender[i];
+            let loudness = loudness.get(i);
+            let tension = tension.get(i);
+            let breathiness = breathiness.get(i);
+            let gender = gender.get(i);
             let value = VoiceControl {
                 tension: -tension.clamp(-1.0, 1.0) as f32,
-                primary_gain: (voicing[i].max(0.0)
+                primary_gain: (voicing.get(i).max(0.0)
                     * 10.0_f64.powf((loudness - 6.0 * tension - 5.5 * breathiness.max(0.0)) / 20.0))
                     as f32,
                 secondary_gain: 10.0_f64.powf((loudness + 7.5 * breathiness) / 20.0) as f32,
@@ -131,7 +132,7 @@ impl PreparedVoiceControls {
         start_seconds: f64,
         frame_seconds: f64,
         frames: usize,
-    ) -> Result<Vec<f64>> {
+    ) -> Result<SampledValues> {
         let baseline = match parameter {
             Parameter::Loudness => self.scalar(VoiceParameter::Loudness),
             Parameter::Tension => self.scalar(VoiceParameter::Tension),
@@ -146,26 +147,39 @@ impl PreparedVoiceControls {
             .filter(|curves| curves.has_parameter(parameter))
             .map(|curves| curves.sample_parameter(parameter, start_seconds, frame_seconds, frames))
             .transpose()?;
-        let mut values = control_buffer(frames)?;
         if let Some(sampled) = sampled {
             if sampled.len() != frames {
                 return Err(VoiceError::new("参数曲线的帧数与音频时间线不一致。"));
             }
-            values.extend(sampled.into_iter().map(f64::from));
+            Ok(SampledValues::Curve(sampled))
         } else {
             let default = if parameter == Parameter::Voicing {
                 1.0
             } else {
                 0.0
             };
-            values.resize(frames, baseline + default);
+            Ok(SampledValues::Constant(baseline + default))
         }
-        Ok(values)
     }
 
     fn has_curve(&self, parameter: Parameter) -> bool {
         self.automations
             .as_ref()
             .is_some_and(|curves| curves.has_parameter(parameter))
+    }
+}
+
+enum SampledValues {
+    Constant(f64),
+    Curve(Vec<f32>),
+}
+
+impl SampledValues {
+    #[inline]
+    fn get(&self, index: usize) -> f64 {
+        match self {
+            Self::Constant(value) => *value,
+            Self::Curve(values) => f64::from(values[index]),
+        }
     }
 }

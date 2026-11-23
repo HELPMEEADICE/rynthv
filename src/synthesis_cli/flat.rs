@@ -64,13 +64,15 @@ fn execute(command: Command, options: &Options) -> Result<Value, String> {
             flat::import(path.expect("import input checked"), &directory).map_err(error)?;
         return Ok(json!({"ok": true, "imported": imported}));
     }
-    let registry = registry(options.voices.as_deref(), options.models.as_deref(), path)?;
     match command {
-        Command::List => Ok(json!({
-            "ok": true,
-            "models": registry.models().collect::<Vec<_>>(),
-            "warnings": registry.warnings,
-        })),
+        Command::List => {
+            let registry = registry(options.voices.as_deref(), options.models.as_deref(), path)?;
+            Ok(json!({
+                "ok": true,
+                "models": registry.models().collect::<Vec<_>>(),
+                "warnings": registry.warnings,
+            }))
+        }
         Command::Inspect => {
             let path = path.expect("inspection input checked");
             let mut archive = FlatArchive::open(path).map_err(error)?;
@@ -78,6 +80,11 @@ fn execute(command: Command, options: &Options) -> Result<Value, String> {
                 let packages = FlatPackage::inspect(path).map_err(error)?;
                 return Ok(json!({"ok": true, "kind": "sfpks", "packages": packages}));
             }
+            let registry = registry(
+                options.voices.as_deref(),
+                options.models.as_deref(),
+                Some(path),
+            )?;
             let package = archive.describe().map_err(error)?;
             let dependencies = registry.dependencies(path, &package).map_err(error)?;
             Ok(json!({
@@ -92,6 +99,11 @@ fn execute(command: Command, options: &Options) -> Result<Value, String> {
             if archive.kind() != PackageKind::Sfpk {
                 return Err("Import the batch and validate individual SFPK voices".into());
             }
+            let registry = registry(
+                options.voices.as_deref(),
+                options.models.as_deref(),
+                Some(path),
+            )?;
             let inventory = VoiceInventory::load_flat(path, &registry).map_err(error)?;
             Ok(json!({
                 "ok": true, "stage_programs_available": inventory.prepare().map_err(error)?.summary().stage_programs_available,
@@ -129,7 +141,7 @@ pub(super) fn registry(
 
 pub(super) fn include_neighbors(registry: &mut FlatModelRegistry, path: &Path) {
     if let Some(parent) = path.parent() {
-        registry.extend(FlatModelRegistry::scan(Some(parent), None));
+        registry.scan_voice_dir(parent);
     }
 }
 

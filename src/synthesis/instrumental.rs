@@ -50,7 +50,9 @@ impl AudioLibrary {
     }
 
     pub fn finish_import(&mut self) {
-        self.import = None;
+        if self.import.take().is_some() {
+            self.generation = self.generation.wrapping_add(1);
+        }
     }
 
     pub fn reconcile(&mut self, project: &Project, ctx: &eframe::egui::Context) {

@@ -114,12 +114,12 @@ impl Runtime {
     }
 
     pub fn sync_project(&mut self, project: &Project, revision: u64) {
-        self.instrumentals.reconcile(project, &self.repaint);
         if self.last_revision == Some(revision)
             && self.last_audio_generation == self.instrumentals.generation
         {
             return;
         }
+        self.instrumentals.reconcile(project, &self.repaint);
         self.reconcile_voices(project);
         let identities: BTreeMap<_, _> = self
             .routes

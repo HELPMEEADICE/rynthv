@@ -3,6 +3,11 @@
 //! The third array maps local symbols to unified symbols. In `multiphone` it
 //! includes an extra terminal empty string, which is retained without indexing it.
 
+use std::{
+    collections::{HashMap, HashSet},
+    sync::{Arc, OnceLock},
+};
+
 use serde::Serialize;
 
 use super::{Result, VoiceError, array, range, sum, u32_at};
@@ -10,6 +15,12 @@ use super::{Result, VoiceError, array, range, sum, u32_at};
 pub const PHONE_SET_TYPE_ID: [u8; 16] = [
     0x4f, 0x0a, 0xa7, 0x7c, 0x74, 0xf4, 0xea, 0x4f, 0x14, 0x5d, 0xf4, 0x36, 0xab, 0xa8, 0xcb, 0x04,
 ];
+
+#[derive(Debug)]
+struct PhoneIndex {
+    symbols: HashMap<String, usize>,
+    classes: HashMap<String, usize>,
+}
 
 /// Four stored string arrays, in their original order. No normalization is done.
 #[derive(Clone, Debug, Serialize)]
@@ -19,6 +30,8 @@ pub struct PhoneSet {
     pub classes_by_symbol: Vec<String>,
     pub mapped_symbols: Vec<String>,
     pub classes: Vec<String>,
+    #[serde(skip)]
+    index: OnceLock<Arc<PhoneIndex>>,
 }
 
 /// Exact token lookup within a stored table, not a prepared neural feature.
@@ -119,8 +132,9 @@ impl PhoneSet {
     pub(super) fn parse_flat(bytes: &[u8]) -> Result<Self> {
         let mut reader = Reader { bytes, offset: 0 };
         let mut table = Self::read_tables(&mut reader)?;
+        let mut seen = HashSet::with_capacity(table.classes_by_symbol.len());
         for class in &table.classes_by_symbol {
-            if !table.classes.contains(class) {
+            if seen.insert(class.as_str()) {
                 table.classes.push(class.clone());
             }
         }
@@ -140,6 +154,7 @@ impl PhoneSet {
             classes_by_symbol: reader.strings()?,
             mapped_symbols: reader.strings()?,
             classes: Vec::new(),
+            index: OnceLock::new(),
         })
     }
 
@@ -150,6 +165,7 @@ impl PhoneSet {
             classes_by_symbol,
             mapped_symbols,
             classes,
+            index: _,
         } = self;
         if reader.offset != reader.bytes.len() {
             return Err(VoiceError::new("Phone set has trailing bytes"));
@@ -166,8 +182,7 @@ impl PhoneSet {
         }
         validate_unique(symbols, "symbols")?;
         validate_unique(classes, "classes")?;
-        let class_set: std::collections::HashSet<&str> =
-            classes.iter().map(String::as_str).collect();
+        let class_set: HashSet<&str> = classes.iter().map(String::as_str).collect();
         if classes_by_symbol
             .iter()
             .any(|class| !class_set.contains(class.as_str()))
@@ -182,13 +197,34 @@ impl PhoneSet {
         Ok(())
     }
 
+    fn index(&self) -> &Arc<PhoneIndex> {
+        self.index.get_or_init(|| {
+            Arc::new(PhoneIndex {
+                symbols: self
+                    .symbols
+                    .iter()
+                    .enumerate()
+                    .map(|(index, symbol)| (symbol.clone(), index))
+                    .collect(),
+                classes: self
+                    .classes
+                    .iter()
+                    .enumerate()
+                    .map(|(index, class)| (class.clone(), index))
+                    .collect(),
+            })
+        })
+    }
+
     pub fn lookup(&self, token: &str) -> Option<PhoneLookup<'_>> {
-        let index = self.symbols.iter().position(|symbol| symbol == token)?;
+        let index_tables = self.index();
+        let &index = index_tables.symbols.get(token)?;
         let class = self.classes_by_symbol.get(index)?;
+        let &class_index = index_tables.classes.get(class.as_str())?;
         Some(PhoneLookup {
             stored_index: index,
             symbol: &self.symbols[index],
-            class_index: self.classes.iter().position(|value| value == class)?,
+            class_index,
             class,
             mapped_symbol: self.mapped_symbols.get(index).map(String::as_str),
         })

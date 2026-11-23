@@ -37,12 +37,9 @@ pub struct ExpandedFeatures {
     /// [first_primary, first_context, first_position, second, second_position,
     /// optional, condition]. The condition region remains zero for the caller.
     pub full: Vec<f32>,
-    pub second_width: usize,
-    /// [second, second_position].
-    pub second: Vec<f32>,
 }
 
-/// Build both expanded matrices, leaving the trailing condition region
+/// Build the expanded feature matrix, leaving the trailing condition region
 /// for the caller to fill.
 pub(super) fn expand(spec: ExpansionSpec, input: &ExpansionInput<'_>) -> Result<ExpandedFeatures> {
     validate_rows(input.first_primary)?;
@@ -76,7 +73,6 @@ pub(super) fn expand(spec: ExpansionSpec, input: &ExpansionInput<'_>) -> Result<
         spec.condition_channels,
     ])?;
     let mut full = zero_matrix(frames, full_width)?;
-    let mut second = zero_matrix(frames, second_width)?;
 
     // Iterate each unit to gather first-level features without allocating
     // an additional frame-to-unit lookup table.
@@ -106,11 +102,10 @@ pub(super) fn expand(spec: ExpansionSpec, input: &ExpansionInput<'_>) -> Result<
     frame = 0;
     for (unit, &duration) in input.second_durations.iter().enumerate() {
         for position in 0..duration {
-            let output = &mut second[frame * second_width..(frame + 1) * second_width];
+            let offset = frame * full_width + second_offset;
+            let output = &mut full[offset..offset + second_width];
             copy_features(output, 0, input.second, unit);
             fill_position(&mut output[input.second.width..], position, duration);
-            let offset = frame * full_width + second_offset;
-            full[offset..offset + second_width].copy_from_slice(output);
             frame += 1;
         }
     }
@@ -118,8 +113,6 @@ pub(super) fn expand(spec: ExpansionSpec, input: &ExpansionInput<'_>) -> Result<
         frames,
         full_width,
         full,
-        second_width,
-        second,
     })
 }
 

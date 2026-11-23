@@ -190,6 +190,8 @@ impl Planner {
     }
 
     pub fn summary(&self) -> PlanSummary {
+        let changed: std::collections::HashSet<_> =
+            self.plan.changes.iter().map(|c| c.owner).collect();
         let changed_owners = self.plan.changes.iter().filter(|c| c.new.is_some()).count();
         let removed_owners = self.plan.changes.iter().filter(|c| c.new.is_none()).count();
         PlanSummary {
@@ -211,7 +213,7 @@ impl Planner {
                     coverage: r.coverage,
                     dependency_policy: r.dependency_policy,
                     voice_available: r.input.voice.model_content_identity.is_some(),
-                    reused_request: !self.plan.changes.iter().any(|c| c.owner == r.owner),
+                    reused_request: !changed.contains(&r.owner),
                     output: self.plan.output_controls[&r.owner].clone(),
                 })
                 .collect(),
