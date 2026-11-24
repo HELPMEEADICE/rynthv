@@ -260,7 +260,8 @@ pub(super) fn schema(entry: &Command) -> Value {
             "id": arg.get_id().as_str(), "long": arg.get_long(), "position": arg.get_index(),
             "description": arg.get_help().map(ToString::to_string), "required": arg.is_required_set(),
             "type": if matches!(arg.get_action(), ArgAction::SetTrue) { "boolean" } else { "string" },
-            "choices": choices, "defaults": defaults
+            "choices": choices, "defaults": defaults,
+            "semantic": semantic(entry.get_name(), arg.get_id().as_str())
         })
     }).collect();
     let subcommands: Vec<_> = entry
@@ -270,4 +271,42 @@ pub(super) fn schema(entry: &Command) -> Value {
         .collect();
     json!({"name": entry.get_name(), "description": entry.get_about().map(ToString::to_string),
         "arguments": args, "subcommands": subcommands})
+}
+
+fn semantic(command: &str, argument: &str) -> Value {
+    match argument {
+        "project" | "destination" | "input" | "source" | "output" | "output-dir" | "databases"
+        | "sv1-databases" | "flat-databases" | "flat-models" | "dictionaries" => {
+            json!({"type":"path"})
+        }
+        "track" | "to-track" => json!({"type":"track_uuid_or_name"}),
+        "group" | "with" => json!({"type":"group_reference_uuid"}),
+        "note" => json!({"type":"note_uuid"}),
+        "pitch" | "min-pitch" | "max-pitch" => {
+            json!({"type":"midi_note_or_name","minimum":0,"maximum":127,"reference":"C4=60"})
+        }
+        "bpm" => json!({"type":"number","exclusive_minimum":0,"unit":"quarter_notes_per_minute"}),
+        "pan" => json!({"type":"number","minimum":-1,"maximum":1}),
+        "volume" => json!({"type":"number","unit":"decibels"}),
+        "mute" | "solo" if command != "analyze" => json!({"type":"boolean"}),
+        "bar" => json!({"type":"integer","minimum":1,"unit":"bar"}),
+        "beat" => json!({"type":"number","minimum":0,"unit":"quarter_note"}),
+        "at" if command == "point" => json!({"type":"integer","unit":"local_blick"}),
+        "at" | "from" | "to" | "duration" => {
+            json!({"type":"position_or_duration","unit_option":"unit"})
+        }
+        "index" if command == "adjust" => {
+            json!({"type":"integer","minimum":0,"unit":"phone_index"})
+        }
+        "index" => json!({"type":"integer","minimum":1,"unit":"track_index"}),
+        "semitones" => json!({"type":"integer","unit":"semitones"}),
+        "cache-mib" => json!({"type":"integer","minimum":0,"unit":"MiB"}),
+        "revision" | "seed" => json!({"type":"integer","minimum":0,"maximum":u32::MAX}),
+        "sample-rate" => json!({"type":"integer","enum":[44100,48000,96000],"unit":"Hz"}),
+        "channels" => json!({"type":"integer","enum":[1,2]}),
+        "bit-depth" => json!({"type":"integer","enum":[16,24,32]}),
+        "compute-adapter" => json!({"type":"adapter_id_json_or_auto"}),
+        "expect-revision" => json!({"type":"string","pattern":"^[0-9a-f]{64}$"}),
+        _ => Value::Null,
+    }
 }

@@ -109,7 +109,16 @@ impl Workstation {
             "protocol_version": SCHEMA_VERSION,
             "command": commands::schema(entry),
             "interfaces": {
-                "result": {"required":["schema_version","ok","command","warnings"],"success":["result"],"failure":["error"]},
+                "result": {
+                    "type":"object","required":["schema_version","ok","command","warnings"],
+                    "properties":{
+                        "schema_version":{"const":SCHEMA_VERSION},"ok":{"type":"boolean"},
+                        "command":{"type":"string"},"warnings":{"type":"array"},
+                        "result":{},"error":{"type":"object","required":["code","message","details"],
+                            "properties":{"code":{"type":"string"},"message":{"type":"string"},"details":{"type":"object"}}}
+                    },
+                    "if":{"properties":{"ok":{"const":true}}},"then":{"required":["result"]},"else":{"required":["error"]}
+                },
                 "stdio_request": {"type":"object","required":["id","args"],"properties":{
                     "id":{"type":["string","integer"]},"args":{"type":"array","items":{"type":"string"}},
                     "input":{}}, "shutdown":{"args":["exit"]}},

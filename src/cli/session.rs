@@ -179,10 +179,14 @@ impl Workstation {
                 std::iter::once("rynthv -cli").chain(args.iter().map(String::as_str)),
             )
         };
-        if args.len() == 3
+        if args.len() >= 3
             && args[0] == "track"
             && args[1] == "add"
             && !args[2].starts_with('-')
+            && !args[2].to_ascii_lowercase().ends_with(".svp")
+            && !args
+                .iter()
+                .any(|arg| arg == "--name" || arg.starts_with("--name="))
             && self.open.is_some()
         {
             args.insert(2, "--name".into());
