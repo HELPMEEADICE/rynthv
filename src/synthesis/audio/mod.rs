@@ -6,13 +6,16 @@ pub(crate) mod conversion;
 pub mod live;
 pub mod metronome;
 mod piano;
+#[cfg(feature = "gui")]
 mod playback;
 mod source;
 mod wav;
 
 pub use live::LiveAudio;
 pub use piano::PianoControl;
+#[cfg(feature = "gui")]
 pub(crate) use playback::LoopControl;
+#[cfg(feature = "gui")]
 pub use playback::{OutputFormat, PlaybackControl, Player};
 pub use source::{AudioLayer, PlaybackSource};
 pub use wav::{WaveFormat, save_wav, save_wav_as};

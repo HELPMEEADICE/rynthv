@@ -29,6 +29,7 @@ pub struct App {
     pub view: ViewState,
     pub preferences: ui::settings::Preferences,
     pub path: Option<PathBuf>,
+    project_revision: Option<storage::Revision>,
     pub error: Option<String>,
     pub settings: bool,
     pub voice_manager: bool,
@@ -113,7 +114,10 @@ impl App {
             serde_json::to_string_pretty(&preferences).expect("valid interface preferences");
         let mut app = Self {
             editor: Editor::new(Project::default()),
-            synthesis: synthesis::runtime::Runtime::new(cc.egui_ctx.clone()),
+            synthesis: synthesis::runtime::Runtime::new({
+                let ctx = cc.egui_ctx.clone();
+                synthesis::notify::Notify::new(move || ctx.request_repaint())
+            }),
             graphics_api: cc
                 .wgpu_render_state
                 .as_ref()
@@ -122,6 +126,7 @@ impl App {
             view,
             preferences,
             path: None,
+            project_revision: None,
             error,
             settings: false,
             voice_manager: false,
@@ -168,10 +173,15 @@ impl App {
         ui::piano::cancel_audition(self);
         self.midi_import = None;
         match storage::load(&path) {
-            Ok(storage::LoadedProject { project, imported }) => {
+            Ok(storage::LoadedProject {
+                project,
+                imported,
+                revision,
+            }) => {
                 self.editor = Editor::new(project);
                 self.synthesis.reset_project();
                 self.path = (!imported).then_some(path);
+                self.project_revision = (!imported).then_some(revision);
                 self.status = if imported {
                     "已导入 Synthesizer V Studio 1 工程，请另存为新文件".into()
                 } else {
@@ -238,10 +248,20 @@ impl App {
         if path.extension().is_none() {
             path.set_extension("svp");
         }
-        match storage::save(&path, &self.editor.project) {
-            Ok(()) => {
+        let result = (|| {
+            let file = storage::ProjectFile::lock(&path)?;
+            let revision = if self.path.as_ref() == Some(&path) {
+                self.project_revision
+            } else {
+                storage::Revision::read(&path)?
+            };
+            file.save_if(&self.editor.project, revision)
+        })();
+        match result {
+            Ok(revision) => {
                 self.editor.mark_saved();
                 self.path = Some(path);
+                self.project_revision = Some(revision);
                 self.status = "工程已保存".into();
                 true
             }

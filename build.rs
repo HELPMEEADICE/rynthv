@@ -6,7 +6,9 @@ fn main() {
     println!("cargo::rerun-if-changed=assets/branding/app-icon.ico");
     println!("cargo::rerun-if-changed={ICON_SCRIPT}");
 
-    if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows")
+        || env::var_os("CARGO_FEATURE_GUI").is_none()
+    {
         return;
     }
 
@@ -29,6 +31,7 @@ fn main() {
             let (arch, coff_target) = match env::var("CARGO_CFG_TARGET_ARCH").as_deref() {
                 Ok("x86_64") => ("x86_64", "pe-x86-64"),
                 Ok("x86") => ("i686", "pe-i386"),
+                Ok("aarch64") => ("aarch64", "pe-aarch64-little"),
                 _ => panic!("unsupported Windows GNU resource target: {target}"),
             };
             let program = if cfg!(windows) {

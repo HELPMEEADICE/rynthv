@@ -44,7 +44,7 @@ pub struct AudioLibrary {
 }
 
 impl AudioLibrary {
-    pub fn begin_import(&mut self, path: PathBuf, ctx: &eframe::egui::Context) {
+    pub fn begin_import(&mut self, path: PathBuf, ctx: &super::notify::Notify) {
         self.import = Some(path.clone());
         self.retry(&path, ctx);
     }
@@ -55,7 +55,7 @@ impl AudioLibrary {
         }
     }
 
-    pub fn reconcile(&mut self, project: &Project, ctx: &eframe::egui::Context) {
+    pub fn reconcile(&mut self, project: &Project, ctx: &super::notify::Notify) {
         let mut paths: BTreeSet<_> = project
             .tracks
             .iter()
@@ -100,13 +100,13 @@ impl AudioLibrary {
         }
     }
 
-    pub fn retry(&mut self, path: &Path, ctx: &eframe::egui::Context) {
+    pub fn retry(&mut self, path: &Path, ctx: &super::notify::Notify) {
         self.entries.remove(path);
         self.request(path.to_owned(), ctx);
         self.generation = self.generation.wrapping_add(1);
     }
 
-    fn request(&mut self, path: PathBuf, ctx: &eframe::egui::Context) {
+    fn request(&mut self, path: PathBuf, ctx: &super::notify::Notify) {
         if self.entries.contains_key(&path) {
             return;
         }
@@ -123,7 +123,7 @@ impl AudioLibrary {
                     .map_err(|error| format!("{}：{error}", file.display()));
                 if !worker_cancel.load(Ordering::Relaxed) {
                     let _ = tx.send(result);
-                    ctx.request_repaint();
+                    ctx.wake();
                 }
             });
         self.entries.insert(

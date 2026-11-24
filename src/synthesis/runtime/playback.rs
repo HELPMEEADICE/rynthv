@@ -45,7 +45,7 @@ pub(super) struct Playback {
 }
 
 impl Playback {
-    pub fn new(repaint: eframe::egui::Context) -> Self {
+    pub fn new(repaint: crate::synthesis::notify::Notify) -> Self {
         let (tx, rx) = mpsc::channel();
         let state = Arc::new(Mutex::new(Snapshot::default()));
         let latest = Arc::new(AtomicU64::new(0));

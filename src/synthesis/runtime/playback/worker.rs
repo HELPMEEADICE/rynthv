@@ -15,7 +15,7 @@ pub(super) fn run(
     pending: Arc<AtomicU64>,
     piano: PianoControl,
     looping: LoopControl,
-    repaint: eframe::egui::Context,
+    repaint: crate::synthesis::notify::Notify,
 ) {
     let mut player = None;
     let mut command_error = None;
@@ -29,7 +29,7 @@ pub(super) fn run(
                     status.audition_error =
                         result.err().map(|error| format!("钢琴试听失败：{error}"));
                 }
-                repaint.request_repaint();
+                repaint.wake();
             }
             Ok(Command::Transport(serial, command)) => {
                 let resets_error = !matches!(&command, Transport::Control { .. });
@@ -60,7 +60,7 @@ pub(super) fn run(
                         status.audition_error = None;
                     }
                 }
-                repaint.request_repaint();
+                repaint.wake();
             }
             Err(RecvTimeoutError::Timeout) => {}
         }
@@ -78,7 +78,7 @@ pub(super) fn run(
                 let error = error.to_string();
                 if status.error.as_ref() != Some(&error) {
                     status.error = Some(error);
-                    repaint.request_repaint();
+                    repaint.wake();
                 }
             }
         }

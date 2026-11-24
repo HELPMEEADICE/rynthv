@@ -101,7 +101,7 @@ impl Worker {
         path: PathBuf,
         dictionaries: PathBuf,
         flat_registry: Arc<FlatModelRegistry>,
-        repaint: eframe::egui::Context,
+        repaint: crate::synthesis::notify::Notify,
         compute: Session,
     ) -> Result<Self, String> {
         let (tx, commands) = mpsc::channel();

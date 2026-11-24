@@ -2,10 +2,12 @@
 //! synthesizes, resamples, normalizes, or limits PCM. Pan uses a conventional
 //! equal-power mono law / unity-center stereo balance.
 
+#[cfg(feature = "gui")]
 mod live;
 mod recordings;
-pub(super) use live::LiveMixer;
-pub(super) use recordings::{RecordingMix, recordings};
+#[cfg(feature = "gui")]
+pub(crate) use live::LiveMixer;
+pub(crate) use recordings::{RecordingMix, recordings};
 
 use crate::{
     model::Extra,
@@ -35,7 +37,7 @@ struct Span<'a> {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub(super) enum VocalStem {
+pub(crate) enum VocalStem {
     Combined,
     Primary,
     Aspiration,
@@ -43,7 +45,7 @@ pub(super) enum VocalStem {
 
 /// Validate owners and compute the mixed duration in seconds without
 /// allocating or mixing PCM samples.
-pub(super) fn mixed_duration_seconds(
+pub(crate) fn mixed_duration_seconds(
     owners: &[PublishedOwner],
     solo_tracks: &BTreeSet<u64>,
 ) -> Result<Option<f64>, String> {
@@ -53,7 +55,7 @@ pub(super) fn mixed_duration_seconds(
     )
 }
 
-pub(super) fn can_mix_with_recordings(
+pub(crate) fn can_mix_with_recordings(
     owners: &[PublishedOwner],
     solo_tracks: &BTreeSet<u64>,
     recordings: &[AudioLayer],
@@ -75,7 +77,7 @@ pub(super) fn can_mix_with_recordings(
     Ok(owner_frames.is_some() || recording_frames)
 }
 
-pub(super) fn mix_with_recordings(
+pub(crate) fn mix_with_recordings(
     owners: &[PublishedOwner],
     solo_tracks: &BTreeSet<u64>,
     recordings: &[AudioLayer],

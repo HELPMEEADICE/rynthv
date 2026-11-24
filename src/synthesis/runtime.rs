@@ -5,7 +5,7 @@ mod events;
 mod export;
 mod library;
 mod metronome;
-mod mixer;
+use super::mixer;
 mod phonemes;
 mod playback;
 mod recordings;
@@ -71,11 +71,11 @@ pub struct Runtime {
     loop_range: Option<(f64, f64)>,
     demand_block: Option<u64>,
     solo_tracks: BTreeSet<u64>,
-    repaint: eframe::egui::Context,
+    repaint: super::notify::Notify,
 }
 
 impl Runtime {
-    pub fn new(repaint: eframe::egui::Context) -> Self {
+    pub fn new(repaint: super::notify::Notify) -> Self {
         let library = VoiceLibrary::new(repaint.clone());
         let compute = compute::State::new(
             library.settings.compute_backend,

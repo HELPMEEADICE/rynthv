@@ -9,12 +9,15 @@ use std::{
 mod identity;
 mod project_size;
 mod svp_v153;
+mod transaction;
+pub use transaction::{ProjectFile, Revision};
 
 use project_size::{MAX_PROJECT_BYTES, ProjectWriter, check_project_size};
 
 pub struct LoadedProject {
     pub project: Project,
     pub imported: bool,
+    pub revision: Revision,
 }
 
 pub fn load(path: &Path) -> Result<LoadedProject, String> {
@@ -31,6 +34,7 @@ pub fn load(path: &Path) -> Result<LoadedProject, String> {
     check_project_size(bytes.len() as u64)?;
     let mut project: Project =
         serde_json::from_slice(&bytes).map_err(|e| format!("SVP 解析失败：{e}"))?;
+    let revision = Revision::of(&bytes);
     let imported = match project.version {
         SVP_VERSION => false,
         svp_v153::VERSION => true,
@@ -42,6 +46,7 @@ pub fn load(path: &Path) -> Result<LoadedProject, String> {
         }
     };
     validate_time(&project.time)?;
+    identity::complete(&mut project, revision);
     if imported {
         svp_v153::import(&mut project)?;
     }
@@ -76,15 +81,27 @@ pub fn load(path: &Path) -> Result<LoadedProject, String> {
     {
         group.notes.sort_by_key(|n| n.onset);
     }
-    Ok(LoadedProject { project, imported })
+    Ok(LoadedProject {
+        project,
+        imported,
+        revision,
+    })
 }
 
 pub fn save(path: &Path, project: &Project) -> Result<(), String> {
+    ProjectFile::lock(path)?.save(project)
+}
+
+pub fn validate(project: &Project) -> Result<(), String> {
     if project.version != SVP_VERSION {
         return Err(format!("只能保存为 SVP {SVP_VERSION} 工程"));
     }
     validate_time(&project.time)?;
-    validate_content(project)?;
+    validate_content(project)
+}
+
+fn save_locked(path: &Path, project: &Project) -> Result<(), String> {
+    validate(project)?;
     let mut ordered = project.clone();
     let base = std::path::absolute(path).map_err(|e| e.to_string())?;
     let parent = base
@@ -122,6 +139,14 @@ pub fn atomic_write_with(
     path: &Path,
     write: impl FnOnce(&mut BufWriter<fs::File>) -> Result<(), String>,
 ) -> Result<(), String> {
+    atomic_write_policy(path, true, write)
+}
+
+pub fn atomic_write_policy(
+    path: &Path,
+    overwrite: bool,
+    write: impl FnOnce(&mut BufWriter<fs::File>) -> Result<(), String>,
+) -> Result<(), String> {
     if path.as_os_str().to_string_lossy().ends_with(['/', '\\']) {
         return Err(format!("写入 {} 失败：目标路径不是文件", path.display()));
     }
@@ -147,7 +172,12 @@ pub fn atomic_write_with(
             writer.flush().map_err(|e| e.to_string())?;
             writer.get_ref().sync_all().map_err(|e| e.to_string())?;
         }
-        fs::rename(&temp, path).map_err(|e| e.to_string())?;
+        if overwrite {
+            fs::rename(&temp, path).map_err(|e| e.to_string())?;
+        } else {
+            fs::hard_link(&temp, path).map_err(|e| e.to_string())?;
+            let _ = fs::remove_file(&temp);
+        }
         #[cfg(unix)]
         if let Ok(dir) = fs::File::open(parent) {
             dir.sync_all().map_err(|e| e.to_string())?;

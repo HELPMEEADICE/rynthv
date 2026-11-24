@@ -1,5 +1,87 @@
+use super::Revision;
 use crate::model::Project;
+use sha2::{Digest, Sha256};
 use std::collections::HashSet;
+
+/// Derive reproducible identities for legacy records that omit them. Group
+/// definition identities are validated because references need an unambiguous target.
+pub(super) fn complete(project: &mut Project, revision: Revision) {
+    let namespace = revision.hex();
+    let generated = |kind: &str, first: usize, second: usize, attempt: usize| {
+        let key = format!("rynthv:{namespace}:{kind}:{first}:{second}:{attempt}");
+        let digest = Sha256::digest(key.as_bytes());
+        let mut bytes = [0; 16];
+        bytes.copy_from_slice(&digest[..16]);
+        uuid::Builder::from_custom_bytes(bytes).into_uuid()
+    };
+    if project.uuid.is_empty() {
+        project.uuid = generated("project", 0, 0, 0).to_string();
+    }
+    let mut notes: HashSet<_> = project
+        .library
+        .iter()
+        .chain(project.tracks.iter().map(|track| &track.main_group))
+        .flat_map(|group| &group.notes)
+        .filter_map(|note| u64::from_str_radix(&note.uuid, 16).ok())
+        .collect();
+    let mut encountered = HashSet::new();
+    let groups = project
+        .library
+        .iter_mut()
+        .chain(project.tracks.iter_mut().map(|track| &mut track.main_group));
+    for (index, group) in groups.enumerate() {
+        for (slot, note) in group.notes.iter_mut().enumerate() {
+            let duplicate = note.uuid.len() == 16
+                && u64::from_str_radix(&note.uuid, 16).is_ok_and(|id| !encountered.insert(id));
+            if note.uuid.is_empty() || duplicate {
+                let id = (0..)
+                    .map(|attempt| generated("note", index, slot, attempt).as_u64_pair().0)
+                    .find(|&id| notes.insert(id))
+                    .expect("UUID space is available");
+                note.uuid = format!("{id:016x}");
+            }
+        }
+    }
+    let mut reserved: HashSet<_> = project
+        .library
+        .iter()
+        .chain(project.tracks.iter().map(|t| &t.main_group))
+        .map(|group| group.uuid.as_str())
+        .chain(std::iter::once(project.uuid.as_str()))
+        .chain(
+            project
+                .tracks
+                .iter()
+                .flat_map(|t| t.references())
+                .map(|r| r.uuid.as_str()),
+        )
+        .filter_map(|id| uuid::Uuid::parse_str(id).ok())
+        .collect();
+    let mut encountered: HashSet<_> = project
+        .library
+        .iter()
+        .chain(project.tracks.iter().map(|t| &t.main_group))
+        .map(|group| group.uuid.as_str())
+        .chain(std::iter::once(project.uuid.as_str()))
+        .filter_map(|id| uuid::Uuid::parse_str(id).ok())
+        .collect();
+    for (index, track) in project.tracks.iter_mut().enumerate() {
+        for (slot, reference) in std::iter::once(&mut track.main_ref)
+            .chain(&mut track.groups)
+            .enumerate()
+        {
+            let duplicate =
+                uuid::Uuid::parse_str(&reference.uuid).is_ok_and(|id| !encountered.insert(id));
+            if reference.uuid.is_empty() || duplicate {
+                reference.uuid = (0..)
+                    .map(|attempt| generated("reference", index, slot, attempt))
+                    .find(|&id| reserved.insert(id))
+                    .expect("UUID space is available")
+                    .to_string();
+            }
+        }
+    }
+}
 
 pub(super) fn validate(project: &Project) -> Result<(), String> {
     let mut ids = HashSet::new();

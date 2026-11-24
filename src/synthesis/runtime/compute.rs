@@ -14,7 +14,7 @@ impl State {
     pub(super) fn new(
         backend: Backend,
         adapter: Option<AdapterId>,
-        repaint: eframe::egui::Context,
+        repaint: crate::synthesis::notify::Notify,
     ) -> Self {
         if backend == Backend::Cpu {
             return Self::Ready(Session::new(backend, None));

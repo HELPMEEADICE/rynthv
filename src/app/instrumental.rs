@@ -53,7 +53,7 @@ impl App {
             .and_then(|t| t.audio_clip())
             .map(|c| c.path.clone())
         {
-            self.synthesis.instrumentals.retry(&path, ctx);
+            self.synthesis.instrumentals.retry(&path, &notify(ctx));
         }
     }
 
@@ -67,7 +67,9 @@ impl App {
             .and_then(|t| t.audio_clip());
         let onset = clip.map_or(0.0, |c| c.onset_seconds);
         let placement = clip.filter(|_| relink).cloned();
-        self.synthesis.instrumentals.begin_import(path.clone(), ctx);
+        self.synthesis
+            .instrumentals
+            .begin_import(path.clone(), &notify(ctx));
         self.audio_import = Some(AudioImport {
             track,
             path,
@@ -129,4 +131,9 @@ impl App {
         self.editor.set_audio_clip(import.track, Some(clip));
         self.status = "伴奏已加载，可拖动片段调整位置".into();
     }
+}
+
+fn notify(ctx: &eframe::egui::Context) -> rynthv::synthesis::notify::Notify {
+    let ctx = ctx.clone();
+    rynthv::synthesis::notify::Notify::new(move || ctx.request_repaint())
 }

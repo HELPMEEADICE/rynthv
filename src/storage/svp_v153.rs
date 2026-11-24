@@ -8,18 +8,12 @@ mod synthesis;
 pub(super) const VERSION: i32 = 153;
 
 pub(super) fn import(project: &mut Project) -> Result<(), String> {
-    if project.uuid.is_empty() {
-        project.uuid = uuid::Uuid::new_v4().to_string();
-    }
     for group in project
         .library
         .iter_mut()
         .chain(project.tracks.iter_mut().map(|track| &mut track.main_group))
     {
         for note in &mut group.notes {
-            if note.uuid.is_empty() {
-                note.renew_identity();
-            }
             synthesis::import_note(note)
                 .map_err(|error| format!("SVP 音符组 {} · {}：{error}", group.name, note.lyrics))?;
         }
@@ -34,9 +28,6 @@ pub(super) fn import(project: &mut Project) -> Result<(), String> {
             track.main_ref.blick_offset = 0;
         }
         for reference in std::iter::once(&mut track.main_ref).chain(&mut track.groups) {
-            if reference.uuid.is_empty() {
-                reference.renew_identity();
-            }
             synthesis::import_reference(reference);
         }
     }
