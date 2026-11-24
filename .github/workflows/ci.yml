@@ -57,3 +57,33 @@ jobs:
       - name: Run tests
         if: matrix.target == 'x86_64-unknown-linux-gnu'
         run: cargo test --locked --target ${{ matrix.target }}
+
+  headless:
+    name: Headless container (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    container: ubuntu:24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    steps:
+      - name: Install the compiler and checkout tools
+        run: apt-get update && apt-get install -y --no-install-recommends build-essential ca-certificates curl git
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: false
+      - name: Verify headless dependency isolation
+        run: |
+          cargo tree --locked --no-default-features --features cli -e normal --prefix none > headless-dependencies.txt
+          if grep -E '^(eframe|egui|wayland-|x11|winit|cpal|rfd|ashpd|fontconfig)' headless-dependencies.txt; then
+            exit 1
+          fi
+      - name: Compile and exercise the headless workstation
+        run: |
+          cargo clippy --locked --no-default-features --features cli --all-targets -- -D warnings
+          cargo test --locked --no-default-features --features cli --test headless_cli
+          cargo build --locked --release --no-default-features --features cli --bin rynthv
+          env -u DISPLAY -u WAYLAND_DISPLAY ./target/release/rynthv -cli --help
+          env -u DISPLAY -u WAYLAND_DISPLAY ./target/release/rynthv -cli doctor --json
