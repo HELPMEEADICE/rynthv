@@ -103,11 +103,6 @@ fn validate_controls(
                 "DDS voices do not support mouth opening controls",
             ));
         }
-        if contract == Contract::Native && control.scalars[1] != 0.0 {
-            return Err(VoiceError::new(
-                "Native SV1 voices do not support phoneme strength controls",
-            ));
-        }
     }
     Ok(())
 }
@@ -136,7 +131,7 @@ fn projection_factors(controls: Option<&[FrameControl]>) -> Result<Option<Vec<f3
             }
             if !factor.is_finite() {
                 return Err(VoiceError::new(
-                    "Compatible phoneme strength produced an invalid projection factor",
+                    "DDS phoneme strength produced an invalid projection factor",
                 ));
             }
             Ok(factor)

@@ -37,6 +37,9 @@ pub fn render_status(app: &mut App, ui: &mut Ui) {
     if let Some(error) = &app.synthesis.recording_error {
         ui.colored_label(Color32::from_rgb(218, 142, 126), error);
     }
+    for error in app.synthesis.recording_failures() {
+        ui.colored_label(Color32::from_rgb(218, 142, 126), error);
+    }
     if let Some(error) = app.synthesis.playback_error() {
         ui.colored_label(
             Color32::from_rgb(218, 142, 126),

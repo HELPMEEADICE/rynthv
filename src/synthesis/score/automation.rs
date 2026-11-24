@@ -7,7 +7,7 @@ mod seconds_curve;
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
-    model::{Parameter, QUARTER, VocalModeComponent, VoiceSettings},
+    model::{Parameter, QUARTER, VocalModeComponent},
     synthesis::{
         plan::OwnerInput,
         voice::{Result, VoiceError},
@@ -66,11 +66,7 @@ impl PreparedAutomations {
         let mut acoustic_grid =
             prepare::GridTimes::new(input, acoustic_begin, acoustic_end, ACOUSTIC_GRID, true);
         let mut pitch_grid = prepare::GridTimes::new(input, begin, end, PITCH_GRID, true);
-        let settings = VoiceSettings::resolve_with_defaults(
-            &input.voice.track_default_options,
-            &input.voice.instance_options,
-        )
-        .map_err(VoiceError::new)?;
+        let settings = input.voice.settings().map_err(VoiceError::new)?;
         let mut parameters = BTreeMap::new();
         let parameter_names: BTreeSet<_> = input
             .automation

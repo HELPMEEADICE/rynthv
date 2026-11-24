@@ -102,12 +102,10 @@ impl RenderedPhonemeTrack {
                 default_end_seconds,
                 activity,
                 position,
-                strength: duration
-                    .supports_strength
-                    .then_some(source.attributes.strength.unwrap_or(0.0)),
+                strength: Some(source.attributes.strength.unwrap_or(0.0)),
                 default_activity,
                 default_position,
-                default_strength: duration.supports_strength.then_some(0.0),
+                default_strength: Some(0.0),
                 supports_timing: duration.supports_timing,
                 supports_impulse: has_impulse_heads
                     && (default_activity.is_some_and(|value| value > 0.0)

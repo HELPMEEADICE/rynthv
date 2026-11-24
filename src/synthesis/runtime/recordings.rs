@@ -3,6 +3,10 @@ use crate::{model::Project, synthesis::audio::PlaybackSource};
 use std::sync::Arc;
 
 impl Runtime {
+    pub fn recording_failures(&self) -> impl Iterator<Item = &str> {
+        self.recordings.failures.values().map(String::as_str)
+    }
+
     pub(super) fn prepare_recordings(&mut self, project: &Project) {
         match mixer::recordings(project, &self.instrumentals, &self.solo_tracks) {
             Ok(mix) => {
@@ -17,7 +21,7 @@ impl Runtime {
     }
 
     pub(super) fn refresh_playback(&self) {
-        let mut pending = self.recordings.pending.clone();
+        let mut pending: Vec<_> = self.recordings.pending.values().cloned().collect();
         let mut end = self.recordings.end;
         let plan = self.planner.plan();
         for (id, request) in &plan.requests {

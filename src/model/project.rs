@@ -19,6 +19,8 @@ pub struct Note {
     pub phonemes: String,
     pub musical_type: String,
     pub attributes: Extra,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rynthv_sv1_pitch: Option<Sv1Pitch>,
     #[serde(flatten)]
     pub extra: Extra,
 }
@@ -34,6 +36,7 @@ impl Note {
             lyrics: "la".into(),
             phonemes: String::new(),
             musical_type: "singing".into(),
+            rynthv_sv1_pitch: None,
             attributes: BTreeMap::from([
                 ("evenSyllableDuration".into(), json!(true)),
                 ("muted".into(), json!(false)),
@@ -105,6 +108,8 @@ pub struct GroupRef {
     #[serde(default)]
     pub mute: bool,
     pub database: Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub system_pitch_delta: Option<std::sync::Arc<Automation>>,
     #[serde(flatten)]
     pub extra: Extra,
 }
@@ -140,6 +145,7 @@ impl GroupRef {
             blick_offset: 0,
             pitch_offset: 0,
             mute: false,
+            system_pitch_delta: None,
             database: json!({"name":"","language":"","phoneset":"","languageOverride":"","phonesetOverride":"","backendType":"","version":"-2"}),
             extra: BTreeMap::from([
                 ("isInstrumental".into(), json!(false)),

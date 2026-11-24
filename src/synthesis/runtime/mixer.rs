@@ -26,12 +26,19 @@ struct Controls {
 }
 
 struct Span<'a> {
-    audio: &'a RenderedAudio,
+    samples: &'a [f32],
+    channels: usize,
     output_start: usize,
-    source_start: usize,
     frames: usize,
     left: f64,
     right: f64,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum VocalStem {
+    Combined,
+    Primary,
+    Aspiration,
 }
 
 /// Validate owners and compute the mixed duration in seconds without
@@ -40,8 +47,10 @@ pub(super) fn mixed_duration_seconds(
     owners: &[PublishedOwner],
     solo_tracks: &BTreeSet<u64>,
 ) -> Result<Option<f64>, String> {
-    Ok(visit_audible_owners(owners, solo_tracks, None, |_| {})?
-        .map(|frames| frames as f64 / f64::from(NATIVE_SAMPLE_RATE)))
+    Ok(
+        visit_audible_owners(owners, solo_tracks, None, VocalStem::Combined, |_| {})?
+            .map(|frames| frames as f64 / f64::from(NATIVE_SAMPLE_RATE)),
+    )
 }
 
 pub(super) fn can_mix_with_recordings(
@@ -49,8 +58,9 @@ pub(super) fn can_mix_with_recordings(
     solo_tracks: &BTreeSet<u64>,
     recordings: &[AudioLayer],
     track_id: Option<u64>,
+    stem: VocalStem,
 ) -> Result<bool, String> {
-    let owner_frames = visit_audible_owners(owners, solo_tracks, track_id, |_| {})?;
+    let owner_frames = visit_audible_owners(owners, solo_tracks, track_id, stem, |_| {})?;
     let mut recording_frames = false;
     for layer in recordings {
         if track_id.is_some_and(|track| layer.track_id != track) {
@@ -70,13 +80,15 @@ pub(super) fn mix_with_recordings(
     solo_tracks: &BTreeSet<u64>,
     recordings: &[AudioLayer],
     track_id: Option<u64>,
+    stem: VocalStem,
 ) -> Result<Option<Arc<RenderedAudio>>, String> {
     let mut spans = Vec::new();
     spans
         .try_reserve_exact(owners.len())
         .map_err(|error| format!("无法分配混音片段：{error}"))?;
     let mut output_frames =
-        visit_audible_owners(owners, solo_tracks, track_id, |span| spans.push(span))?.unwrap_or(0);
+        visit_audible_owners(owners, solo_tracks, track_id, stem, |span| spans.push(span))?
+            .unwrap_or(0);
     for layer in recordings {
         if track_id.is_some_and(|track| layer.track_id != track) {
             continue;
@@ -86,10 +98,12 @@ pub(super) fn mix_with_recordings(
             .checked_add(layer.frames)
             .ok_or("伴奏混音结束位置溢出")?;
         output_frames = output_frames.max(end);
+        let channels = layer.audio.layout().channels();
         spans.push(Span {
-            audio: &layer.audio,
+            samples: &layer.audio.samples()
+                [layer.source_start * channels..(layer.source_start + layer.frames) * channels],
+            channels,
             output_start: layer.start_frame,
-            source_start: layer.source_start,
             frames: layer.frames,
             left: f64::from(layer.gains[0]),
             right: f64::from(layer.gains[1]),
@@ -105,16 +119,14 @@ pub(super) fn mix_with_recordings(
         .map_err(|error| format!("无法分配立体声混音缓冲区：{error}"))?;
     samples.resize(sample_count, 0.0_f32);
     for span in spans {
-        let channels = span.audio.layout().channels();
-        let source = &span.audio.samples()
-            [span.source_start * channels..(span.source_start + span.frames) * channels];
         let destination =
             &mut samples[span.output_start * 2..(span.output_start + span.frames) * 2];
-        for (input, output) in source
-            .chunks_exact(channels)
+        for (input, output) in span
+            .samples
+            .chunks_exact(span.channels)
             .zip(destination.as_chunks_mut::<2>().0)
         {
-            let right = input[channels - 1];
+            let right = input[span.channels - 1];
             output[0] = (f64::from(output[0]) + f64::from(input[0]) * span.left) as f32;
             output[1] = (f64::from(output[1]) + f64::from(right) * span.right) as f32;
         }
@@ -129,6 +141,7 @@ fn visit_audible_owners<'a>(
     owners: &'a [PublishedOwner],
     solo_tracks: &BTreeSet<u64>,
     track_id: Option<u64>,
+    stem: VocalStem,
     mut visit: impl FnMut(Span<'a>),
 ) -> Result<Option<usize>, String> {
     let mut output_frames: Option<usize> = None;
@@ -157,7 +170,7 @@ fn visit_audible_owners<'a>(
         {
             continue;
         }
-        let Some(span) = prepare_span(owner, controls)? else {
+        let Some(span) = prepare_span(owner, controls, stem)? else {
             continue;
         };
         let end = span
@@ -170,7 +183,11 @@ fn visit_audible_owners<'a>(
     Ok(output_frames)
 }
 
-fn prepare_span(owner: &PublishedOwner, controls: Controls) -> Result<Option<Span<'_>>, String> {
+fn prepare_span(
+    owner: &PublishedOwner,
+    controls: Controls,
+    stem: VocalStem,
+) -> Result<Option<Span<'_>>, String> {
     let coverage = owner.coverage;
     if coverage.sample_rate == 0 || coverage.sample_end.0 < coverage.sample_start.0 {
         return Err(format!("音符组 {} 的音频覆盖范围无效", owner.owner.0));
@@ -197,12 +214,33 @@ fn prepare_span(owner: &PublishedOwner, controls: Controls) -> Result<Option<Spa
     if output_end <= output_start {
         return Ok(None);
     }
+    let layout = owner.audio.layout();
+    let frames = output_end - output_start;
+    let channels = layout.channels();
+    let samples = match stem {
+        VocalStem::Combined => &owner.audio.samples()
+            [(output_start - origin) * channels..(output_end - origin) * channels],
+        VocalStem::Primary | VocalStem::Aspiration => {
+            let source = if stem == VocalStem::Primary {
+                &owner.components.primary
+            } else {
+                &owner.components.secondary
+            };
+            let component_origin =
+                (owner.components.start_seconds * f64::from(NATIVE_SAMPLE_RATE)).round();
+            let from = usize::try_from(output_start as i128 - component_origin as i128)
+                .ok()
+                .and_then(|start| start.checked_add(frames).map(|end| start..end))
+                .and_then(|range| source.get(range));
+            from.ok_or("分离气声与已发布人声的时间范围不一致")?
+        }
+    };
     let (left, right) = controls.gains(owner.audio.layout());
     Ok(Some(Span {
-        audio: &owner.audio,
+        samples,
+        channels,
         output_start,
-        source_start: output_start - origin,
-        frames: output_end - output_start,
+        frames,
         left,
         right,
     }))

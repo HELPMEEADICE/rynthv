@@ -167,11 +167,15 @@ impl VoiceSettings {
 
     /// Missing values use the neutral setting for this reference.
     pub fn resolve(extra: &Extra) -> Result<Self, String> {
-        Self::resolve_with_defaults(&Extra::new(), extra)
+        Self::resolve_with_defaults(&Extra::new(), extra, false)
     }
 
     /// Layers instance overrides onto track-level defaults.
-    pub fn resolve_with_defaults(track_defaults: &Extra, instance: &Extra) -> Result<Self, String> {
+    pub fn resolve_with_defaults(
+        track_defaults: &Extra,
+        instance: &Extra,
+        inherit_modes: bool,
+    ) -> Result<Self, String> {
         let defaults = Self::from_extra(track_defaults)?;
         let mut result = Self::from_extra(instance)?;
         for parameter in VoiceParameter::ALL {
@@ -183,7 +187,7 @@ impl VoiceSettings {
                 .unwrap_or_else(|| parameter.default_value());
             result.scalars.insert(parameter, value);
         }
-        if result.vocal_mode_inherited {
+        if inherit_modes && result.vocal_mode_inherited {
             for (name, values) in defaults.vocal_modes {
                 result.vocal_modes.entry(name).or_insert(values);
             }

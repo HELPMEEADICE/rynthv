@@ -54,11 +54,6 @@ pub(super) fn prepare(
                     "SV1 synthesis does not yet support phoneme onset offsets",
                 ));
             }
-            if phone.attributes.strength.is_some_and(|value| value != 0.0) {
-                return Err(VoiceError::new(
-                    "SV1 synthesis does not yet support phoneme strength controls",
-                ));
-            }
             let resolved = resolver.resolve(&phone.language, &phone.token)?;
             output.push(PhoneFeatures {
                 unified_phone_index: resolved.unified_phone_index,

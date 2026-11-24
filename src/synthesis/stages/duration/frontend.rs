@@ -12,7 +12,7 @@ const FRONTEND_TYPE: [u8; 16] = [
     0x94, 0xe2, 0xba, 0x14, 0x8e, 0xe1, 0xf6, 0x8d, 0x07, 0x43, 0x4d, 0xcb, 0xf5, 0xa4, 0x04, 0xab,
 ];
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct ExplicitPhone {
     pub language: String,
     pub token: String,

@@ -3,12 +3,17 @@ use crate::{
     model::Project,
     synthesis::{audio::AudioLayer, instrumental::AudioLibrary},
 };
-use std::{collections::BTreeSet, ops::Range, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    ops::Range,
+    sync::Arc,
+};
 
 #[derive(Default)]
 pub(crate) struct RecordingMix {
     pub layers: Vec<AudioLayer>,
-    pub pending: Vec<Range<usize>>,
+    pub pending: BTreeMap<u64, Range<usize>>,
+    pub failures: BTreeMap<u64, String>,
     pub end: usize,
 }
 
@@ -57,10 +62,13 @@ pub(crate) fn recordings(
                 gains,
             });
         } else if let Some(error) = library.error(&clip.path) {
-            return Err(format!("伴奏音轨 {} 加载失败：{error}", track.name));
+            mix.failures.insert(
+                track.id,
+                format!("伴奏音轨 {} 加载失败：{error}", track.name),
+            );
         } else {
             mix.end = mix.end.max(requested_end);
-            mix.pending.push(start..requested_end);
+            mix.pending.insert(track.id, start..requested_end);
         }
     }
     Ok(mix)

@@ -267,6 +267,8 @@ impl Runtime {
             "正在合成歌声"
         } else if self.error.is_some() || self.stats.failed > 0 {
             "歌声合成失败 · 查看渲染面板"
+        } else if !self.recordings.failures.is_empty() {
+            "部分伴奏不可用 · 查看渲染面板"
         } else if self.has_audio() {
             "音频已就绪"
         } else if self.voices.values().any(|v| v.ready) {

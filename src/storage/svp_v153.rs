@@ -25,7 +25,7 @@ pub(super) fn import(project: &mut Project) -> Result<(), String> {
         }
     }
     for track in &mut project.tracks {
-        if track.main_ref.extra.get("isInstrumental") == Some(&Value::Bool(true)) {
+        if track.main_ref.extra.remove("isInstrumental") == Some(Value::Bool(true)) {
             let clip = import_clip(&project.time, &mut track.main_ref)
                 .map_err(|error| format!("SVP 伴奏轨 {}：{error}", track.name))?;
             track.instrumental = Some(InstrumentalTrack { clip });
@@ -40,13 +40,6 @@ pub(super) fn import(project: &mut Project) -> Result<(), String> {
             synthesis::import_reference(reference);
         }
     }
-    // RynthV exports both vocal components together so the imported
-    // export configuration can be used without a separate breath stem.
-    if let Some(format) = project.render_config.get_mut("aspirationFormat")
-        && format.as_str() == Some("asFiles")
-    {
-        *format = "noAspiration".into();
-    }
     project.version = SVP_VERSION;
     Ok(())
 }
@@ -58,9 +51,8 @@ struct AudioFile {
 }
 
 fn import_clip(time: &TimeAxis, reference: &mut GroupRef) -> Result<Option<AudioClip>, String> {
-    if reference.blick_absolute_begin < 0
-        || (reference.blick_absolute_end != -1
-            && reference.blick_absolute_end < reference.blick_absolute_begin)
+    if reference.blick_absolute_end != -1
+        && reference.blick_absolute_end < reference.blick_absolute_begin
     {
         return Err("片段可见范围无效".into());
     }

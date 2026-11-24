@@ -33,7 +33,7 @@ pub fn prepare_owner(
             note.pitch_offset += tuning as f32;
         }
     }
-    phrase.pitch_controls = super::PreparedPitchControls::new(input, tuning);
+    phrase.pitch_controls = super::PreparedPitchControls::new(input, tuning)?;
     phrase.performance_controls = super::PreparedPerformanceControls::new(input)?;
     Ok(phrase)
 }
@@ -117,7 +117,15 @@ impl ExplicitScore {
         let mut previous_end_seconds = start_seconds;
         let mut previous_pitch = 60.0;
         let mut previous_detune = 0.0;
-        for (index, &(begin_seconds, nominal_end, note)) in sources.iter().enumerate() {
+        let pronunciation = super::pronunciation::resolve_context(
+            sources.iter().map(|&(_, _, note)| note),
+            language,
+            lexicon,
+            input.voice.dictionary.as_ref(),
+        )?;
+        for (index, (&(begin_seconds, nominal_end, note), pronunciation)) in
+            sources.iter().zip(pronunciation).enumerate()
+        {
             // An early pronunciation takes time from a preceding note if it
             // crosses that note's end. A late pronunciation leaves a gap.
             let end_seconds = sources
@@ -176,14 +184,13 @@ impl ExplicitScore {
                     VoiceError::new(format!("Note {} pitch is outside MIDI range", note.id))
                 })? as f32;
             let detune = note.detune / 100.0;
-            let note_language = lexicon.note_language(note, language)?;
             let previous = score
                 .notes
                 .last()
                 .filter(|note| note.source_note_id.is_some());
             let (note_language, syllables) = super::pronunciation::resolve_note(
                 note,
-                note_language,
+                pronunciation,
                 previous,
                 lexicon,
                 input.voice.dictionary.as_ref(),

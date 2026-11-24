@@ -1,16 +1,35 @@
-use super::{Runtime, events::WakeOnExit, mixer};
+use super::{
+    Runtime,
+    events::WakeOnExit,
+    mixer::{self, VocalStem},
+};
 use crate::{
     model::Project,
     synthesis::audio::{self, ChannelLayout, WaveFormat},
 };
-use std::{path::PathBuf, sync::mpsc, thread};
+use std::{
+    path::{Path, PathBuf},
+    sync::mpsc,
+    thread,
+};
 
 pub struct ExportRequest {
-    pub outputs: Vec<(PathBuf, Option<u64>)>,
+    outputs: Vec<Output>,
+    directory: PathBuf,
     format: WaveFormat,
 }
 
+struct Output {
+    path: PathBuf,
+    track: Option<u64>,
+    stem: VocalStem,
+}
+
 impl ExportRequest {
+    pub fn paths(&self) -> impl Iterator<Item = &Path> {
+        self.outputs.iter().map(|output| output.path.as_path())
+    }
+
     pub fn from_project(project: &Project) -> Result<Self, String> {
         let config = &project.render_config;
         crate::synthesis::mixing_options::validate_export_bypass(config)?;
@@ -34,7 +53,7 @@ impl ExportRequest {
                 .unwrap_or(0)
         };
         let directory = PathBuf::from(text("destination"));
-        if !directory.is_dir() {
+        if directory.as_os_str().is_empty() || (directory.exists() && !directory.is_dir()) {
             return Err("请选择有效的目标文件夹".into());
         }
         let name = text("filename").trim();
@@ -65,16 +84,41 @@ impl ExportRequest {
             2 => ChannelLayout::Stereo,
             _ => return Err("请选择有效的声道数".into()),
         };
-        if text("aspirationFormat") != "noAspiration" {
-            return Err("暂不支持单独导出气声".into());
-        }
+        let separate_aspiration = match text("aspirationFormat") {
+            "noAspiration" => false,
+            "asFiles" => true,
+            _ => return Err("请选择有效的气声输出格式".into()),
+        };
         let mut outputs = Vec::new();
+        let mut add_output = |name: String, track: Option<u64>, vocal: bool| {
+            let split = separate_aspiration && vocal;
+            outputs.push(Output {
+                path: directory.join(format!("{name}.wav")),
+                track,
+                stem: if split {
+                    VocalStem::Primary
+                } else {
+                    VocalStem::Combined
+                },
+            });
+            if split {
+                outputs.push(Output {
+                    path: directory.join(format!("{name}-aspiration.wav")),
+                    track,
+                    stem: VocalStem::Aspiration,
+                });
+            }
+        };
         if config
             .get("exportMixDown")
             .and_then(serde_json::Value::as_bool)
             == Some(true)
         {
-            outputs.push((directory.join(format!("{stem}.wav")), None));
+            add_output(
+                stem.to_owned(),
+                None,
+                project.tracks.iter().any(|track| !track.is_instrumental()),
+            );
         }
         for (index, track) in project.tracks.iter().enumerate() {
             if track
@@ -96,20 +140,22 @@ impl ExportRequest {
                     }
                 })
                 .collect();
-            outputs.push((
-                directory.join(format!(
-                    "{stem}-{:02}-{}.wav",
+            add_output(
+                format!(
+                    "{stem}-{:02}-{}",
                     index + 1,
                     safe.trim_end_matches(['.', ' '])
-                )),
+                ),
                 Some(track.id),
-            ));
+                !track.is_instrumental(),
+            );
         }
         if outputs.is_empty() {
             return Err("请勾选混音导出或至少一条音轨".into());
         }
         Ok(Self {
             outputs,
+            directory,
             format: WaveFormat {
                 sample_rate: sample_rate as u32,
                 layout,
@@ -131,7 +177,6 @@ impl Runtime {
             && self.last_audio_generation == self.instrumentals.generation
             && self.export.is_none()
             && self.recording_error.is_none()
-            && self.recordings.pending.is_empty()
             && self.pending_voices.is_empty()
             && (self
                 .planner
@@ -152,6 +197,25 @@ impl Runtime {
             self.export_result = Some(Err(error));
             return;
         }
+        let includes = |track_id| {
+            request.outputs.iter().any(|output| {
+                output.stem != VocalStem::Aspiration
+                    && output.track.is_none_or(|track| track == track_id)
+            })
+        };
+        if let Some((_, error)) = self
+            .recordings
+            .failures
+            .iter()
+            .find(|(id, _)| includes(**id))
+        {
+            self.export_result = Some(Err(error.clone()));
+            return;
+        }
+        if self.recordings.pending.keys().any(|id| includes(*id)) {
+            self.export_result = Some(Err("请等待所选伴奏加载完成后再导出".into()));
+            return;
+        }
         let owners = self.export_owners.clone();
         let recordings = self.recordings.layers.clone();
         let solo = self.solo_tracks.clone();
@@ -165,26 +229,54 @@ impl Runtime {
                 let sender = tx;
                 let result = (|| {
                     // Validate all selected sources before writing the first file.
-                    for (path, track) in &request.outputs {
-                        if !mixer::can_mix_with_recordings(&owners, &solo, &recordings, *track)? {
+                    let recordings_for = |stem| {
+                        if stem == VocalStem::Aspiration {
+                            &[][..]
+                        } else {
+                            recordings.as_slice()
+                        }
+                    };
+                    let mut outputs = Vec::with_capacity(request.outputs.len());
+                    for output in &request.outputs {
+                        if mixer::can_mix_with_recordings(
+                            &owners,
+                            &solo,
+                            recordings_for(output.stem),
+                            output.track,
+                            output.stem,
+                        )? {
+                            outputs.push(output);
+                        } else if output.stem != VocalStem::Aspiration {
                             return Err(format!(
                                 "{} 没有可导出的音频，请检查音轨是否为空、静音或被独奏排除",
-                                path.display()
+                                output.path.display()
                             ));
                         }
                     }
-                    let mut written = Vec::with_capacity(request.outputs.len());
-                    for (path, track) in request.outputs {
-                        let audio = mixer::mix_with_recordings(&owners, &solo, &recordings, track)?
-                            .ok_or_else(|| {
-                                format!(
-                                    "{} 没有可导出的音频，请检查音轨是否为空、静音或被独奏排除",
-                                    path.display()
-                                )
-                            })?;
-                        audio::save_wav_as(&path, &audio, request.format)
+                    std::fs::create_dir_all(&request.directory).map_err(|error| {
+                        format!(
+                            "无法创建导出文件夹 {}：{error}",
+                            request.directory.display()
+                        )
+                    })?;
+                    let mut written = Vec::with_capacity(outputs.len());
+                    for output in outputs {
+                        let audio = mixer::mix_with_recordings(
+                            &owners,
+                            &solo,
+                            recordings_for(output.stem),
+                            output.track,
+                            output.stem,
+                        )?
+                        .ok_or_else(|| {
+                            format!(
+                                "{} 没有可导出的音频，请检查音轨是否为空、静音或被独奏排除",
+                                output.path.display()
+                            )
+                        })?;
+                        audio::save_wav_as(&output.path, &audio, request.format)
                             .map_err(|e| format!("{e}（此前已完成 {} 个文件）", written.len()))?;
-                        written.push(path);
+                        written.push(output.path.clone());
                     }
                     Ok(written)
                 })();

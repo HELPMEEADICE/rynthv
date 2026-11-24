@@ -1,11 +1,13 @@
-use super::dictionary::{PhoneTable, Phones, WordReadings, read, unknown};
+mod readings;
+
+use super::dictionary::{PhoneTable, Phones, read, unknown};
 use crate::synthesis::voice::{Result, VoiceError};
 use std::{collections::HashMap, path::Path};
 
 pub(super) struct Japanese {
     phones: PhoneTable,
     kana: HashMap<char, String>,
-    words: WordReadings,
+    readings: readings::Readings,
 }
 
 impl Japanese {
@@ -29,11 +31,11 @@ impl Japanese {
                 }
             }
         }
-        let words = WordReadings::load(&directory.join("edict.txt"))?;
+        let readings = readings::Readings::load(&directory.join("japanese-kanji-jsm.data"))?;
         Ok(Self {
             phones,
             kana,
-            words,
+            readings,
         })
     }
 
@@ -51,15 +53,29 @@ impl Japanese {
             {
                 result.extend(self.resolve_kana(token)?);
             } else {
-                for reading in self.words.resolve(token)? {
-                    result.extend(self.resolve_kana(&reading)?);
-                }
+                let reading = self.readings.decode(token)?.concat();
+                result.extend(self.resolve_kana(&reading)?);
             }
         }
         if result.is_empty() {
             return Err(unknown(lyrics));
         }
         Ok(result)
+    }
+
+    pub(super) fn resolve_notes(&self, notes: &[&str]) -> Result<Vec<Vec<Phones>>> {
+        let text = notes.concat();
+        let readings = self.readings.decode(&text)?;
+        let mut offset = 0;
+        notes
+            .iter()
+            .map(|note| {
+                let end = offset + note.chars().count();
+                let result = self.resolve_kana(&readings[offset..end].concat());
+                offset = end;
+                result
+            })
+            .collect()
     }
 
     fn resolve_kana(&self, text: &str) -> Result<Vec<Phones>> {

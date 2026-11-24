@@ -15,6 +15,7 @@ pub struct NoteInput {
     pub lyrics: String,
     pub phonemes: String,
     pub musical_type: String,
+    pub sv1_pitch: Option<crate::model::Sv1Pitch>,
     /// Includes note-level `muted`; it is not equivalent to track mixer mute.
     pub attributes: Extra,
     pub extensions: Extra,
@@ -31,6 +32,7 @@ impl From<&Note> for NoteInput {
             lyrics: note.lyrics.clone(),
             phonemes: note.phonemes.clone(),
             musical_type: note.musical_type.clone(),
+            sv1_pitch: note.rynthv_sv1_pitch,
             attributes: synthesis_extensions(&note.attributes),
             extensions: synthesis_extensions(&note.extra),
         }
@@ -48,6 +50,16 @@ pub struct VoiceInput {
     pub track_default_options: Extra,
     pub track_options: Extra,
     pub dictionary: Option<crate::model::PronunciationDictionary>,
+}
+
+impl VoiceInput {
+    pub(crate) fn settings(&self) -> Result<crate::model::VoiceSettings, String> {
+        crate::model::VoiceSettings::resolve_with_defaults(
+            &self.track_default_options,
+            &self.instance_options,
+            crate::model::inherits_singer_modes(&self.track_default_database, &self.database),
+        )
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -198,6 +210,7 @@ pub struct OwnerInput {
     pub track_vocal_modes: BTreeMap<String, Automation>,
     pub track_automation_offset: GlobalBlick,
     pub pitch_controls: Vec<PitchControl>,
+    pub system_pitch_delta: Option<std::sync::Arc<Automation>>,
     pub group_options: Extra,
     pub voice: VoiceInput,
     pub tempo: TempoMapping,
@@ -266,13 +279,18 @@ impl OwnerInput {
             } else {
                 track.main_group.parameters.clone()
             },
-            track_vocal_modes: if reference.id == track.main_ref.id {
+            track_vocal_modes: if reference.id == track.main_ref.id
+                || !crate::model::inherits_singer_modes(
+                    &track.main_ref.database,
+                    &reference.database,
+                ) {
                 BTreeMap::new()
             } else {
                 track.main_group.vocal_modes.clone()
             },
             track_automation_offset: GlobalBlick(track.main_ref.blick_offset),
             pitch_controls: group.pitch_controls.clone(),
+            system_pitch_delta: reference.system_pitch_delta.clone(),
             group_options: group_extensions(&group.extra),
             voice: VoiceInput {
                 model_content_identity: voice_identity.map(str::to_owned),

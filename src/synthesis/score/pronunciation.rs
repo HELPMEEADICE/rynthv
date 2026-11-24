@@ -1,3 +1,7 @@
+mod context;
+
+pub(super) use context::resolve_context;
+
 use super::{LyricFrontend, ScoreNote};
 use crate::{
     model::{Language, PronunciationDictionary},
@@ -9,36 +13,43 @@ use crate::{
 
 pub(super) fn resolve_note(
     note: &NoteInput,
-    language: Language,
+    pronunciation: context::Pronunciation,
     previous: Option<&ScoreNote>,
     frontend: &LyricFrontend,
     dictionary: Option<&PronunciationDictionary>,
     resolver: &PhoneResolver<'_>,
 ) -> Result<(Language, Vec<Vec<String>>)> {
     let lyrics = note.lyrics.trim();
-    let explicit = (!note.phonemes.trim().is_empty())
-        .then_some(note.phonemes.as_str())
-        .or_else(|| {
-            dictionary
-                .filter(|dict| dict.language == language)
-                .and_then(|dict| dict.entries.get(lyrics).map(String::as_str))
-        });
+    let (language, phones) = pronunciation;
+    let explicit = explicit_phones(note, language, dictionary);
     let (language, syllables) = if let Some(phones) = explicit {
         (language, split_syllables(phones, language, resolver)?)
     } else {
         let text = lyric_text(lyrics);
-        let (language, mut syllables) = match text {
-            "-" | "ー" => {
+        let (language, mut syllables) = match (text, phones) {
+            (_, Some(phones)) => (language, phones),
+            ("-" | "ー", None) => {
                 let (language, vowel) = continuation(previous, resolver)?;
                 (language, vec![vec![vowel]])
             }
-            "br" => (language, vec![vec!["br".into()]]),
-            _ => (
-                language,
-                frontend.resolve(language, text).map_err(|error| {
-                    VoiceError::new(format!("音符 {} · {}：{error}", note.id, language.label()))
-                })?,
-            ),
+            ("br", None) => (language, vec![vec!["br".into()]]),
+            (text, None) => {
+                let text = text.strip_prefix('-').unwrap_or(text);
+                let syllables = if language != Language::English
+                    && !text.contains(char::is_whitespace)
+                    && lyric_text(lyrics).starts_with('-')
+                    && resolver
+                        .resolve(language.id(), text)
+                        .is_ok_and(|phone| !phone.used_silence_fallback)
+                {
+                    vec![vec![text.to_owned()]]
+                } else {
+                    frontend.resolve(language, text).map_err(|error| {
+                        VoiceError::new(format!("音符 {} · {}：{error}", note.id, language.label()))
+                    })?
+                };
+                (language, syllables)
+            }
         };
         if text != lyrics
             && let Some(first) = syllables.first_mut()
@@ -57,6 +68,20 @@ pub(super) fn resolve_note(
     } else {
         Ok((language, syllables))
     }
+}
+
+fn explicit_phones<'a>(
+    note: &'a NoteInput,
+    language: Language,
+    dictionary: Option<&'a PronunciationDictionary>,
+) -> Option<&'a str> {
+    (!note.phonemes.trim().is_empty())
+        .then_some(note.phonemes.as_str())
+        .or_else(|| {
+            dictionary
+                .filter(|dict| dict.language == language)
+                .and_then(|dict| dict.entries.get(note.lyrics.trim()).map(String::as_str))
+        })
 }
 
 fn lyric_text(lyrics: &str) -> &str {

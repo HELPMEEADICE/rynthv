@@ -209,7 +209,10 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
             ui,
             "aspiration-format",
             &mut aspiration,
-            &[("noAspiration".to_owned(), "无")],
+            &[
+                ("noAspiration".to_owned(), "与人声合并"),
+                ("asFiles".to_owned(), "单独导出气声文件"),
+            ],
         ) {
             pending_config.push(("aspirationFormat", aspiration.into()));
         }
@@ -280,10 +283,9 @@ fn start_export(app: &mut App) {
         }
     };
     let existing: Vec<_> = request
-        .outputs
-        .iter()
-        .filter(|(path, _)| path.exists())
-        .map(|(path, _)| path.display().to_string())
+        .paths()
+        .filter(|path| path.exists())
+        .map(|path| path.display().to_string())
         .collect();
     if !existing.is_empty()
         && rfd::MessageDialog::new()
@@ -298,6 +300,8 @@ fn start_export(app: &mut App) {
     {
         return;
     }
+    app.synthesis
+        .sync_project(&app.editor.project, app.editor.revision);
     app.synthesis.export_project(request, app.editor.revision);
 }
 

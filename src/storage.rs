@@ -50,6 +50,17 @@ pub fn load(path: &Path) -> Result<LoadedProject, String> {
     let parent = base
         .parent()
         .ok_or_else(|| format!("路径 {} 缺少父目录", path.display()))?;
+    if let Some(destination) = project.render_config.get_mut("destination")
+        && let Some(directory) = destination
+            .as_str()
+            .filter(|directory| !directory.is_empty())
+        && Path::new(directory).is_relative()
+    {
+        *destination = resolve_relative_clip(parent, Path::new(directory))
+            .to_string_lossy()
+            .into_owned()
+            .into();
+    }
     for track in &mut project.tracks {
         if let Some(clip) = track.instrumental.as_mut().and_then(|t| t.clip.as_mut())
             && clip.path.is_relative()
@@ -249,6 +260,9 @@ fn validate_content(p: &Project) -> Result<(), String> {
             if note.duration <= 0 || !(0..=127).contains(&note.pitch) || !note.detune.is_finite() {
                 return bad("音符时间或 MIDI 音高无效");
             }
+            if note.rynthv_sv1_pitch.is_some_and(|pitch| !pitch.valid()) {
+                return bad("一代音符音高参数无效");
+            }
             note_bounds = Some(match note_bounds {
                 Some((min_o, max_e)) => (min_o.min(note.onset), max_e.max(note_end)),
                 None => (note.onset, note_end),
@@ -323,6 +337,11 @@ fn validate_content(p: &Project) -> Result<(), String> {
             return bad("主组引用不匹配");
         }
         for r in track.references() {
+            if let Some(curve) = r.system_pitch_delta.as_deref() {
+                curve.validate().map_err(|error| {
+                    format!("工程校验失败：音轨 {} 的系统音高：{error}", track.name)
+                })?;
+            }
             TakeSet::from_extra(&r.extra)
                 .map_err(|error| format!("工程校验失败：音轨 {}：{error}", track.name))?;
             let Some(bounds) = groups.get(r.group_id.as_str()) else {

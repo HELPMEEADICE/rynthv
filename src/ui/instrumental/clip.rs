@@ -167,6 +167,10 @@ pub fn show(app: &mut App, ui: &mut Ui, body: Rect, track_index: usize) {
             ui.close();
             app.import_audio(Some(track_id), ui.ctx());
         }
+        if ui.button("重新链接音频…").clicked() {
+            ui.close();
+            app.relink_audio(track_id, ui.ctx());
+        }
         if ui.button("重新加载音频").clicked() {
             app.reload_audio(track_id, ui.ctx());
             ui.close();

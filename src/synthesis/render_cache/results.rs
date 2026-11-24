@@ -78,6 +78,7 @@ impl RenderCache {
                     coverage: owner.request.coverage,
                     controls: owner.controls.clone(),
                     audio: Arc::clone(&completed.clip.audio),
+                    components: completed.clip.state.components.clone(),
                     visuals: Arc::clone(&completed.clip.visuals),
                 })
             })

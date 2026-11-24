@@ -90,7 +90,6 @@ impl<'a> Sv1DurationStage<'a> {
             durations,
         )?;
         result.supports_timing = false;
-        result.supports_strength = false;
         Ok(Sv1DurationResult {
             result,
             record_seconds,

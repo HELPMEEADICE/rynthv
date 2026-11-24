@@ -1,5 +1,6 @@
-//! Pitch controls on a prepared owner's model clock. Curves reserve
-//! their frames before anchors; an anchor fills only an unspecified frame.
+//! Pitch controls on a prepared owner's model clock.
+
+mod sv1;
 
 use crate::{
     model::pitch::PitchControl,
@@ -12,6 +13,7 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct PreparedPitchControls {
     controls: Vec<PitchControl>,
+    sv1: Option<sv1::Pitch>,
     tempo: TempoMapping,
     content_offset: GlobalBlick,
     pitch_offset: i32,
@@ -19,14 +21,22 @@ pub struct PreparedPitchControls {
 }
 
 impl PreparedPitchControls {
-    pub(super) fn new(input: &OwnerInput, tuning_semitones: f64) -> Option<Self> {
-        (!input.pitch_controls.is_empty()).then(|| Self {
-            controls: input.pitch_controls.clone(),
-            tempo: input.tempo.clone(),
-            content_offset: input.content_offset,
-            pitch_offset: input.pitch_offset,
-            tuning_semitones,
-        })
+    pub(super) fn new(input: &OwnerInput, tuning_semitones: f64) -> Result<Option<Self>> {
+        let sv1 = sv1::Pitch::new(input, tuning_semitones)?;
+        Ok(
+            (!input.pitch_controls.is_empty() || sv1.is_some()).then(|| Self {
+                controls: input.pitch_controls.clone(),
+                sv1,
+                tempo: input.tempo.clone(),
+                content_offset: input.content_offset,
+                pitch_offset: input.pitch_offset,
+                tuning_semitones,
+            }),
+        )
+    }
+
+    pub(crate) fn sv1_memory_bytes(&self) -> usize {
+        self.sv1.as_ref().map_or(0, sv1::Pitch::memory_bytes)
     }
 
     pub fn sample(&self, origin: f64, step: f64, count: usize) -> Result<Vec<f32>> {
@@ -87,6 +97,9 @@ impl PreparedPitchControls {
                     ));
                 }
             }
+        }
+        if let Some(sv1) = &self.sv1 {
+            sv1.fill(&self.tempo, origin, step, &mut result)?;
         }
         Ok(result)
     }

@@ -101,9 +101,6 @@ fn prepare(acoustic: &PreparedRenderAcoustics) -> Result<Vec<Point>> {
         }
         source.attributes.validate().map_err(VoiceError::new)?;
         let mut strength = source.attributes.strength.unwrap_or(0.0) as f32;
-        if !duration.supports_strength && strength != 0.0 {
-            return Err(VoiceError::new("此歌声暂不支持音素强度调节。"));
-        }
         if let Some(activity) = source.attributes.activity {
             let predicted = duration
                 .prediction

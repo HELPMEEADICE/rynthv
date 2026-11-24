@@ -6,7 +6,10 @@ use std::ops::Range;
 /// In particular, changed/erased manual curves require a fresh F0 prediction:
 /// the retained pitch already contains the preceding manual overrides.
 pub(super) fn changed_notes(old: &OwnerInput, new: &OwnerInput) -> Option<Range<usize>> {
-    if old.notes.len() != new.notes.len() || new.notes.is_empty() {
+    if old.notes.len() != new.notes.len()
+        || new.notes.is_empty()
+        || new.notes.iter().any(|note| note.sv1_pitch.is_some())
+    {
         return None;
     }
     let mut equivalent = old.clone();

@@ -99,13 +99,27 @@ impl IncrementalEdit {
         let layout = RecordLayout::new(phrase, notes)?;
         let previous_records = previous_layout.records(input_first..input_last + 1);
         let work_records = layout.records(input_first..input_last + 1);
-        let write_frames = layout.frames(&layout.records(first..last + 1));
+        let previous_core = previous_layout.records(first..last + 1);
+        let core = layout.records(first..last + 1);
+        let write_frames = layout.frames(&core);
+        // Contextual pronunciation may change notes beyond the local PCM range.
+        let same_phones = |left: Range<usize>, right: Range<usize>| {
+            previous.records[left]
+                .iter()
+                .map(|record| &record.phones)
+                .eq(phrase.records[right].iter().map(|record| &record.phones))
+        };
         // Different syllable counts may change row counts, never absolute time.
         if previous.start_seconds != phrase.start_seconds
             || previous.visible_begin_seconds != phrase.visible_begin_seconds
             || previous.visible_end_seconds != phrase.visible_end_seconds
             || previous_layout.frames(&previous_records) != layout.frames(&work_records)
             || previous_layout.total_frames() != layout.total_frames()
+            || !same_phones(0..previous_core.start, 0..core.start)
+            || !same_phones(
+                previous_core.end..previous.records.len(),
+                core.end..phrase.records.len(),
+            )
         {
             return Ok(None);
         }

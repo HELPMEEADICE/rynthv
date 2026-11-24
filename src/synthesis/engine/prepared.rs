@@ -63,6 +63,9 @@ impl OwnerSynthesis {
         if let Some(controls) = &phrase.performance_controls {
             bytes = bytes.saturating_add(controls.memory_bytes());
         }
+        if let Some(controls) = &phrase.pitch_controls {
+            bytes = bytes.saturating_add(controls.sv1_memory_bytes());
+        }
         if let Some(controls) = &phrase.voice_controls {
             bytes = bytes.saturating_add(controls.memory_bytes());
         }

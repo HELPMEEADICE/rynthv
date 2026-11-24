@@ -78,6 +78,28 @@ impl LyricFrontend {
     }
 
     pub(super) fn resolve(&self, language: Language, lyrics: &str) -> Result<Vec<Vec<String>>> {
+        let result = match self.lexicon(language)? {
+            Lexicon::Mandarin(dictionary) => dictionary.resolve(lyrics),
+            Lexicon::Japanese(dictionary) => dictionary.resolve(lyrics),
+            Lexicon::Dictionary(dictionary) => dictionary.resolve(lyrics),
+        }?;
+        if result.is_empty() || result.iter().any(Vec::is_empty) {
+            return Err(VoiceError::new(format!(
+                "{}歌词没有可合成的音素",
+                language.label()
+            )));
+        }
+        Ok(result)
+    }
+
+    pub(super) fn resolve_japanese_notes(&self, notes: &[&str]) -> Result<Vec<Vec<Vec<String>>>> {
+        let Lexicon::Japanese(dictionary) = self.lexicon(Language::Japanese)? else {
+            unreachable!("Japanese is resolved by its own frontend")
+        };
+        dictionary.resolve_notes(notes)
+    }
+
+    fn lexicon(&self, language: Language) -> Result<&Lexicon> {
         let dictionary = self
             .dictionaries
             .get(&language)
@@ -91,17 +113,6 @@ impl LyricFrontend {
             })
             .as_ref()
             .map_err(Clone::clone)?;
-        let result = match dictionary {
-            Lexicon::Mandarin(dictionary) => dictionary.resolve(lyrics),
-            Lexicon::Japanese(dictionary) => dictionary.resolve(lyrics),
-            Lexicon::Dictionary(dictionary) => dictionary.resolve(lyrics),
-        }?;
-        if result.is_empty() || result.iter().any(Vec::is_empty) {
-            return Err(VoiceError::new(format!(
-                "{}歌词没有可合成的音素",
-                language.label()
-            )));
-        }
-        Ok(result)
+        Ok(dictionary)
     }
 }

@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::{
-    model::{Parameter, VocalModeValues, VoiceParameter, VoiceSettings},
+    model::{Parameter, VocalModeValues, VoiceParameter},
     synthesis::{
         plan::OwnerInput,
         voice::{Result, VoiceError, VoiceFamily},
@@ -31,11 +31,7 @@ impl PreparedVoiceControls {
         family: VoiceFamily,
         automations: Option<Arc<PreparedAutomations>>,
     ) -> Result<Option<Self>> {
-        let settings = VoiceSettings::resolve_with_defaults(
-            &input.voice.track_default_options,
-            &input.voice.instance_options,
-        )
-        .map_err(VoiceError::new)?;
+        let settings = input.voice.settings().map_err(VoiceError::new)?;
         if family != VoiceFamily::Sv2
             && settings
                 .vocal_modes

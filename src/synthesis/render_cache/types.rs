@@ -1,5 +1,6 @@
 use super::super::{
     audio::RenderedAudio,
+    engine::PcmComponents,
     plan::{Coverage, OwnerId, OwnerInput, OwnerOutputControls, OwnerRequest},
     rendered::{RenderVisuals, RenderedClip},
 };
@@ -54,6 +55,7 @@ pub struct PublishedOwner {
     pub coverage: Coverage,
     pub controls: OwnerOutputControls,
     pub audio: Arc<RenderedAudio>,
+    pub components: PcmComponents,
     pub visuals: Arc<RenderVisuals>,
 }
 

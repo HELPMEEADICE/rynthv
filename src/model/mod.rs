@@ -7,6 +7,7 @@ mod phoneme;
 pub mod pitch;
 mod project;
 mod retakes;
+mod sv1_pitch;
 mod time;
 mod track_color;
 mod voice;
@@ -20,6 +21,7 @@ pub use phoneme::*;
 pub use pitch::{PitchControl, PitchCurve, PitchPoint};
 pub use project::*;
 pub use retakes::*;
+pub use sv1_pitch::Sv1Pitch;
 pub use time::*;
 pub use track_color::*;
 pub use voice::*;
@@ -33,4 +35,4 @@ pub fn new_id() -> EntityId {
 }
 pub type Extra = std::collections::BTreeMap<String, serde_json::Value>;
 mod singer;
-pub use singer::singer_database;
+pub use singer::{inherits_singer_modes, singer_database};

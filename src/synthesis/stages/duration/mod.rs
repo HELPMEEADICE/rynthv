@@ -46,7 +46,6 @@ pub struct DurationResult {
     pub durations: Vec<PhoneDuration>,
     pub default_durations: Vec<PhoneDuration>,
     pub supports_timing: bool,
-    pub supports_strength: bool,
     pub prediction: DurationPrediction,
 }
 
@@ -62,7 +61,6 @@ impl DurationResult {
             durations,
             default_durations,
             supports_timing: true,
-            supports_strength: true,
             prediction,
         })
     }
