@@ -100,7 +100,7 @@ pub fn validate(project: &Project) -> Result<(), String> {
     validate_content(project)
 }
 
-fn save_locked(path: &Path, project: &Project) -> Result<(), String> {
+fn save_locked(path: &Path, project: &Project, overwrite: bool) -> Result<(), String> {
     validate(project)?;
     let mut ordered = project.clone();
     let base = std::path::absolute(path).map_err(|e| e.to_string())?;
@@ -123,7 +123,7 @@ fn save_locked(path: &Path, project: &Project) -> Result<(), String> {
     {
         group.notes.sort_by_key(|n| n.onset);
     }
-    atomic_write_with(path, |writer| {
+    atomic_write_policy(path, overwrite, |writer| {
         serde_json::to_writer_pretty(ProjectWriter::new(writer), &ordered)
             .map_err(|error| error.to_string())
     })
@@ -175,8 +175,16 @@ pub fn atomic_write_policy(
         if overwrite {
             fs::rename(&temp, path).map_err(|e| e.to_string())?;
         } else {
-            fs::hard_link(&temp, path).map_err(|e| e.to_string())?;
-            let _ = fs::remove_file(&temp);
+            publish_new_file(&temp, path).map_err(|error| {
+                if error.kind() == std::io::ErrorKind::AlreadyExists {
+                    format!(
+                        "OUTPUT_EXISTS: {} already exists. Specify --overwrite to replace it.",
+                        path.display()
+                    )
+                } else {
+                    error.to_string()
+                }
+            })?;
         }
         #[cfg(unix)]
         if let Ok(dir) = fs::File::open(parent) {
@@ -187,7 +195,23 @@ pub fn atomic_write_policy(
     if result.is_err() {
         let _ = fs::remove_file(&temp);
     }
-    result.map_err(|e| format!("写入 {} 失败：{e}", path.display()))
+    result.map_err(|error| {
+        if error.starts_with("OUTPUT_EXISTS: ") {
+            error
+        } else {
+            format!("写入 {} 失败：{error}", path.display())
+        }
+    })
+}
+
+#[cfg(windows)]
+use crate::platform::publish_new_file;
+
+#[cfg(not(windows))]
+fn publish_new_file(temp: &Path, path: &Path) -> std::io::Result<()> {
+    fs::hard_link(temp, path)?;
+    let _ = fs::remove_file(temp);
+    Ok(())
 }
 
 fn portable_relative_path(path: &Path) -> Option<std::path::PathBuf> {

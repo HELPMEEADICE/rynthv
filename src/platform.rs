@@ -5,6 +5,9 @@ use std::path::PathBuf;
 #[cfg(windows)]
 mod windows;
 
+#[cfg(windows)]
+pub(crate) use windows::publish_new_file;
+
 /// RynthV's saved model contexts use the user's roaming directory on Windows.
 pub fn context_directory() -> Result<PathBuf, String> {
     #[cfg(windows)]

@@ -57,6 +57,46 @@ impl Note {
             .and_then(Value::as_bool)
             .unwrap_or(false)
     }
+
+    pub fn replace_lyric(&mut self, lyric: &str) -> bool {
+        if self.lyrics == lyric {
+            return false;
+        }
+        self.lyrics.clear();
+        self.lyrics.push_str(lyric);
+        self.phonemes.clear();
+        self.attributes.remove("phonemes");
+        true
+    }
+
+    pub fn replace_phonemes(&mut self, phonemes: &str) {
+        let value = phonemes.split_whitespace().collect::<Vec<_>>().join(" ");
+        if self.phonemes != value {
+            self.phonemes = value;
+            self.attributes.remove("phonemes");
+        }
+    }
+
+    pub fn set_language_override(&mut self, language: Option<Language>) {
+        let previous_language = self.attributes.get("languageOverride").cloned();
+        let previous_alphabet = self.attributes.get("phonesetOverride").cloned();
+        if let Some(language) = language {
+            self.attributes
+                .insert("languageOverride".into(), language.id().into());
+            self.attributes.insert(
+                "phonesetOverride".into(),
+                language.phoneme_alphabet().into(),
+            );
+        } else {
+            self.attributes.remove("languageOverride");
+            self.attributes.remove("phonesetOverride");
+        }
+        if previous_language.as_ref() != self.attributes.get("languageOverride")
+            || previous_alphabet.as_ref() != self.attributes.get("phonesetOverride")
+        {
+            self.attributes.remove("phonemes");
+        }
+    }
 }
 
 fn fresh_note_uuid() -> String {
@@ -67,6 +107,7 @@ fn fresh_note_uuid() -> String {
 #[serde(rename_all = "camelCase")]
 pub struct Group {
     pub name: String,
+    #[serde(default)]
     pub uuid: String,
     pub notes: Vec<Note>,
     pub parameters: BTreeMap<String, Automation>,
@@ -99,7 +140,7 @@ pub struct GroupRef {
     pub id: EntityId,
     #[serde(default)]
     pub uuid: String,
-    #[serde(rename = "groupID")]
+    #[serde(default, rename = "groupID")]
     pub group_id: String,
     pub blick_absolute_begin: i64,
     pub blick_absolute_end: i64,

@@ -12,6 +12,10 @@ impl LyricSelection {
     pub fn len(&self) -> usize {
         self.notes.len()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.notes.is_empty()
+    }
 }
 
 impl Editor {
@@ -65,14 +69,8 @@ impl Editor {
         let mut changed = 0;
         if let Some(group) = self.project.group_mut(&selection.group) {
             for note in &mut group.notes {
-                if let Some(word) = lyrics.get(&note.id)
-                    && note.lyrics != **word
-                {
-                    note.lyrics.clone_from(word);
-                    // An explicit pronunciation must not override the newly entered lyric.
-                    note.phonemes.clear();
-                    note.attributes.remove("phonemes");
-                    changed += 1;
+                if let Some(word) = lyrics.get(&note.id) {
+                    changed += usize::from(note.replace_lyric(word));
                 }
             }
         }

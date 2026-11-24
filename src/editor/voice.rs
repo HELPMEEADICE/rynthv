@@ -1,5 +1,6 @@
 use super::Editor;
 use crate::model::Language;
+use serde_json::Value;
 
 impl Editor {
     pub fn set_track_voice(&mut self, singer: Option<(&str, &str, u32)>) -> Result<(), String> {
@@ -21,27 +22,29 @@ impl Editor {
             .find(|t| t.id == self.track)
             .expect("selected track exists");
         for reference in std::iter::once(&mut track.main_ref).chain(&mut track.groups) {
-            let database = reference
-                .database
-                .as_object_mut()
-                .expect("validated database");
-            database.remove("id");
-            let (name, version) = match singer {
-                Some((id, name, version)) => {
-                    database.insert("id".into(), id.into());
-                    (name, version.to_string())
-                }
-                None => ("", "-2".to_owned()),
-            };
-            database.insert("name".into(), name.into());
-            database.insert("version".into(), version.into());
-            // These are bank defaults; explicit user language overrides stay intact.
-            for key in ["language", "phoneset", "backendType"] {
-                database.insert(key.into(), "".into());
-            }
+            write_voice(&mut reference.database, singer).expect("validated database");
         }
         self.finish();
         Ok(())
+    }
+
+    pub fn set_instance_voice(
+        &mut self,
+        track_id: u64,
+        reference_id: u64,
+        singer: (&str, &str, u32),
+    ) -> Result<(), String> {
+        let track = self
+            .project
+            .tracks
+            .iter_mut()
+            .find(|track| track.id == track_id && !track.is_instrumental())
+            .ok_or("Choose a vocal track")?;
+        let reference = std::iter::once(&mut track.main_ref)
+            .chain(&mut track.groups)
+            .find(|reference| reference.id == reference_id)
+            .ok_or("Unknown group reference")?;
+        write_voice(&mut reference.database, Some(singer))
     }
 
     /// With a group selected, edit only that instance. Otherwise edit the track
@@ -86,4 +89,25 @@ impl Editor {
         self.finish();
         Ok(())
     }
+}
+
+fn write_voice(database: &mut Value, singer: Option<(&str, &str, u32)>) -> Result<(), String> {
+    let database = database
+        .as_object_mut()
+        .ok_or("Voice database must be an object")?;
+    database.remove("id");
+    let (name, version) = match singer {
+        Some((id, name, version)) => {
+            database.insert("id".into(), id.into());
+            (name, version.to_string())
+        }
+        None => ("", "-2".to_owned()),
+    };
+    database.insert("name".into(), name.into());
+    database.insert("version".into(), version.into());
+    // Bank defaults can change without discarding explicit language overrides.
+    for key in ["language", "phoneset", "backendType"] {
+        database.insert(key.into(), "".into());
+    }
+    Ok(())
 }

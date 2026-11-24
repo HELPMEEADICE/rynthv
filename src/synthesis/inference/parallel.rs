@@ -9,10 +9,18 @@ static POOL: OnceLock<Result<ThreadPool, String>> = OnceLock::new();
 
 pub(super) fn pool() -> Result<&'static ThreadPool, String> {
     POOL.get_or_init(|| {
-        let threads = std::thread::available_parallelism()
+        let available = std::thread::available_parallelism()
             .map_err(|error| format!("Cannot determine synthesis concurrency: {error}"))?
-            .get()
-            .min(MAX_THREADS);
+            .get();
+        let threads = match std::env::var("RYNTHV_THREADS") {
+            Ok(value) => value
+                .parse::<usize>()
+                .ok()
+                .filter(|threads| (1..=256).contains(threads))
+                .ok_or("RYNTHV_THREADS must be an integer between 1 and 256")?,
+            Err(std::env::VarError::NotPresent) => available.min(MAX_THREADS),
+            Err(error) => return Err(error.to_string()),
+        };
         ThreadPoolBuilder::new()
             .num_threads(threads)
             .thread_name(|index| format!("synthesis-compute-{index}"))

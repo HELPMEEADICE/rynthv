@@ -53,7 +53,8 @@ pub struct ProjectFile {
 
 impl ProjectFile {
     pub fn lock(path: &Path) -> Result<Self, String> {
-        let path = match fs::canonicalize(path) {
+        let absolute = std::path::absolute(path).map_err(|error| error.to_string())?;
+        let canonical = match fs::canonicalize(path) {
             Ok(path) => path,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
                 let parent = path
@@ -67,7 +68,9 @@ impl ProjectFile {
             }
             Err(error) => return Err(error.to_string()),
         };
-        let name = path.file_name().ok_or("Project path must name a file")?;
+        let name = canonical
+            .file_name()
+            .ok_or("Project path must name a file")?;
         let mut lock_name = std::ffi::OsString::from(".");
         lock_name.push(name);
         lock_name.push(".rynthv-lock");
@@ -76,14 +79,22 @@ impl ProjectFile {
             .write(true)
             .create(true)
             .truncate(false)
-            .open(path.with_file_name(lock_name))
+            .open(canonical.with_file_name(lock_name))
             .map_err(|error| error.to_string())?;
         lock.try_lock().map_err(|error| match error {
             TryLockError::WouldBlock => {
-                format!("PROJECT_CONFLICT: {} is being edited", path.display())
+                format!("PROJECT_CONFLICT: {} is being edited", absolute.display())
             }
             TryLockError::Error(error) => error.to_string(),
         })?;
+        let path = if absolute
+            .symlink_metadata()
+            .is_ok_and(|metadata| metadata.file_type().is_symlink())
+        {
+            canonical
+        } else {
+            absolute
+        };
         Ok(Self { path, _lock: lock })
     }
 
@@ -92,7 +103,7 @@ impl ProjectFile {
     }
 
     pub fn save(&self, project: &Project) -> Result<(), String> {
-        save_locked(&self.path, project)
+        save_locked(&self.path, project, true)
     }
 
     pub fn save_if(
@@ -106,7 +117,7 @@ impl ProjectFile {
                 self.path.display()
             ));
         }
-        self.save(project)?;
+        save_locked(&self.path, project, expected.is_some())?;
         Revision::read(&self.path)?.ok_or_else(|| "Saved project disappeared".into())
     }
 }

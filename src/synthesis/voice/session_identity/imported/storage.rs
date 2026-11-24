@@ -48,7 +48,7 @@ fn decode(file: File) -> Result<Context> {
     Ok(context)
 }
 
-pub(super) fn save(path: &Path, entry: VoiceContext) -> Result<()> {
+pub(super) fn save(path: &Path, entry: VoiceContext, overwrite: bool) -> Result<()> {
     let directory = path.parent().expect("context has its RynthV directory");
     fs::create_dir_all(directory)?;
     // Lock a stable sibling because the destination is atomically replaced.
@@ -61,6 +61,11 @@ pub(super) fn save(path: &Path, entry: VoiceContext) -> Result<()> {
     if let Some(existing) = context.voices.iter_mut().find(|existing| {
         existing.voice_name == entry.voice_name && existing.model_version == entry.model_version
     }) {
+        if !overwrite {
+            return Err(VoiceError::new(
+                "OUTPUT_EXISTS: A context already exists for this voice; use --overwrite.",
+            ));
+        }
         *existing = entry;
     } else {
         context.voices.push(entry);

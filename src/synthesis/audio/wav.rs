@@ -10,7 +10,7 @@ pub struct WaveFormat {
 
 /// Native float output used by the synthesis CLI, without normalization.
 pub fn save_wav(path: &Path, audio: &RenderedAudio) -> Result<(), AudioError> {
-    encode(path, audio, 32)
+    encode(path, audio, 32, true)
 }
 
 pub fn save_wav_as(
@@ -18,23 +18,38 @@ pub fn save_wav_as(
     audio: &RenderedAudio,
     format: WaveFormat,
 ) -> Result<(), AudioError> {
+    save_wav_policy(path, audio, format, true)
+}
+
+pub fn save_wav_policy(
+    path: &Path,
+    audio: &RenderedAudio,
+    format: WaveFormat,
+    overwrite: bool,
+) -> Result<(), AudioError> {
     if ![44100, 48000, 96000].contains(&format.sample_rate)
         || ![16, 24, 32].contains(&format.bit_depth)
     {
         return Err(AudioError::Wave("不支持的导出格式".into()));
     }
     if audio.sample_rate() == format.sample_rate && audio.layout() == format.layout {
-        encode(path, audio, format.bit_depth)
+        encode(path, audio, format.bit_depth, overwrite)
     } else {
         encode(
             path,
             &conversion::convert(audio, format.sample_rate, format.layout)?,
             format.bit_depth,
+            overwrite,
         )
     }
 }
 
-fn encode(path: &Path, audio: &RenderedAudio, depth: u16) -> Result<(), AudioError> {
+fn encode(
+    path: &Path,
+    audio: &RenderedAudio,
+    depth: u16,
+    overwrite: bool,
+) -> Result<(), AudioError> {
     let float = depth == 32;
     let header_bytes = if float { 58 } else { 44 };
     let data_bytes = audio
@@ -49,7 +64,7 @@ fn encode(path: &Path, audio: &RenderedAudio, depth: u16) -> Result<(), AudioErr
         .ok_or_else(|| AudioError::Wave("PCM exceeds RIFF's 4 GiB limit".into()))?;
     let channels = audio.layout().channels() as u16;
     let block_align = channels * (depth / 8);
-    crate::storage::atomic_write_with(path, |writer| {
+    crate::storage::atomic_write_policy(path, overwrite, |writer| {
         let write = |writer: &mut std::io::BufWriter<std::fs::File>, bytes: &[u8]| {
             writer.write_all(bytes).map_err(|e| e.to_string())
         };
@@ -79,6 +94,7 @@ fn encode(path: &Path, audio: &RenderedAudio, depth: u16) -> Result<(), AudioErr
         let sample_bytes = usize::from(depth / 8);
         for &sample in audio.samples() {
             if cursor + sample_bytes > chunk.len() {
+                crate::synthesis::execution::checkpoint().map_err(|error| error.to_string())?;
                 write(writer, &chunk[..cursor])?;
                 cursor = 0;
             }
@@ -111,7 +127,7 @@ fn encode(path: &Path, audio: &RenderedAudio, depth: u16) -> Result<(), AudioErr
         if padding != 0 {
             write(writer, &[0])?;
         }
-        Ok(())
+        crate::synthesis::execution::checkpoint().map_err(|error| error.to_string())
     })
     .map_err(AudioError::Wave)
 }

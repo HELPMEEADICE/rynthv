@@ -19,7 +19,7 @@ use symphonia::core::{
 
 const MAX_SAMPLES: usize = 512 * 1024 * 1024;
 
-pub(super) fn load(path: &Path, cancelled: &AtomicBool) -> Result<AudioAsset, String> {
+pub(super) fn decode(path: &Path, cancelled: &AtomicBool) -> Result<RenderedAudio, String> {
     let file = File::open(path).map_err(|e| format!("无法打开音频文件：{e}"))?;
     let stream = MediaSourceStream::new(Box::new(file), Default::default());
     let mut hint = Hint::new();
@@ -95,16 +95,25 @@ pub(super) fn load(path: &Path, cancelled: &AtomicBool) -> Result<AudioAsset, St
     } else {
         ChannelLayout::Stereo
     };
-    let audio = Arc::new(if spec.rate() == 48_000 {
-        RenderedAudio::new(48_000, 0.0, layout, samples).map_err(|e| e.to_string())?
+    RenderedAudio::new(spec.rate(), 0.0, layout, samples).map_err(|e| e.to_string())
+}
+
+pub(super) fn load(
+    path: &Path,
+    cancelled: &AtomicBool,
+    waveform: bool,
+) -> Result<AudioAsset, String> {
+    let source = decode(path, cancelled)?;
+    let audio = Arc::new(if source.sample_rate() == 48_000 {
+        source
     } else {
-        if samples.iter().any(|sample| !sample.is_finite()) {
-            return Err("音频包含非有限采样值".into());
-        }
-        conversion::convert_samples(spec.rate(), 0.0, layout, &samples, 48_000, layout)
-            .map_err(|e| e.to_string())?
+        conversion::convert(&source, 48_000, source.layout()).map_err(|e| e.to_string())?
     });
-    let waveforms = (0..layout.channels())
+    let waveforms = (0..if waveform {
+        audio.layout().channels()
+    } else {
+        0
+    })
         .map(|c| Waveform::new_channel(&audio, c))
         .collect();
     Ok(AudioAsset { audio, waveforms })

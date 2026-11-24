@@ -1,5 +1,9 @@
-use super::{LiveAudio, RenderedAudio, metronome::Metronome};
-use std::{ops::Range, sync::Arc};
+use super::RenderedAudio;
+#[cfg(feature = "gui")]
+use super::{LiveAudio, metronome::Metronome};
+#[cfg(feature = "gui")]
+use std::ops::Range;
+use std::sync::Arc;
 
 /// A decoded recording and cheap placement/mixer metadata. Moving or mixing a
 /// recording never copies its PCM or recomputes its waveform index.
@@ -18,6 +22,7 @@ impl AudioLayer {
         self.start_frame.saturating_add(self.frames)
     }
 
+    #[cfg(feature = "gui")]
     pub(crate) fn sample(&self, position: f64) -> [f32; 2] {
         if self.frames == 0
             || !position.is_finite()
@@ -43,6 +48,7 @@ impl AudioLayer {
 
 /// Both sources share one device clock. Pending vocal/recording regions stop
 /// the whole mix, so accompaniment cannot run ahead while vocals are loading.
+#[cfg(feature = "gui")]
 pub struct PlaybackSource {
     pub(crate) metronome: Option<Arc<Metronome>>,
     pub(crate) vocals: Vec<Arc<LiveAudio>>,
@@ -51,6 +57,7 @@ pub struct PlaybackSource {
     total_frames: usize,
 }
 
+#[cfg(feature = "gui")]
 impl PlaybackSource {
     pub fn new(
         vocals: Vec<Arc<LiveAudio>>,
@@ -81,6 +88,7 @@ impl PlaybackSource {
     }
 }
 
+#[cfg(feature = "gui")]
 fn merge_ranges(mut ranges: Vec<Range<usize>>) -> Vec<Range<usize>> {
     ranges.retain(|range| !range.is_empty());
     if ranges.len() <= 1 {

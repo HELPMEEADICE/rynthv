@@ -90,7 +90,7 @@ impl Session {
         }))
     }
 
-    pub(crate) fn adapters(&self) -> &[AdapterInfo] {
+    pub fn adapters(&self) -> &[AdapterInfo] {
         &self.0.adapters
     }
 

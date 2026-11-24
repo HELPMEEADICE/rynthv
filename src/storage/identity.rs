@@ -17,6 +17,23 @@ pub(super) fn complete(project: &mut Project, revision: Revision) {
     if project.uuid.is_empty() {
         project.uuid = generated("project", 0, 0, 0).to_string();
     }
+    for (index, group) in project.library.iter_mut().enumerate() {
+        if group.uuid.is_empty() {
+            group.uuid = generated("library", index, 0, 0).to_string();
+        }
+    }
+    for (index, track) in project.tracks.iter_mut().enumerate() {
+        if track.main_group.uuid.is_empty() {
+            track.main_group.uuid = if track.main_ref.group_id.is_empty() {
+                generated("main_group", index, 0, 0).to_string()
+            } else {
+                track.main_ref.group_id.clone()
+            };
+        }
+        if track.main_ref.group_id.is_empty() {
+            track.main_ref.group_id.clone_from(&track.main_group.uuid);
+        }
+    }
     let mut notes: HashSet<_> = project
         .library
         .iter()

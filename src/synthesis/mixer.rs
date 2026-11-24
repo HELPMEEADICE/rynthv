@@ -7,18 +7,35 @@ mod live;
 mod recordings;
 #[cfg(feature = "gui")]
 pub(crate) use live::LiveMixer;
-pub(crate) use recordings::{RecordingMix, recordings};
+#[cfg(feature = "gui")]
+pub(crate) use recordings::RecordingMix;
+pub(crate) use recordings::recordings;
 
 use crate::{
-    model::Extra,
+    model::{Extra, Project},
     synthesis::{
         audio::{AudioLayer, ChannelLayout, RenderedAudio},
         render_cache::PublishedOwner,
     },
 };
-use std::{collections::BTreeSet, sync::Arc};
+use std::{collections::BTreeSet, ops::Range, sync::Arc};
 
 const NATIVE_SAMPLE_RATE: u32 = 48_000;
+
+pub(crate) fn solo_tracks(project: &Project) -> Result<BTreeSet<u64>, String> {
+    super::mixing_options::validate_project_mixer(project.extra.get("projectMixer"))?;
+    project
+        .tracks
+        .iter()
+        .try_fold(BTreeSet::new(), |mut solo, track| {
+            let controls = Controls::read(&track.mixer)
+                .map_err(|error| format!("音轨 {}：{error}", track.name))?;
+            if controls.solo {
+                solo.insert(track.id);
+            }
+            Ok(solo)
+        })
+}
 
 struct Controls {
     mute: bool,
@@ -37,7 +54,7 @@ struct Span<'a> {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub(crate) enum VocalStem {
+pub enum VocalStem {
     Combined,
     Primary,
     Aspiration,
@@ -45,6 +62,7 @@ pub(crate) enum VocalStem {
 
 /// Validate owners and compute the mixed duration in seconds without
 /// allocating or mixing PCM samples.
+#[cfg(feature = "gui")]
 pub(crate) fn mixed_duration_seconds(
     owners: &[PublishedOwner],
     solo_tracks: &BTreeSet<u64>,
@@ -55,6 +73,7 @@ pub(crate) fn mixed_duration_seconds(
     )
 }
 
+#[cfg(feature = "gui")]
 pub(crate) fn can_mix_with_recordings(
     owners: &[PublishedOwner],
     solo_tracks: &BTreeSet<u64>,
@@ -83,6 +102,7 @@ pub(crate) fn mix_with_recordings(
     recordings: &[AudioLayer],
     track_id: Option<u64>,
     stem: VocalStem,
+    range: Option<Range<usize>>,
 ) -> Result<Option<Arc<RenderedAudio>>, String> {
     let mut spans = Vec::new();
     spans
@@ -111,7 +131,13 @@ pub(crate) fn mix_with_recordings(
             right: f64::from(layer.gains[1]),
         });
     }
-    if spans.is_empty() {
+    let range = range.unwrap_or(0..output_frames);
+    output_frames = range.end.saturating_sub(range.start);
+    if output_frames == 0
+        || !spans.iter().any(|span| {
+            span.output_start < range.end && span.output_start + span.frames > range.start
+        })
+    {
         return Ok(None);
     }
     let sample_count = output_frames.checked_mul(2).ok_or("混音样本数量溢出")?;
@@ -121,13 +147,23 @@ pub(crate) fn mix_with_recordings(
         .map_err(|error| format!("无法分配立体声混音缓冲区：{error}"))?;
     samples.resize(sample_count, 0.0_f32);
     for span in spans {
-        let destination =
-            &mut samples[span.output_start * 2..(span.output_start + span.frames) * 2];
-        for (input, output) in span
-            .samples
+        super::execution::checkpoint().map_err(|error| error.to_string())?;
+        let start = span.output_start.max(range.start);
+        let end = (span.output_start + span.frames).min(range.end);
+        if start >= end {
+            continue;
+        }
+        let destination = &mut samples[(start - range.start) * 2..(end - range.start) * 2];
+        let first = (start - span.output_start) * span.channels;
+        let last = (end - span.output_start) * span.channels;
+        for (index, (input, output)) in span.samples[first..last]
             .chunks_exact(span.channels)
             .zip(destination.as_chunks_mut::<2>().0)
+            .enumerate()
         {
+            if index.is_multiple_of(65_536) {
+                super::execution::checkpoint().map_err(|error| error.to_string())?;
+            }
             let right = input[span.channels - 1];
             output[0] = (f64::from(output[0]) + f64::from(input[0]) * span.left) as f32;
             output[1] = (f64::from(output[1]) + f64::from(right) * span.right) as f32;

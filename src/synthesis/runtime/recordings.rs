@@ -8,7 +8,12 @@ impl Runtime {
     }
 
     pub(super) fn prepare_recordings(&mut self, project: &Project) {
-        match mixer::recordings(project, &self.instrumentals, &self.solo_tracks) {
+        match mixer::recordings(&project.tracks, &self.solo_tracks, |path| {
+            self.instrumentals
+                .asset(path)
+                .map(|asset| Ok(asset.as_ref()))
+                .or_else(|| self.instrumentals.error(path).map(Err))
+        }) {
             Ok(mix) => {
                 self.recordings = mix;
                 self.recording_error = None;

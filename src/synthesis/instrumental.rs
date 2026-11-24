@@ -19,6 +19,16 @@ pub struct AudioAsset {
     pub waveforms: Vec<Waveform>,
 }
 
+pub fn read_audio(path: &Path, cancelled: &AtomicBool) -> Result<RenderedAudio, String> {
+    decode::decode(path, cancelled)
+}
+
+impl AudioAsset {
+    pub(crate) fn read_for_mix(path: &Path, cancelled: &AtomicBool) -> Result<Self, String> {
+        decode::load(path, cancelled, false)
+    }
+}
+
 enum Entry {
     Loading {
         rx: mpsc::Receiver<Result<Arc<AudioAsset>, String>>,
@@ -118,7 +128,7 @@ impl AudioLibrary {
         let result = thread::Builder::new()
             .name("audio-import".into())
             .spawn(move || {
-                let result = decode::load(&file, &worker_cancel)
+                let result = decode::load(&file, &worker_cancel, true)
                     .map(Arc::new)
                     .map_err(|error| format!("{}：{error}", file.display()));
                 if !worker_cancel.load(Ordering::Relaxed) {

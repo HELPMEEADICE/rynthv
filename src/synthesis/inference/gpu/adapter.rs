@@ -50,8 +50,12 @@ pub(super) fn adapters() -> (Backends, Vec<(Adapter, AdapterInfo)>) {
     let mut descriptor = wgpu::InstanceDescriptor::new_without_display_handle();
     let supported = if cfg!(windows) {
         Backends::DX12 | Backends::VULKAN
-    } else {
+    } else if cfg!(feature = "gui")
+        && (std::env::var_os("DISPLAY").is_some() || std::env::var_os("WAYLAND_DISPLAY").is_some())
+    {
         Backends::VULKAN | Backends::GL
+    } else {
+        Backends::VULKAN
     };
     descriptor.backends = supported & supported.with_env();
     let backends = descriptor.backends;

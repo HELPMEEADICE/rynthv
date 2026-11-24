@@ -10,6 +10,14 @@ pub(crate) struct PhoneResolver<'a> {
 }
 
 impl<'a> PhoneResolver<'a> {
+    pub(crate) fn inventory(&self) -> Vec<(&'a str, &'a [String])> {
+        let mut tables = std::collections::BTreeMap::new();
+        for table in self.languages.iter().copied().chain(self.overrides) {
+            tables.insert(table.name.as_str(), table.symbols.as_slice());
+        }
+        tables.into_iter().collect()
+    }
+
     pub(crate) fn resolve(&self, language: &str, token: &str) -> Result<ResolvedPhone<'a>> {
         resolve_with_overrides(
             &self.languages,

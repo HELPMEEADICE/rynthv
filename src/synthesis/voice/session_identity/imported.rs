@@ -33,6 +33,12 @@ struct VoiceContext {
     machine_fingerprint: Option<String>,
 }
 
+pub(super) fn contains(voice_name: &str, model_version: u8) -> Result<bool> {
+    Ok(storage::load_saved(&context_path()?)?
+        .as_ref()
+        .is_some_and(|context| find(context, voice_name, model_version).is_some()))
+}
+
 pub(super) fn read(voice_name: &str, model_version: u8) -> Result<Option<u64>> {
     let Some(context) = storage::load_saved(&context_path()?)? else {
         return Ok(None);
@@ -76,11 +82,17 @@ pub(super) fn save_bound(voice_name: &str, model_version: u8, identity: u64) -> 
         model_version,
         identity,
         Some(machine_fingerprint()?),
+        true,
     )
 }
 
-pub(super) fn save_manual(voice_name: &str, model_version: u8, identity: u64) -> Result<PathBuf> {
-    save(voice_name, model_version, identity, None)
+pub(super) fn save_manual(
+    voice_name: &str,
+    model_version: u8,
+    identity: u64,
+    overwrite: bool,
+) -> Result<PathBuf> {
+    save(voice_name, model_version, identity, None, overwrite)
 }
 
 fn save(
@@ -88,6 +100,7 @@ fn save(
     model_version: u8,
     identity: u64,
     machine_fingerprint: Option<String>,
+    overwrite: bool,
 ) -> Result<PathBuf> {
     let entry = VoiceContext {
         voice_name: voice_name.to_owned(),
@@ -96,7 +109,7 @@ fn save(
         machine_fingerprint,
     };
     let path = context_path()?;
-    storage::save(&path, entry)?;
+    storage::save(&path, entry, overwrite)?;
     Ok(path)
 }
 

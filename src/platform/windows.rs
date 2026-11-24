@@ -1,4 +1,30 @@
-use std::{ffi::c_void, os::windows::ffi::OsStringExt, path::PathBuf, ptr};
+use std::{
+    ffi::c_void,
+    os::windows::ffi::{OsStrExt, OsStringExt},
+    path::{Path, PathBuf},
+    ptr,
+};
+
+pub(crate) fn publish_new_file(source: &Path, target: &Path) -> std::io::Result<()> {
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn MoveFileExW(source: *const u16, target: *const u16, flags: u32) -> i32;
+    }
+    const WRITE_THROUGH: u32 = 0x8;
+    let wide = |path: &Path| {
+        path.as_os_str()
+            .encode_wide()
+            .chain(Some(0))
+            .collect::<Vec<_>>()
+    };
+    let source = wide(source);
+    let target = wide(target);
+    // SAFETY: The two NUL-terminated buffers outlive the call.
+    if unsafe { MoveFileExW(source.as_ptr(), target.as_ptr(), WRITE_THROUGH) } == 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    Ok(())
+}
 
 #[repr(C)]
 struct Guid {

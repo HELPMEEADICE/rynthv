@@ -5,6 +5,10 @@ use crate::synthesis::stages::{
 use crate::synthesis::voice::{PhoneResolver, PhoneSet};
 
 impl PreparedVoice {
+    pub fn phone_inventory(&self) -> Result<Vec<(&str, &[String])>> {
+        Ok(self.duration_phones()?.inventory())
+    }
+
     /// Interpolate Flat timbre conditions in the same validated acoustic
     /// model. Timing, pitch, phonemes and selectable modes belong to self.
     pub fn blend_flat(&self, other: &Self, weight: f32) -> Result<Self> {

@@ -8,6 +8,7 @@ pub mod library;
 mod mixer;
 mod mixing_options;
 pub mod notify;
+pub mod offline;
 pub mod plan;
 #[cfg(feature = "synth-profile")]
 pub mod profiling;

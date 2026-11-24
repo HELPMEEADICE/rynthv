@@ -77,7 +77,7 @@ impl LyricFrontend {
         Ok(language)
     }
 
-    pub(super) fn resolve(&self, language: Language, lyrics: &str) -> Result<Vec<Vec<String>>> {
+    pub fn resolve(&self, language: Language, lyrics: &str) -> Result<Vec<Vec<String>>> {
         let result = match self.lexicon(language)? {
             Lexicon::Mandarin(dictionary) => dictionary.resolve(lyrics),
             Lexicon::Japanese(dictionary) => dictionary.resolve(lyrics),

@@ -51,17 +51,38 @@ fn save_imported_identity(voice_name: &str, model_version: u8, identity: u64) ->
 /// file. The saved condition is portable and does not retain a source-machine
 /// fingerprint. No identity is invented or derived from another record.
 pub fn import_context_file(voice_name: &str, model_version: u8, path: &Path) -> Result<PathBuf> {
+    import_context_file_with_policy(voice_name, model_version, path, true)
+}
+
+pub fn validate_context_file(voice_name: &str, model_version: u8, path: &Path) -> Result<()> {
+    validate_voice_name(voice_name)?;
+    model_suffix(model_version)?;
+    imported::read_source(voice_name, model_version, path).map(|_| ())
+}
+
+pub fn has_context_record(voice_name: &str, model_version: u8) -> Result<bool> {
+    validate_voice_name(voice_name)?;
+    model_suffix(model_version)?;
+    imported::contains(voice_name, model_version)
+}
+
+pub fn import_context_file_with_policy(
+    voice_name: &str,
+    model_version: u8,
+    path: &Path,
+    overwrite: bool,
+) -> Result<PathBuf> {
     validate_voice_name(voice_name)?;
     model_suffix(model_version)?;
     let identity = imported::read_source(voice_name, model_version, path)?;
-    save_manual_identity(voice_name, model_version, identity)
+    imported::save_manual(voice_name, model_version, identity, overwrite)
 }
 
 /// Saves an explicitly supplied, already derived model condition for this voice.
 pub fn save_manual_identity(voice_name: &str, model_version: u8, identity: u64) -> Result<PathBuf> {
     validate_voice_name(voice_name)?;
     model_suffix(model_version)?;
-    imported::save_manual(voice_name, model_version, identity)
+    imported::save_manual(voice_name, model_version, identity, true)
 }
 
 /// Parses the complete unsigned model condition without rounding or truncation.

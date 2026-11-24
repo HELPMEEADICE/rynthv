@@ -33,6 +33,7 @@ pub struct RenderJob {
 }
 
 impl RenderJob {
+    #[cfg(feature = "gui")]
     pub(crate) fn cancellation(&self) -> super::super::execution::Cancellation {
         super::super::execution::Cancellation::from_flag(Arc::clone(&self.cancelled))
     }

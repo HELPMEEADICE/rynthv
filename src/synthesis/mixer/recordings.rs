@@ -1,11 +1,12 @@
 use super::{Controls, NATIVE_SAMPLE_RATE};
 use crate::{
-    model::Project,
-    synthesis::{audio::AudioLayer, instrumental::AudioLibrary},
+    model::Track,
+    synthesis::{audio::AudioLayer, instrumental::AudioAsset},
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
     ops::Range,
+    path::Path,
     sync::Arc,
 };
 
@@ -17,14 +18,14 @@ pub(crate) struct RecordingMix {
     pub end: usize,
 }
 
-pub(crate) fn recordings(
-    project: &Project,
-    library: &AudioLibrary,
+pub(crate) fn recordings<'a, 'track>(
+    tracks: impl IntoIterator<Item = &'track Track>,
     solo: &BTreeSet<u64>,
+    asset: impl Fn(&Path) -> Option<Result<&'a AudioAsset, &'a str>>,
 ) -> Result<RecordingMix, String> {
     let mut mix = RecordingMix::default();
     let sample_rate = f64::from(NATIVE_SAMPLE_RATE);
-    for track in &project.tracks {
+    for track in tracks {
         let Some(clip) = track.audio_clip() else {
             continue;
         };
@@ -37,7 +38,8 @@ pub(crate) fn recordings(
         }
         let start = (clip.onset_seconds * sample_rate).round() as usize;
         let requested_end = (clip.end_seconds() * sample_rate).ceil() as usize;
-        if let Some(asset) = library.asset(&clip.path) {
+        let available = asset(&clip.path);
+        if let Some(Ok(asset)) = available {
             let source_start = (clip.source_offset_seconds * sample_rate).round() as usize;
             let frames = asset
                 .audio
@@ -61,7 +63,7 @@ pub(crate) fn recordings(
                 frames,
                 gains,
             });
-        } else if let Some(error) = library.error(&clip.path) {
+        } else if let Some(Err(error)) = available {
             mix.failures.insert(
                 track.id,
                 format!("伴奏音轨 {} 加载失败：{error}", track.name),

@@ -134,28 +134,7 @@ impl Runtime {
             .update(project, revision, |owner| identities.get(&owner).cloned());
         self.sync_visuals();
         self.sync_phonemes();
-        let solo = crate::synthesis::mixing_options::validate_project_mixer(
-            project.extra.get("projectMixer"),
-        )
-        .and_then(|()| {
-            project
-                .tracks
-                .iter()
-                .try_fold(BTreeSet::new(), |mut solo, track| {
-                    crate::synthesis::mixing_options::validate_mixer(&track.mixer)
-                        .map_err(|error| format!("音轨 {}：{error}", track.name))?;
-                    match track.mixer.get("solo").and_then(serde_json::Value::as_bool) {
-                        Some(true) => {
-                            solo.insert(track.id);
-                        }
-                        Some(false) => {}
-                        None => {
-                            return Err(format!("音轨 {} 的独奏字段缺失或类型无效。", track.name));
-                        }
-                    }
-                    Ok(solo)
-                })
-        });
+        let solo = super::mixer::solo_tracks(project);
         self.last_revision = Some(revision);
         self.last_audio_generation = self.instrumentals.generation;
         self.request_serial = self.request_serial.wrapping_add(1);

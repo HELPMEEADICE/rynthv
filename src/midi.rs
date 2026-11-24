@@ -1,7 +1,9 @@
 //! Standard MIDI files are imported as editable notes, not instrument playback.
+mod export;
 mod instruments;
 mod time;
 mod track;
+pub use export::save as save_project;
 
 use crate::model::TimeAxis;
 use midly::{Format, Timing};
@@ -14,14 +16,14 @@ const MAX_EVENTS: usize = 2_000_000;
 const MAX_NOTES: usize = 200_000;
 const MAX_TEXT: usize = 4096;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct MidiFile {
     pub tracks: Vec<MidiTrack>,
     pub time: TimeAxis,
     pub warnings: Vec<String>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct MidiTrack {
     pub name: String,
     /// Zero-based index of the source SMF track.
@@ -32,7 +34,7 @@ pub struct MidiTrack {
     pub notes: Vec<MidiNote>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct MidiNote {
     pub onset: i64,
     pub duration: i64,
@@ -58,8 +60,15 @@ pub fn load(path: &Path) -> Result<MidiFile, String> {
     if bytes.len() as u64 > MAX_BYTES {
         return Err("MIDI 文件不能超过 64 MiB".into());
     }
+    parse(&bytes)
+}
+
+pub fn parse(bytes: &[u8]) -> Result<MidiFile, String> {
+    if bytes.len() as u64 > MAX_BYTES {
+        return Err("MIDI 文件不能超过 64 MiB".into());
+    }
     let (header, source_tracks) =
-        midly::parse(&bytes).map_err(|e| format!("MIDI 文件格式无效或不完整：{e}"))?;
+        midly::parse(bytes).map_err(|e| format!("MIDI 文件格式无效或不完整：{e}"))?;
     if header.format == Format::Sequential {
         return Err("暂不支持 Format 2 MIDI；请先转换为 Format 0 或 Format 1".into());
     }

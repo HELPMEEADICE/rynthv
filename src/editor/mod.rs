@@ -4,6 +4,7 @@ mod commands;
 mod dictionary;
 mod groups;
 mod history;
+mod instances;
 mod instrumental;
 mod loop_region;
 mod lyrics;

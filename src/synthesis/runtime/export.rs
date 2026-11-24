@@ -267,6 +267,7 @@ impl Runtime {
                             recordings_for(output.stem),
                             output.track,
                             output.stem,
+                            None,
                         )?
                         .ok_or_else(|| {
                             format!(

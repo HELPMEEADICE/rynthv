@@ -22,6 +22,11 @@ pub struct ImportedFlatVoice {
     pub path: PathBuf,
 }
 
+pub fn inspect_import(input: &Path) -> Result<Vec<super::FlatManifest>> {
+    let mut archive = FlatArchive::open(input)?;
+    archive.visit_packages(|_, package| Ok(package.manifest))
+}
+
 /// A batch becomes visible to library scans with one directory rename.
 pub fn import(input: &Path, root: &Path) -> Result<Vec<ImportedFlatVoice>> {
     let mut archive = FlatArchive::open(input)?;

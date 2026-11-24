@@ -11,7 +11,7 @@ mod resolver;
 
 pub use archive::{FlatArchive, PackageKind};
 pub(crate) use conditioning::FlatConditioning;
-pub use library::{ImportedFlatVoice, import, remove_import};
+pub use library::{ImportedFlatVoice, import, inspect_import, remove_import};
 pub use manifest::{FlatManifest, FlatStyle, ModelRole, PackageConfig};
 pub use registry::{FlatModelRegistry, ModelSource};
 pub use resolver::{FlatDependency, FlatModel, ResolvedFlatModels};

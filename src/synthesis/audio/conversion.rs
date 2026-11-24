@@ -46,6 +46,7 @@ pub(crate) fn convert_samples(
     };
     if rate == source_rate {
         for frame in 0..source_frames {
+            checkpoint(frame)?;
             for channel in 0..channels {
                 samples.push(sample(frame, channel) as f32);
             }
@@ -77,6 +78,7 @@ pub(crate) fn convert_samples(
         }
         let ratio = f64::from(source_rate) / f64::from(rate);
         for frame in 0..count / channels {
+            checkpoint(frame)?;
             let position = frame as f64 * ratio;
             let base = position.floor() as i64;
             let phase = (position.fract() * PHASES as f64).round() as usize;
@@ -107,4 +109,12 @@ pub(crate) fn convert_samples(
         }
     }
     RenderedAudio::new(rate, start_seconds, layout, samples)
+}
+
+fn checkpoint(frame: usize) -> Result<(), AudioError> {
+    if frame.is_multiple_of(4096) {
+        crate::synthesis::execution::checkpoint()
+            .map_err(|error| AudioError::Wave(error.to_string()))?;
+    }
+    Ok(())
 }

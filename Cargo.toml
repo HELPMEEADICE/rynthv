@@ -8,7 +8,7 @@ default-run = "rynthv"
 
 [features]
 default = ["gui", "cli"]
-gui = ["dep:eframe", "dep:egui_extras", "dep:image", "dep:rfd", "dep:cpal"]
+gui = ["dep:eframe", "dep:egui_extras", "dep:rfd", "dep:cpal", "wgpu/gles"]
 cli = ["dep:clap", "dep:ctrlc", "dep:rustyline", "dep:shell-words"]
 # Opt-in CPU timing spans; absent from normal editor builds.
 synth-profile = []
@@ -21,10 +21,14 @@ path = "src/main.rs"
 name = "rynthv-synth"
 path = "src/synthesis_cli.rs"
 
+[[example]]
+name = "generate_icons"
+required-features = ["gui"]
+
 [dependencies]
 eframe = { version = "=0.36.2", optional = true, default-features = false, features = ["default_fonts", "wgpu_no_default_features", "accesskit"] }
 egui_extras = { version = "=0.36.2", optional = true, default-features = false, features = ["svg", "file", "image"] }
-image = { version = "=0.25.10", optional = true, default-features = false, features = ["png"] }
+image = { version = "=0.25.10", default-features = false, features = ["png"] }
 clap = { version = "4.5", optional = true, default-features = false, features = ["std", "help", "usage", "error-context", "derive"] }
 ctrlc = { version = "3.4", optional = true }
 rustyline = { version = "17", optional = true, default-features = false }
@@ -54,7 +58,7 @@ wgpu = { version = "=30.0.1", default-features = false, features = ["dx12", "vul
 
 [target.'cfg(target_os = "linux")'.dependencies]
 eframe = { version = "=0.36.2", optional = true, default-features = false, features = ["x11", "wayland"] }
-wgpu = { version = "=30.0.1", default-features = false, features = ["vulkan", "gles"] }
+wgpu = { version = "=30.0.1", default-features = false, features = ["vulkan"] }
 rfd = { version = "=0.17.2", optional = true, default-features = false, features = ["xdg-portal", "wayland"] }
 
 [build-dependencies]
