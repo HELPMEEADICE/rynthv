@@ -80,7 +80,7 @@ impl Workstation {
                 )
             }
             ("audio", "import") => {
-                let path = std::fs::canonicalize(call.path("input")?)
+                let path = std::path::absolute(call.path("input")?)
                     .map_err(|error| Failure::new("AUDIO_RESOURCE", error.to_string()))?;
                 let audio = instrumental::read_audio(&path, &self.cancellation)
                     .map_err(|error| Failure::new("AUDIO_RESOURCE", error))?;

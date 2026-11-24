@@ -97,6 +97,19 @@ pub(super) fn edit(call: Call<'_>, editor: &mut Editor, selection: &Selection) -
                     "Group transpose must be between -127 and 127 semitones",
                 ));
             }
+            if let Some(value) = transpose
+                && editor
+                    .project
+                    .group(&reference.group_id)
+                    .expect("selected group")
+                    .notes
+                    .iter()
+                    .any(|note| !(0..=127).contains(&(note.pitch + value)))
+            {
+                return Err(invalid(
+                    "Group transpose would put a note outside MIDI pitch range",
+                ));
+            }
             editor.begin("Set group instance");
             let selected = editor
                 .project

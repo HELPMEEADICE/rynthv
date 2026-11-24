@@ -335,7 +335,12 @@ impl Workstation {
                 let edit = NoteEdit::parse(call)?;
                 let delta = edit
                     .offset(project, unit)?
-                    .map_or(0, |at| at - items[0].onset());
+                    .map(|at| {
+                        at.checked_sub(items[0].onset())
+                            .ok_or_else(|| invalid("Copy offset overflow"))
+                    })
+                    .transpose()?
+                    .unwrap_or(0);
                 for item in &items {
                     let mut note = item.note.clone();
                     note.renew_identity();
@@ -399,7 +404,10 @@ impl Workstation {
                     let end = snap(item.onset() + item.note.duration)?;
                     let note = note_mut(project, item);
                     set_position(note, &item.reference, at)?;
-                    note.duration = (end - at).max(grid);
+                    note.duration = end
+                        .checked_sub(at)
+                        .ok_or_else(|| invalid("Quantized duration overflow"))?
+                        .max(grid);
                 }
             }
             "split" => {
@@ -439,7 +447,9 @@ impl Workstation {
                     }
                     end = end.max(item.note.onset + item.note.duration);
                 }
-                note_mut(project, first).duration = end - first.note.onset;
+                note_mut(project, first).duration = end
+                    .checked_sub(first.note.onset)
+                    .ok_or_else(|| invalid("Merged duration overflow"))?;
                 remove(project, &items[1..]);
             }
             _ => return Err(invalid("Unknown note edit")),

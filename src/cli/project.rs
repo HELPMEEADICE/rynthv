@@ -119,12 +119,15 @@ impl Workstation {
     pub(super) fn current(&self, path: &Path) -> Option<&OpenProject> {
         let open = self.open.as_ref()?;
         (open.path == path
-            || std::fs::canonicalize(path).is_ok_and(|canonical| canonical == open.path))
+            || std::fs::canonicalize(path)
+                .ok()
+                .zip(std::fs::canonicalize(&open.path).ok())
+                .is_some_and(|(a, b)| a == b))
         .then_some(open)
     }
 
     fn open_path(&mut self, path: &Path) -> Result<()> {
-        let path = std::fs::canonicalize(path).map_err(|error| {
+        let path = std::path::absolute(path).map_err(|error| {
             Failure::new("PROJECT_LOAD", format!("{}: {error}", path.display()))
         })?;
         let loaded = storage::load(&path).map_err(|error| Failure::new("PROJECT_LOAD", error))?;

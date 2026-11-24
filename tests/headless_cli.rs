@@ -482,6 +482,11 @@ fn mixed_audio_and_stems_preserve_native_samples() {
     work.args(&[
         "audio", "import", "song.svp", "--input", "tone.wav", "--name", "B", "--offset", "0.05",
     ]);
+    let saved: Value = serde_json::from_slice(&fs::read(work.path("song.svp")).unwrap()).unwrap();
+    assert_eq!(
+        saved["tracks"][1]["rynthvInstrumental"]["clip"]["path"],
+        "tone.wav"
+    );
     let rendered = work.args(&[
         "render",
         "song.svp",
