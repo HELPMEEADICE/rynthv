@@ -52,3 +52,9 @@ find-msvc-tools = "=0.1.14"
 [profile.release]
 lto = "thin"
 codegen-units = 1
+
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = 0
