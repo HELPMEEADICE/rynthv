@@ -4,7 +4,18 @@
   <img src="assets/branding/app-icon.png" alt="RynthV 图标" width="96" height="96">
 </p>
 
-使用 Rust + egui 开发的歌声合成引擎。
+使用 Rust 开发的原生歌声合成工作站，提供 egui 编辑器和可脚本化的 Headless CLI。
+
+```sh
+rynthv song.svp
+rynthv -cli --help
+rynthv --cli project info song.svp --json
+rynthv -cli render song.svp --compute-backend cpu --output song.wav
+```
+
+在终端执行 `rynthv -cli` 可进入 REPL，自动化程序可以使用子命令或 `rynthv -cli --stdio`。
+见 [CLI 制作指南](docs/cli.md)、[Linux Headless 构建与资源配置](docs/headless.md)、
+[Agent 集成](docs/agent-integration.md) 和 [机器接口](docs/cli-schema.md)。
 
 ## 构建与运行
 
@@ -37,7 +48,8 @@ AppImage 在 Ubuntu 24.04 上构建。运行依赖系统的 glibc 和 `libgcc_s.
 
 ## 声库与配置
 
-首次使用请在设置中手动选择声库目录和发音词典目录，程序不会自动探测资源路径，也不附带声库、词典或用户模型上下文。
+首次使用可在设置中选择声库和发音词典目录，或者执行 `rynthv -cli config set`。
+声库、词典和用户模型上下文由用户提供。
 
 | 声库类型 | Windows | Linux |
 | --- | --- | --- |
@@ -48,7 +60,7 @@ Windows ARM64 和 Linux 可通过上下文文件或手动输入导入二代声�
 
 配置目录：Windows 为 `%LOCALAPPDATA%/RynthV`，Linux 为 `$XDG_CONFIG_HOME/RynthV`（未设置时为 `$HOME/.config/RynthV`）。模型上下文在 Windows 保存在 `%APPDATA%/RynthV/context.json`，Linux 保存在上述配置目录的 `context.json`。
 
-命令行合成与诊断工具的用法可通过 `cargo run --release --locked --bin rynthv-synth -- --help` 查看。
+底层合成和诊断工具的用法可通过 `cargo run --release --locked --bin rynthv-synth -- --help` 查看。
 
 CPU / WebGPU 推理设置和性能对比方法见 [原生 WebGPU 推理指南](docs/webgpu-inference.md)。
 

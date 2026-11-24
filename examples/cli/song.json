@@ -1,0 +1,5 @@
+[
+  ["project", "new", "draft.svp", "--bpm", "128"],
+  ["project", "apply", "draft.svp", "--input", "examples/cli/batch.json"],
+  ["project", "info", "draft.svp"]
+]
