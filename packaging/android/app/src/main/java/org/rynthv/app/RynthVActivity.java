@@ -3,6 +3,7 @@ package org.rynthv.app;
 import android.app.AlertDialog;
 import android.app.NativeActivity;
 import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.ComponentCallbacks2;
 import android.content.Intent;
 import android.media.AudioManager;
@@ -36,6 +37,7 @@ public final class RynthVActivity extends NativeActivity {
     private DocumentStore documents;
     private PlaybackFocus playbackFocus;
     private AudioManager audioManager;
+    private EditorInput editorInput;
     private final AudioDeviceCallback routes = new AudioDeviceCallback() {
         @Override public void onAudioDevicesAdded(AudioDeviceInfo[] devices) { changed(devices); }
         @Override public void onAudioDevicesRemoved(AudioDeviceInfo[] devices) { changed(devices); }
@@ -63,6 +65,7 @@ public final class RynthVActivity extends NativeActivity {
         playbackFocus = new PlaybackFocus(audioManager, () -> nativeEvent(2));
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         super.onCreate(state);
+        editorInput = new EditorInput(this, () -> nativeEvent(6));
         audioManager.registerAudioDeviceCallback(routes, new Handler(Looper.getMainLooper()));
         setVolumeControlStream(AudioManager.STREAM_MUSIC);
         if (Build.VERSION.SDK_INT >= 33) {
@@ -106,6 +109,25 @@ public final class RynthVActivity extends NativeActivity {
 
     boolean rynthvSetPlaybackWanted(boolean wanted) {
         return playbackFocus.setWanted(wanted);
+    }
+
+    void rynthvUpdateKeyboard(int purpose, boolean reset) {
+        runOnUiThread(() -> editorInput.showKeyboard(purpose, reset));
+    }
+
+    String rynthvTakeInput() {
+        return editorInput == null ? null : editorInput.takeEvents();
+    }
+
+    String rynthvReadClipboard() {
+        ClipData clip = getSystemService(ClipboardManager.class).getPrimaryClip();
+        if (clip == null || clip.getItemCount() == 0) return null;
+        CharSequence text = clip.getItemAt(0).getText();
+        return text == null ? null : text.toString();
+    }
+
+    void rynthvCopyText(String text) {
+        getSystemService(ClipboardManager.class).setPrimaryClip(ClipData.newPlainText("RynthV", text));
     }
 
     String rynthvFilesDirectory() {

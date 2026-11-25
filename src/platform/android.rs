@@ -12,6 +12,7 @@ use std::{
     sync::{Mutex, OnceLock},
 };
 
+pub(crate) mod input;
 pub(crate) mod lifecycle;
 
 thread_local! {
@@ -50,7 +51,7 @@ pub(crate) fn wake() {
 }
 
 pub(crate) fn with_activity<T>(
-    f: impl FnOnce(&mut Env<'_>, &Global<JObject<'static>>) -> JniResult<T>,
+    f: impl FnOnce(&mut Env<'_>, &JObject<'_>) -> JniResult<T>,
 ) -> Result<T, String> {
     ACTIVITY.with_borrow(|app| {
         let app = app.as_ref().ok_or("Android Activity 未初始化")?;

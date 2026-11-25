@@ -407,6 +407,11 @@ impl App {
     }
 }
 impl eframe::App for App {
+    #[cfg(target_os = "android")]
+    fn raw_input_hook(&mut self, ctx: &Context, raw: &mut RawInput) {
+        crate::platform::android::input::read(ctx, raw);
+    }
+
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         #[cfg(target_os = "android")]
@@ -586,7 +591,10 @@ impl eframe::App for App {
             self.persist_layout();
         }
         #[cfg(target_os = "android")]
-        self.update_recovery(&ctx);
+        {
+            self.update_recovery(&ctx);
+            crate::platform::android::input::publish(&ctx);
+        }
     }
     fn on_exit(&mut self) {
         ui::piano::cancel_audition(self);

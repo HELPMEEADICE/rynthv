@@ -29,6 +29,10 @@ pub(crate) fn event(event: i32) {
         3 => BACK,
         4 => TRIM_MEMORY,
         5 => AUDIO_ROUTE,
+        6 => {
+            super::input::ready();
+            0
+        }
         _ => 0,
     };
     EVENTS.fetch_or(bit, Ordering::Release);

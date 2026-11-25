@@ -3,7 +3,7 @@ use crate::{
     app::App,
     ui::{lanes, phonemes, piano},
 };
-use eframe::egui::{Context, Event, ViewportCommand};
+use eframe::egui::{Context, Event};
 
 fn anchors(app: &App) -> bool {
     app.piano_tool == piano::Tool::PitchAnchor
@@ -107,7 +107,14 @@ pub(crate) fn paste(app: &mut App, ctx: &Context) {
         piano::anchor_paste(app);
     } else if can_paste(app) {
         // Menus and the platform shortcut read the same system clipboard.
-        ctx.send_viewport_cmd(ViewportCommand::RequestPaste);
+        #[cfg(not(target_os = "android"))]
+        ctx.send_viewport_cmd(eframe::egui::ViewportCommand::RequestPaste);
+        #[cfg(target_os = "android")]
+        match crate::platform::android::input::clipboard() {
+            Ok(Some(text)) => paste_notes(app, &text),
+            Ok(None) => {}
+            Err(error) => app.error = Some(error),
+        }
     }
 }
 
@@ -156,15 +163,19 @@ pub(super) fn clipboard_events(app: &mut App, ctx: &Context) -> bool {
                 if lanes::parameter_active(app) {
                     lanes::parameter_paste_text(app, &text);
                 } else {
-                    let at = app.editor.transport.position;
-                    let result = app.editor.paste_text(&text, at);
-                    report_paste(app, result);
+                    paste_notes(app, &text);
                 }
             }
             _ => unreachable!(),
         }
     }
     handled
+}
+
+fn paste_notes(app: &mut App, text: &str) {
+    let at = app.editor.transport.position;
+    let result = app.editor.paste_text(text, at);
+    report_paste(app, result);
 }
 
 pub(super) fn duplicate(app: &mut App) {
