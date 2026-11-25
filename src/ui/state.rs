@@ -127,6 +127,7 @@ impl Default for ViewState {
     }
 }
 impl ViewState {
+    #[cfg(not(target_os = "android"))]
     pub fn toggle(&mut self, column: Column) {
         if self.columns.contains(&column) {
             self.columns.retain(|c| *c != column);
@@ -189,6 +190,7 @@ impl ViewState {
 }
 #[derive(Clone, Copy)]
 pub enum DragPayload {
+    #[cfg(not(target_os = "android"))]
     Column(Column),
     Arrangement,
     Piano,

@@ -478,95 +478,11 @@ impl eframe::App for App {
         ui.painter()
             .rect_filled(ui.max_rect(), 0, ui::theme::BACKGROUND);
         #[cfg(target_os = "android")]
-        let rect = ui.max_rect().intersect(ctx.content_rect());
+        ui::mobile::show(self, ui, ctx.content_rect().intersect(ui.max_rect()));
         #[cfg(not(target_os = "android"))]
-        let rect = ui.max_rect();
-        #[cfg(target_os = "android")]
-        let (menu_height, transport_height) =
-            (ui::mobile::MENU_HEIGHT, ui::mobile::TRANSPORT_HEIGHT);
-        #[cfg(not(target_os = "android"))]
-        let (menu_height, transport_height) = (27.0, 44.0);
-        let mobile = cfg!(target_os = "android");
-        let menu = Rect::from_min_max(rect.min, pos2(rect.right(), rect.top() + menu_height));
-        #[cfg(not(target_os = "android"))]
-        ui::chrome::menus(self, &mut ui::child(ui, menu, "menu"));
-        #[cfg(target_os = "android")]
-        ScrollArea::horizontal()
-            .auto_shrink([false, false])
-            .scroll_bar_visibility(scroll_area::ScrollBarVisibility::AlwaysHidden)
-            .show(&mut ui::child(ui, menu, "menu"), |ui| {
-                ui::chrome::menus(self, ui)
-            });
-        let transport_top = if mobile {
-            rect.bottom() - transport_height
-        } else {
-            menu.bottom()
-        };
-        let transport = Rect::from_min_size(
-            pos2(rect.left(), transport_top),
-            vec2(rect.width(), transport_height),
-        );
-        let mut transport_ui = ui::child(ui, transport, "transport");
-        #[cfg(target_os = "android")]
-        if rect.width() < 760.0 {
-            ui::mobile::transport(self, &mut transport_ui);
-        } else {
-            ui::transport::show(self, &mut transport_ui);
-        }
-        #[cfg(not(target_os = "android"))]
-        ui::transport::show(self, &mut transport_ui);
-        let status_height = if self.preferences.show_status_bar {
-            23.0
-        } else {
-            0.0
-        };
-        let status_bottom = if mobile {
-            transport.top()
-        } else {
-            rect.bottom()
-        };
-        let status = Rect::from_min_size(
-            pos2(rect.left(), status_bottom - status_height),
-            vec2(rect.width(), status_height),
-        );
-        let work = Rect::from_min_max(
-            pos2(
-                rect.left() + 5.0,
-                if mobile {
-                    menu.bottom()
-                } else {
-                    transport.bottom()
-                },
-            ),
-            pos2(rect.right() - 5.0, status.top() - 4.0),
-        );
-        ui::workspace::show(self, &mut ui::child(ui, work, "workspace"));
+        ui::chrome::desktop(self, ui);
         ui::instrumental::update_drag(self, &ctx);
         ui::group_edit::end_frame(self, &ctx);
-        if self.preferences.show_status_bar {
-            let mut status_ui = ui::child(ui, status.shrink2(vec2(8.0, 1.0)), "status");
-            status_ui.horizontal(|ui| {
-                let hint = if mobile && self.status.is_empty() {
-                    "双指缩放或平移 · 长按打开菜单"
-                } else if self.status.is_empty() && self.piano_tool == ui::piano::Tool::PitchAnchor {
-                    "双击创建控制点 · 拖动框选 / 移动 · 四边手柄缩放 · Delete 删除 · Esc 取消 · Ctrl+Z 撤销"
-                } else if self.status.is_empty() && self.piano_tool == ui::piano::Tool::PitchDraw {
-                    "左键拖动绘制音高 · 右键拖动擦除 · Esc 取消本次绘制 · Ctrl+Z 撤销 · 中键拖动视野"
-                } else if self.status.is_empty() {
-                    "双击创建音符 · 拖动框选 · 中键拖动视野 · Shift+滚轮水平移动 · Ctrl+滚轮缩放"
-                } else {
-                    &self.status
-                };
-                ui.label(RichText::new(hint).size(11.0).color(ui::theme::MUTED));
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.label(
-                        RichText::new(self.synthesis.status())
-                            .size(11.0)
-                            .color(ui::theme::MUTED),
-                    );
-                });
-            });
-        }
         self.dialogs(&ctx);
         ui::rename::show(self, &ctx);
         if self.pending.is_none() && self.error.is_none() {

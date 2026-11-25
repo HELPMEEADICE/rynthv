@@ -26,10 +26,12 @@ pub mod theme;
 pub mod time_edit;
 pub mod time_tracks;
 pub mod timeline;
-pub mod tool_rail;
+#[cfg(not(target_os = "android"))]
+mod tool_rail;
 mod track_color;
 pub mod track_header;
-pub mod transport;
+#[cfg(not(target_os = "android"))]
+mod transport;
 pub mod view_pan;
 pub mod voice_library;
 pub mod workspace;

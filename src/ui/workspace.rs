@@ -1,18 +1,12 @@
-use super::{
-    child,
-    state::{Column, DragPayload},
-    theme::*,
-};
+#[cfg(not(target_os = "android"))]
+use super::state::Column;
+use super::{child, state::DragPayload, theme::*};
 use crate::app::App;
 use eframe::egui::*;
 
+#[cfg(not(target_os = "android"))]
 pub fn show(app: &mut App, ui: &mut Ui) {
     let rect = ui.max_rect();
-    #[cfg(target_os = "android")]
-    if rect.width() < 980.0 {
-        super::mobile::workspace(app, ui);
-        return;
-    }
     let rail = Rect::from_min_max(
         pos2(rect.right() - super::tool_rail::WIDTH, rect.top()),
         rect.max,
@@ -79,14 +73,11 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         app.view.columns.insert(index, source);
     }
 }
-pub(super) fn editor(app: &mut App, ui: &mut Ui) {
+#[cfg(not(target_os = "android"))]
+fn editor(app: &mut App, ui: &mut Ui) {
     let rect = ui.max_rect();
     let available = (rect.height() - 5.0).max(0.0);
-    let arrangement_limit = if cfg!(target_os = "android") {
-        (available * 0.34).max(42.0)
-    } else {
-        (available - 170.0).max(80.0)
-    };
+    let arrangement_limit = (available - 170.0).max(80.0);
     let arrangement_height = if app.view.arrangement_collapsed {
         42.0
     } else if app.piano_collapsed {
@@ -156,7 +147,7 @@ pub(super) fn editor(app: &mut App, ui: &mut Ui) {
         }
     }
 }
-fn piano_stack(app: &mut App, ui: &mut Ui) {
+pub(super) fn piano_stack(app: &mut App, ui: &mut Ui) {
     let rect = ui.max_rect();
     let toolbar = Rect::from_min_size(rect.min, vec2(rect.width(), super::piano::TOOLBAR_HEIGHT));
     let tabs = Rect::from_min_max(pos2(rect.left(), rect.bottom() - 28.0), rect.max);

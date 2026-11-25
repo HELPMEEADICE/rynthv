@@ -31,6 +31,7 @@ pub(super) fn general(app: &mut App, ui: &mut Ui) {
     toggle(ui, "显示状态栏", &mut app.preferences.show_status_bar);
     toggle(ui, "显示控件操作提示", &mut app.preferences.control_hints);
     section(ui, "工作区");
+    #[cfg(not(target_os = "android"))]
     row(ui, "工具列宽度", |ui| {
         ui.spacing_mut().slider_width = (ui.available_width() - 55.0).max(40.0);
         ui.add(Slider::new(&mut app.view.panel_width, 140.0..=420.0).suffix(" px"));
@@ -109,9 +110,12 @@ pub(super) fn rendering(app: &mut App, ui: &mut Ui) {
     section(ui, "音频导出");
     row(ui, "导出设置", |ui| {
         if ui.button("打开渲染面板").clicked() {
+            #[cfg(not(target_os = "android"))]
             if !app.view.columns.contains(&Column::Render) {
                 app.view.toggle(Column::Render);
             }
+            #[cfg(target_os = "android")]
+            crate::ui::mobile::open_panel(app, ui.ctx(), Column::Render);
             app.settings = false;
         }
     });
