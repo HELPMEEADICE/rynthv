@@ -9,16 +9,24 @@ use jni::{
 use std::{
     cell::RefCell,
     path::{Path, PathBuf},
-    sync::Mutex,
+    sync::{Mutex, OnceLock},
 };
+
+pub(crate) mod lifecycle;
 
 thread_local! {
     static ACTIVITY: RefCell<Option<AndroidApp>> = const { RefCell::new(None) };
 }
 static REPAINT: Mutex<Option<Context>> = Mutex::new(None);
+static FILES_DIRECTORY: OnceLock<Result<PathBuf, String>> = OnceLock::new();
 
 pub(crate) fn install_activity(app: AndroidApp) {
     ACTIVITY.set(Some(app));
+    FILES_DIRECTORY.get_or_init(|| {
+        string_method(jni::jni_str!("rynthvFilesDirectory"))?
+            .map(PathBuf::from)
+            .ok_or_else(|| "Android 无法定位应用私有目录".into())
+    });
 }
 
 pub(crate) fn release_activity() {
@@ -71,9 +79,10 @@ pub(crate) fn string_method(method: &jni::strings::JNIStr) -> Result<Option<Stri
 }
 
 pub(crate) fn files_directory() -> Result<PathBuf, String> {
-    string_method(jni::jni_str!("rynthvFilesDirectory"))?
-        .map(PathBuf::from)
-        .ok_or_else(|| "Android 无法定位应用私有目录".into())
+    FILES_DIRECTORY
+        .get()
+        .cloned()
+        .unwrap_or_else(|| Err("Android 应用目录未初始化".into()))
 }
 
 pub(crate) fn finish() -> Result<(), String> {

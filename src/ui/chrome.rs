@@ -39,6 +39,10 @@ pub fn menus(app: &mut App, ui: &mut Ui) {
             if item(ui, "另存为…", "Ctrl+Shift+S", true) {
                 app.save_project(true, &ctx);
             }
+            #[cfg(target_os = "android")]
+            if item(ui, "分享工程…", "", true) {
+                app.share_project(&ctx);
+            }
             ui.separator();
             if item(ui, "导入…", "Ctrl+Shift+I", true) {
                 app.request_file(FileAction::ImportMidi, &ctx);

@@ -3,9 +3,17 @@ package org.rynthv.app;
 import android.app.AlertDialog;
 import android.app.NativeActivity;
 import android.content.ClipData;
+import android.content.ComponentCallbacks2;
 import android.content.Intent;
+import android.media.AudioManager;
+import android.media.AudioDeviceCallback;
+import android.media.AudioDeviceInfo;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.window.OnBackInvokedDispatcher;
 import android.util.Log;
 import android.view.WindowManager;
 import android.widget.Toast;
@@ -26,17 +34,78 @@ public final class RynthVActivity extends NativeActivity {
     private final ExecutorService files = Executors.newSingleThreadExecutor();
     private final AtomicReference<String> pickerResult = new AtomicReference<>();
     private DocumentStore documents;
+    private PlaybackFocus playbackFocus;
+    private AudioManager audioManager;
+    private final AudioDeviceCallback routes = new AudioDeviceCallback() {
+        @Override public void onAudioDevicesAdded(AudioDeviceInfo[] devices) { changed(devices); }
+        @Override public void onAudioDevicesRemoved(AudioDeviceInfo[] devices) { changed(devices); }
+
+        private void changed(AudioDeviceInfo[] devices) {
+            for (AudioDeviceInfo device : devices) {
+                if (device.isSink()) {
+                    nativeEvent(5);
+                    return;
+                }
+            }
+        }
+    };
     private int pickerKind;
     private String pickerExtensions;
     private File publishSource;
 
     private static native void nativeWake();
+    private static native void nativeEvent(int event);
 
     @Override
     protected void onCreate(Bundle state) {
         documents = new DocumentStore(this);
+        audioManager = getSystemService(AudioManager.class);
+        playbackFocus = new PlaybackFocus(audioManager, () -> nativeEvent(2));
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         super.onCreate(state);
+        audioManager.registerAudioDeviceCallback(routes, new Handler(Looper.getMainLooper()));
+        setVolumeControlStream(AudioManager.STREAM_MUSIC);
+        if (Build.VERSION.SDK_INT >= 33) {
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                OnBackInvokedDispatcher.PRIORITY_DEFAULT, () -> nativeEvent(3));
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        playbackFocus.setActive(true);
+        nativeEvent(1);
+    }
+
+    @Override
+    protected void onPause() {
+        nativeEvent(0);
+        playbackFocus.setActive(false);
+        super.onPause();
+    }
+
+    @Override
+    public void onBackPressed() {
+        nativeEvent(3);
+    }
+
+    @Override
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        if (level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW
+                || level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL
+                || level >= ComponentCallbacks2.TRIM_MEMORY_MODERATE) nativeEvent(4);
+    }
+
+    @Override
+    public void onLowMemory() {
+        super.onLowMemory();
+        nativeEvent(4);
+    }
+
+    boolean rynthvSetPlaybackWanted(boolean wanted) {
+        return playbackFocus.setWanted(wanted);
     }
 
     String rynthvFilesDirectory() {
@@ -171,6 +240,7 @@ public final class RynthVActivity extends NativeActivity {
 
     @Override
     protected void onDestroy() {
+        audioManager.unregisterAudioDeviceCallback(routes);
         files.shutdown();
         super.onDestroy();
     }

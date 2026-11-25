@@ -23,6 +23,10 @@ pub(super) fn build<T: SizedSample + FromSample<f32>>(
         config,
         move |output: &mut [T], _| {
             output.fill(T::EQUILIBRIUM);
+            #[cfg(target_os = "android")]
+            if !crate::platform::android::lifecycle::audio_allowed() {
+                return;
+            }
             if state.failure.load(Ordering::Acquire) != 0 {
                 return;
             }

@@ -15,6 +15,13 @@ pub struct KeyboardAudition {
     visible: bool,
 }
 
+#[cfg(target_os = "android")]
+impl KeyboardAudition {
+    pub(crate) fn is_sounding(&self) -> bool {
+        self.note.is_some()
+    }
+}
+
 pub fn begin_keyboard_frame(app: &mut App, ctx: &Context) {
     app.piano_audition.visible = false;
     if blocked(app, ctx) || ctx.input(|i| !i.focused) {

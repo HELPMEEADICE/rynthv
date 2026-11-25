@@ -41,3 +41,8 @@ pub fn run_android(app: AndroidApp) {
 pub fn wake_android() {
     android::wake();
 }
+
+pub fn android_event(event: i32) {
+    android::lifecycle::event(event);
+    android::wake();
+}

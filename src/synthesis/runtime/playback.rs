@@ -25,6 +25,8 @@ pub(super) struct Snapshot {
 enum Command {
     Transport(u64, Transport),
     Audition,
+    #[cfg(target_os = "android")]
+    ResetDevice,
     Quit,
 }
 
@@ -148,6 +150,14 @@ impl Playback {
             state.position_seconds = None;
         }
         self.send(Transport::Clear);
+    }
+
+    #[cfg(target_os = "android")]
+    pub(super) fn reset_device(&self) {
+        self.clear();
+        if self.tx.send(Command::ResetDevice).is_err() {
+            self.thread_stopped();
+        }
     }
 
     fn send(&self, command: Transport) {

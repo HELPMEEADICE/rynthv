@@ -104,6 +104,11 @@ impl App {
                 // Construct and validate before retiring the current project.
                 let (editor, summary) = Editor::from_midi(file, &indices)?;
                 self.synthesis.reset_project();
+                #[cfg(target_os = "android")]
+                {
+                    self.recovery.invalidate();
+                    self.recovered_dirty = true;
+                }
                 self.editor = editor;
                 self.path = None;
                 self.audio_import = None;

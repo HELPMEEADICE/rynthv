@@ -8,6 +8,7 @@ use std::{
 
 /// Content fingerprint used for optimistic writes across processes.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[cfg_attr(target_os = "android", derive(serde::Serialize, serde::Deserialize))]
 pub struct Revision([u8; 32]);
 
 impl Revision {

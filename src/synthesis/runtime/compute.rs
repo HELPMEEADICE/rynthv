@@ -58,6 +58,17 @@ impl State {
 }
 
 impl Runtime {
+    #[cfg(target_os = "android")]
+    pub(crate) fn release_mobile_caches(&mut self) {
+        self.clear_voices();
+        self.visuals.clear();
+        self.compute = State::new(
+            self.library.settings.compute_backend,
+            self.library.settings.compute_adapter.clone(),
+            self.repaint.clone(),
+        );
+    }
+
     pub fn compute_diagnostics(&self) -> Option<Diagnostics> {
         self.compute.session().map(Session::diagnostics)
     }

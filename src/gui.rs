@@ -1,7 +1,7 @@
 #[cfg(target_os = "android")]
 mod android;
 #[cfg(target_os = "android")]
-pub use android::{run_android, wake_android};
+pub use android::{android_event, run_android, wake_android};
 
 #[cfg(not(target_os = "android"))]
 pub fn run_desktop(path: Option<std::path::PathBuf>) -> eframe::Result {

@@ -1,6 +1,11 @@
 mod instrumental;
 mod midi;
+#[cfg(target_os = "android")]
+mod mobile;
 pub(crate) mod picker;
+mod project;
+#[cfg(target_os = "android")]
+mod recovery;
 mod voice;
 pub use midi::{MidiImport, MidiImportMode, MidiImportPhase};
 
@@ -61,6 +66,12 @@ pub struct App {
     pub pending: Option<FileAction>,
     #[cfg(target_os = "android")]
     picker: Option<picker::Completion>,
+    #[cfg(target_os = "android")]
+    recovery: recovery::Recovery,
+    #[cfg(target_os = "android")]
+    recovered_dirty: bool,
+    #[cfg(target_os = "android")]
+    audio_wanted: bool,
     pub allow_close: bool,
     pub status: String,
     settings_path: Option<PathBuf>,
@@ -161,6 +172,12 @@ impl App {
             pending: None,
             #[cfg(target_os = "android")]
             picker: None,
+            #[cfg(target_os = "android")]
+            recovery: recovery::Recovery::default(),
+            #[cfg(target_os = "android")]
+            recovered_dirty: false,
+            #[cfg(target_os = "android")]
+            audio_wanted: false,
             allow_close: false,
             status: String::new(),
             settings_path,
@@ -173,140 +190,27 @@ impl App {
         if let Some(path) = path {
             app.open_path(path);
         }
+        #[cfg(target_os = "android")]
+        match recovery::Recovery::init(&cc.egui_ctx) {
+            Ok((recovery, snapshot)) => {
+                app.recovery = recovery;
+                if let Some(snapshot) = snapshot
+                    && let Err(error) = app.restore_snapshot(snapshot)
+                {
+                    app.error = Some(error);
+                }
+            }
+            Err(error) => app.error = Some(error),
+        }
         app
     }
-    pub fn open_path(&mut self, path: PathBuf) {
-        ui::phonemes::phoneme_deactivate(self);
-        ui::piano::cancel_audition(self);
-        self.midi_import = None;
-        match storage::load(&path) {
-            Ok(storage::LoadedProject {
-                project,
-                imported,
-                revision,
-            }) => {
-                self.editor = Editor::new(project);
-                self.synthesis.reset_project();
-                self.path = (!imported).then_some(path);
-                self.project_revision = (!imported).then_some(revision);
-                self.status = if imported {
-                    "已导入 Synthesizer V Studio 1 工程，请另存为新文件".into()
-                } else {
-                    String::new()
-                };
-                self.gesture = None;
-                self.piano_anchor = ui::piano::AnchorSelection::default();
-                self.parameter_lane = ui::lanes::ParameterSelection::default();
-                self.phoneme_editing = ui::phonemes::PhonemeEditing::default();
-                self.group_gesture = None;
-                self.audio_drag = None;
-                self.mixer_drag = None;
-                self.audio_import = None;
-                self.view_pan = ui::view_pan::ViewPan::default();
-                self.rename = None;
-                self.time_edit = None;
-                self.bpm_edit = None;
-                self.lyric = None;
-                self.phoneme_draft = ui::panels::PhonemeDraft::default();
-                self.fill_lyrics = None;
-                let reference = self.editor.active_ref();
-                let first = reference.and_then(|r| {
-                    self.editor.notes().iter().find_map(|n| {
-                        r.note_range(n)
-                            .map(|(start, _)| (start, n.pitch + r.pitch_offset))
-                    })
-                });
-                self.view.piano.start = beats(first.map_or_else(
-                    || reference.map_or(0, |r| r.blick_absolute_begin),
-                    |(start, _)| start,
-                ))
-                .floor()
-                .max(0.0);
-                if let Some((_, pitch)) = first {
-                    self.view.top_pitch = (pitch + 9).clamp(12, 127) as f32;
-                }
-            }
-            Err(e) => self.error = Some(e),
-        }
-    }
-    pub fn save_project(&mut self, save_as: bool, _ctx: &Context) -> bool {
-        ui::phonemes::phoneme_deactivate(self);
-        ui::piano::cancel_audition(self);
-        ui::tempo_input::finish(self);
-        self.commit_lyric();
-        self.editor.finish();
-        #[cfg(not(target_os = "android"))]
-        let path = if save_as || self.path.is_none() {
-            let name = self
-                .path
-                .as_ref()
-                .and_then(|p| p.file_name())
-                .and_then(|n| n.to_str())
-                .unwrap_or("未命名.svp");
-            rfd::FileDialog::new()
-                .add_filter("Synthesizer V 工程", &["svp"])
-                .set_file_name(name)
-                .save_file()
-        } else {
-            self.path.clone()
-        };
+
+    fn has_unsaved_changes(&self) -> bool {
         #[cfg(target_os = "android")]
-        let path = if save_as || self.path.is_none() {
-            let name = self
-                .path
-                .as_deref()
-                .and_then(std::path::Path::file_name)
-                .unwrap_or_else(|| std::ffi::OsStr::new("未命名.svp"));
-            match crate::platform::config_directory().and_then(|root| {
-                let directory = root.join("projects").join(uuid::Uuid::new_v4().to_string());
-                std::fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
-                Ok(directory.join(name))
-            }) {
-                Ok(path) => Some(path),
-                Err(error) => {
-                    self.error = Some(error);
-                    return false;
-                }
-            }
-        } else {
-            self.path.clone()
-        };
-        let Some(mut path) = path else {
-            return false;
-        };
-        if path.extension().is_none() {
-            path.set_extension("svp");
+        if self.recovered_dirty {
+            return true;
         }
-        let result = (|| {
-            let file = storage::ProjectFile::lock(&path)?;
-            let revision = if self.path.as_ref() == Some(&path) {
-                self.project_revision
-            } else {
-                storage::Revision::read(&path)?
-            };
-            file.save_if(&self.editor.project, revision)
-        })();
-        match result {
-            Ok(revision) => {
-                self.editor.mark_saved();
-                self.path = Some(path.clone());
-                self.project_revision = Some(revision);
-                self.status = "工程已保存".into();
-                #[cfg(target_os = "android")]
-                if save_as {
-                    self.pick(
-                        _ctx,
-                        picker::Picker::publish(path, "application/octet-stream"),
-                        |app, _, _| app.status = "工程副本已导出".into(),
-                    );
-                }
-                true
-            }
-            Err(e) => {
-                self.error = Some(e);
-                false
-            }
-        }
+        self.editor.dirty()
     }
     pub fn request_file(&mut self, action: FileAction, ctx: &Context) {
         ui::phonemes::phoneme_deactivate(self);
@@ -316,7 +220,7 @@ impl App {
         self.commit_lyric();
         self.fill_lyrics = None;
         self.editor.finish();
-        if self.editor.dirty() {
+        if self.has_unsaved_changes() {
             self.pending = Some(action);
         } else {
             self.perform_file(action, ctx);
@@ -343,8 +247,7 @@ impl App {
         self.bpm_edit = None;
         match action {
             FileAction::New => {
-                self.editor = Editor::new(Project::default());
-                self.synthesis.reset_project();
+                self.install_project(Project::default());
                 self.path = None;
                 self.project_revision = None;
             }
@@ -419,7 +322,7 @@ impl App {
                 .and_then(|p| p.file_stem())
                 .and_then(|p| p.to_str())
                 .unwrap_or("未命名"),
-            if self.editor.dirty() { " *" } else { "" }
+            if self.has_unsaved_changes() { " *" } else { "" }
         );
         if title != self.last_title {
             self.last_title = title.clone();
@@ -507,7 +410,13 @@ impl eframe::App for App {
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         #[cfg(target_os = "android")]
-        self.poll_picker(&ctx);
+        {
+            self.handle_mobile_events(&ctx);
+            self.poll_picker(&ctx);
+            if !crate::platform::android::lifecycle::foreground() {
+                return;
+            }
+        }
         ui::piano::begin_keyboard_frame(self, &ctx);
         self.synthesis.poll();
         self.poll_audio_import();
@@ -596,6 +505,8 @@ impl eframe::App for App {
         }
         self.view_pan.end_frame(&ctx);
         ui::piano::end_keyboard_frame(self, &ctx);
+        #[cfg(target_os = "android")]
+        self.sync_android_audio();
         ui::piano::end_gesture_frame(self, &ctx);
         ui::piano::end_pitch_frame(self, &ctx);
         ui::piano::end_anchor_frame(self, &ctx);
@@ -630,6 +541,8 @@ impl eframe::App for App {
         if self.last_persist.elapsed() > Duration::from_secs(3) {
             self.persist_layout();
         }
+        #[cfg(target_os = "android")]
+        self.update_recovery(&ctx);
     }
     fn on_exit(&mut self) {
         ui::piano::cancel_audition(self);

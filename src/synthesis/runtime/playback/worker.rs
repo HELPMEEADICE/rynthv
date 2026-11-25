@@ -20,7 +20,12 @@ pub(super) fn run(
     let mut player = None;
     let mut command_error = None;
     loop {
-        match rx.recv_timeout(Duration::from_millis(10)) {
+        let message = if player.is_none() {
+            rx.recv().map_err(|_| RecvTimeoutError::Disconnected)
+        } else {
+            rx.recv_timeout(Duration::from_millis(50))
+        };
+        match message {
             Ok(Command::Quit) | Err(RecvTimeoutError::Disconnected) => break,
             Ok(Command::Audition) => {
                 let result = ensure_player(&mut player, &piano, &looping)
@@ -30,6 +35,17 @@ pub(super) fn run(
                         result.err().map(|error| format!("钢琴试听失败：{error}"));
                 }
                 repaint.wake();
+            }
+            #[cfg(target_os = "android")]
+            Ok(Command::ResetDevice) => {
+                player = None;
+                command_error = None;
+                if let Ok(mut status) = published.lock() {
+                    *status = Snapshot {
+                        serial: status.serial,
+                        ..Default::default()
+                    };
+                }
             }
             Ok(Command::Transport(serial, command)) => {
                 let resets_error = !matches!(&command, Transport::Control { .. });
