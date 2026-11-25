@@ -47,7 +47,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    sourceSets.main.res.srcDir(layout.buildDirectory.dir("branding"))
+    sourceSets.main.res.srcDir(layout.buildDirectory.dir("branding").get().asFile)
 }
 
 def copyBranding = tasks.register("copyBranding", Copy) {
