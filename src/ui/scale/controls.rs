@@ -1,14 +1,12 @@
 use super::{Scale, Tonic};
-use crate::{
-    app::App,
-    ui::theme::{BORDER, MUTED},
-};
+use crate::{app::App, ui::theme::BORDER};
 use eframe::egui::*;
 use serde_json::{Value, json};
 
+#[cfg(not(target_os = "android"))]
 pub fn toolbar(app: &mut App, ui: &mut Ui) {
     ui.add_space(15.0);
-    ui.label(RichText::new("调式音阶").color(MUTED));
+    ui.label(RichText::new("调式音阶").color(crate::ui::theme::MUTED));
     ui.add_space(8.0);
     ui.push_id("scale-toolbar", |ui| controls(app, ui, false));
 }

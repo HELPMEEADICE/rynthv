@@ -58,7 +58,7 @@ fn navigation(app: &mut App, ui: &mut Ui, width: f32) {
             "面板"
         };
         ComboBox::from_id_salt("mobile-page-picker")
-            .width(68.0)
+            .width(if width < 210.0 { 54.0 } else { 68.0 })
             .selected_text(label)
             .show_ui(ui, |ui| {
                 let editors = Page::EDITORS.into_iter().filter(|_| width < 345.0);

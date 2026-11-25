@@ -2,17 +2,19 @@ use super::{group_edit, theme::*, timeline::*, track_color::TrackColors};
 use crate::{app::App, editor::GroupEdit, model::*};
 use eframe::egui::*;
 
-pub fn show(app: &mut App, ui: &mut Ui, timeline_left: f32, scroll: f32) {
+pub(super) const ROW_HEIGHT: f32 = 56.0;
+
+pub fn show(app: &mut App, ui: &mut Ui, timeline_left: f32, first_y: f32) {
     let rect = ui.max_rect();
     let track_count = app.editor.project.tracks.len();
     let mut track_rects = Vec::new();
     for index in 0..track_count {
-        let y = rect.top() + index as f32 * 56.0 - scroll;
+        let y = first_y + index as f32 * ROW_HEIGHT;
         let head = Rect::from_min_size(
             pos2(rect.left(), y),
-            vec2(timeline_left - rect.left(), 56.0),
+            vec2(timeline_left - rect.left(), ROW_HEIGHT),
         );
-        let body = Rect::from_min_max(pos2(timeline_left, y), pos2(rect.right(), y + 56.0));
+        let body = Rect::from_min_max(pos2(timeline_left, y), pos2(rect.right(), y + ROW_HEIGHT));
         if !head.intersects(rect) {
             continue;
         }

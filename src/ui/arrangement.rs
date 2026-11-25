@@ -2,12 +2,14 @@ use super::{
     child,
     icons::{Icon, IconButton},
     label,
-    state::DragPayload,
     theme::*,
     timeline::*,
 };
 use crate::{app::App, model::*};
 use eframe::egui::*;
+
+#[cfg(target_os = "android")]
+mod touch;
 
 pub fn show(app: &mut App, ui: &mut Ui) {
     let rect = ui.max_rect();
@@ -16,11 +18,23 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         super::phonemes::phoneme_deactivate(app);
     }
     ui.painter().rect_filled(rect, 4, CANVAS);
-    let gutter = 250.0_f32.min(rect.width() * 0.36);
-    let header = Rect::from_min_size(rect.min, vec2(rect.width(), 42.0));
+    let mobile = cfg!(target_os = "android");
+    let (gutter, header_height, scrollbar_width) = if mobile {
+        (
+            (rect.width() * 0.42)
+                .clamp(106.0, 200.0)
+                .min(rect.width() * 0.65),
+            34.0,
+            12.0,
+        )
+    } else {
+        (250.0_f32.min(rect.width() * 0.36), 42.0, 0.0)
+    };
+    let collapsed = !mobile && app.view.arrangement_collapsed;
+    let header = Rect::from_min_size(rect.min, vec2(rect.width(), header_height));
     ui.painter().rect_filled(
         header,
-        if app.view.arrangement_collapsed {
+        if collapsed {
             CornerRadius::same(4)
         } else {
             CornerRadius {
@@ -34,16 +48,18 @@ pub fn show(app: &mut App, ui: &mut Ui) {
     );
     ui.painter()
         .rect_stroke(rect, 4, Stroke::new(1.0, BORDER), StrokeKind::Inside);
+    let header_padding = if mobile { 2.0 } else { 8.0 };
     let mut bar = child(
         ui,
         Rect::from_min_max(
-            header.min + vec2(6.0, 8.0),
-            pos2(rect.left() + gutter - 6.0, header.bottom() - 8.0),
+            header.min + vec2(6.0, header_padding),
+            pos2(rect.left() + gutter - 6.0, header.bottom() - header_padding),
         ),
         "arrangement-header",
     );
     bar.horizontal_centered(|ui| {
         ui.spacing_mut().item_spacing.x = 5.0;
+        #[cfg(not(target_os = "android"))]
         if ui
             .add(
                 IconButton::new(
@@ -61,18 +77,28 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         {
             app.view.arrangement_collapsed = !app.view.arrangement_collapsed;
         }
-        super::section_title(ui, "编排", DragPayload::Arrangement);
+        #[cfg(not(target_os = "android"))]
+        super::section_title(ui, "编排", super::state::DragPayload::Arrangement);
+        #[cfg(target_os = "android")]
+        if gutter >= 104.0 {
+            ui.label(RichText::new("编排").font(section_title_font()));
+        }
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+            let size = if mobile {
+                vec2(28.0, 30.0)
+            } else {
+                vec2(23.0, 24.0)
+            };
             let create = ui.add(
                 IconButton::new(Icon::Plus, "创建音轨")
-                    .size(vec2(23.0, 24.0))
+                    .size(size)
                     .icon_size(17.0),
             );
             Popup::menu(&create).show(|ui| super::instrumental::create_menu(app, ui));
             if ui
                 .add(
                     IconButton::new(Icon::TempoTracks, "显示 / 隐藏曲速和拍号轨")
-                        .size(vec2(24.0, 24.0))
+                        .size(if mobile { size } else { Vec2::splat(24.0) })
                         .icon_size(17.0)
                         .selected(app.show_time_tracks)
                         .background(PANEL),
@@ -83,12 +109,12 @@ pub fn show(app: &mut App, ui: &mut Ui) {
             }
         });
     });
-    if app.view.arrangement_collapsed {
+    if collapsed {
         return;
     }
     let ruler = Rect::from_min_max(
         pos2(rect.left() + gutter, rect.top()),
-        pos2(rect.right(), header.bottom()),
+        pos2(rect.right() - scrollbar_width, header.bottom()),
     );
     ui.painter().hline(
         header.left()..=ruler.left(),
@@ -102,38 +128,64 @@ pub fn show(app: &mut App, ui: &mut Ui) {
     };
     let body = Rect::from_min_max(
         pos2(ruler.left(), header.bottom()),
-        rect.max - vec2(0.0, 6.0),
+        rect.max - vec2(scrollbar_width, 6.0),
     );
+    if mobile && (body.height() < 8.0 || body.width() < 16.0) {
+        return;
+    }
+    #[cfg(target_os = "android")]
+    let (touching, touch_y) = touch::navigate(app, ui, body, rect.left());
+    #[cfg(not(target_os = "android"))]
+    let (touching, touch_y) = (false, 0.0);
     let pan = app.view_pan.drag(
         ui,
         super::view_pan::Target::Arrangement,
         Rect::from_min_max(ruler.min, body.max),
-        app.gesture.is_none() && app.group_gesture.is_none() && app.audio_drag.is_none(),
+        !touching
+            && app.gesture.is_none()
+            && app.group_gesture.is_none()
+            && app.audio_drag.is_none(),
     );
     app.view.arrangement.start = (app.view.arrangement.start
         - pan.x as f64 / app.view.arrangement.beat_width as f64)
         .max(0.0);
     let response = ui.interact(body, Id::new("arrangement-background"), Sense::click());
-    let vertical = if app.view_pan.is_active() {
+    let vertical = if touching {
+        touch_y
+    } else if app.view_pan.is_active() {
         pan.y
     } else {
         scroll(ui, &response, body, &mut app.view.arrangement)
     };
     let scroll_id = Id::new("track-scroll");
-    let max_scroll =
-        (app.editor.project.tracks.len() as f32 * 56.0 - (body.height() - time_height)).max(0.0);
-    let scroll = ui.ctx().data_mut(|d| {
-        let value = d.get_temp::<f32>(scroll_id).unwrap_or(0.0);
-        let value = (value - vertical).clamp(0.0, max_scroll);
-        d.insert_temp(scroll_id, value);
-        value
-    });
+    let rows_height =
+        app.editor.project.tracks.len() as f32 * super::arrangement_tracks::ROW_HEIGHT;
+    let max_scroll = (rows_height + time_height - body.height()).max(0.0);
+    let scroll = ui
+        .ctx()
+        .data(|d| d.get_temp::<f32>(scroll_id).unwrap_or(0.0));
+    let scroll = (scroll - vertical).clamp(0.0, max_scroll);
+    #[cfg(target_os = "android")]
+    let scroll = super::scrollbars::track_rows(
+        ui,
+        Rect::from_min_max(
+            pos2(body.right(), body.top()),
+            pos2(rect.right(), body.bottom()),
+        ),
+        rows_height + time_height,
+        max_scroll,
+        scroll,
+    );
+    ui.ctx().data_mut(|d| d.insert_temp(scroll_id, scroll));
+    let time_y = body.top() - if mobile { scroll } else { 0.0 };
+    let first_track_y = body.top() + time_height - scroll;
     follow_playhead(
         ui,
         Rect::from_min_max(ruler.min, body.max),
         &mut app.view.arrangement,
         app.editor.transport.position,
-        app.editor.transport.playing
+        !touching
+            && app.editor.transport.playing
             && app.gesture.is_none()
             && app.group_gesture.is_none()
             && app.audio_drag.is_none()
@@ -148,7 +200,8 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         loop_region::RulerOptions {
             marker_step: app.view.snap.then_some(ARRANGEMENT_GRID),
             seek_step: None,
-            enabled: !app.view_pan.is_active()
+            enabled: !touching
+                && !app.view_pan.is_active()
                 && app.gesture.is_none()
                 && app.group_gesture.is_none()
                 && app.audio_drag.is_none(),
@@ -167,8 +220,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
             body.min,
             pos2(
                 body.right(),
-                (body.top() + time_height + app.editor.project.tracks.len() as f32 * 56.0)
-                    .min(body.bottom()),
+                (time_y + time_height + rows_height).min(body.bottom()),
             ),
         ),
         &app.view.arrangement,
@@ -176,32 +228,41 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         ARRANGEMENT_GRID,
     );
     if app.show_time_tracks {
+        let row_height = super::time_tracks::ROW_HEIGHT;
+        let clip = Rect::from_min_max(pos2(rect.left(), body.top()), body.max);
+        let mut time_ui = child(ui, clip, "time-tracks");
         for (index, text) in ["拍号", "曲速"].into_iter().enumerate() {
-            let y = header.bottom() + index as f32 * 28.0;
-            ui.painter().rect_filled(
-                Rect::from_min_size(pos2(rect.left(), y), vec2(gutter, 28.0)),
+            let y = time_y + index as f32 * row_height;
+            time_ui.painter().rect_filled(
+                Rect::from_min_size(pos2(rect.left(), y), vec2(gutter, row_height)),
                 0,
                 PANEL,
             );
-            label(ui, pos2(rect.left() + 14.0, y + 14.0), text, MUTED);
-            ui.painter()
-                .hline(rect.x_range(), y + 28.0, Stroke::new(1.0, EDGE));
+            label(
+                &time_ui,
+                pos2(rect.left() + 14.0, y + row_height * 0.5),
+                text,
+                MUTED,
+            );
+            time_ui
+                .painter()
+                .hline(clip.x_range(), y + row_height, Stroke::new(1.0, EDGE));
         }
         super::time_tracks::show(
             app,
-            ui,
-            Rect::from_min_size(body.min, vec2(body.width(), time_height)).intersect(body),
+            &mut time_ui,
+            Rect::from_min_size(pos2(body.left(), time_y), vec2(body.width(), time_height)),
         );
     }
     let tracks_rect = Rect::from_min_max(
-        pos2(rect.left(), header.bottom() + time_height),
-        rect.max - vec2(0.0, 6.0),
+        pos2(rect.left(), (time_y + time_height).max(body.top())),
+        body.max,
     );
     super::arrangement_tracks::show(
         app,
         &mut child(ui, tracks_rect, "tracks"),
         ruler.left(),
-        scroll,
+        first_track_y,
     );
     ui.painter()
         .vline(ruler.left(), rect.y_range(), Stroke::new(1.0, EDGE));
@@ -210,7 +271,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         "arrangement-scrollbar",
         Rect::from_min_max(
             pos2(ruler.left() + 2.0, rect.bottom() - 6.0),
-            rect.max - vec2(2.0, 0.0),
+            pos2(body.right() - 2.0, rect.bottom()),
         ),
         &mut app.view.arrangement,
         beats(app.editor.project_end()) + 32.0,

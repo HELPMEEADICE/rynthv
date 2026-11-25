@@ -91,9 +91,14 @@ pub fn show(app: &mut App, ui: &mut Ui, rect: Rect, track_index: usize) {
             ui.close();
         }
     });
+    let mixer_width = if cfg!(target_os = "android") && rect.width() < 210.0 {
+        6.0
+    } else {
+        95.0
+    };
     let text_rect = Rect::from_min_max(
         rect.min + vec2(16.0, 0.0),
-        pos2(rect.right() - 95.0, rect.bottom()),
+        pos2(rect.right() - mixer_width, rect.bottom()),
     );
     let painter = ui
         .painter()

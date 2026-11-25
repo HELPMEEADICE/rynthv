@@ -99,7 +99,7 @@ fn content(app: &mut App, ui: &mut Ui) {
     match current_page(ui.ctx()) {
         Page::Piano => {
             let rect = ui.max_rect();
-            if rect.height() >= 480.0 && !app.view.arrangement_collapsed && app.lyric.is_none() {
+            if rect.height() >= 480.0 && !app.view.arrangement_collapsed {
                 let arrangement_height = (rect.height() * 0.32).clamp(154.0, 260.0);
                 let (piano, arrangement) = if app.view.arrangement_first {
                     let y = rect.top() + arrangement_height;

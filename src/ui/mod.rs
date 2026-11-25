@@ -52,6 +52,7 @@ pub fn label(ui: &Ui, pos: Pos2, text: impl ToString, color: Color32) {
     );
 }
 
+#[cfg(not(target_os = "android"))]
 pub fn section_title(ui: &mut Ui, text: &str, payload: state::DragPayload) -> Response {
     let response = ui.add(
         Label::new(

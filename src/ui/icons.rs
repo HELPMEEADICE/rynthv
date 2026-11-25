@@ -4,6 +4,7 @@ use eframe::egui::*;
 #[derive(Clone, Copy)]
 pub enum Icon {
     ChevronDown,
+    #[cfg(not(target_os = "android"))]
     ChevronRight,
     Plus,
     Close,
@@ -45,6 +46,7 @@ impl Icon {
     pub fn image(self) -> Image<'static> {
         match self {
             Self::ChevronDown => Image::new(include_image!("../../assets/icons/chevron-down.svg")),
+            #[cfg(not(target_os = "android"))]
             Self::ChevronRight => {
                 Image::new(include_image!("../../assets/icons/chevron-right.svg"))
             }

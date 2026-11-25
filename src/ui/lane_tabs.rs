@@ -1,55 +1,25 @@
-use super::{
-    icons::{Icon, IconButton},
-    piano::Gesture,
-    state::Lane,
-    theme::*,
-};
+#[cfg(not(target_os = "android"))]
+use super::icons::IconButton;
+use super::{icons::Icon, piano::Gesture, state::Lane, theme::*};
 use crate::app::App;
 use eframe::egui::*;
 
 pub(super) fn show(app: &mut App, ui: &mut Ui) {
     let mut close = None;
+    #[cfg(not(target_os = "android"))]
     ScrollArea::horizontal()
         .id_salt("lane-tabs-scroll")
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 0.0;
-                if tab(ui, Icon::Phonemes, "音素时值", app.view.phonemes, None)
-                    .0
-                    .clicked()
-                {
-                    app.view.phonemes = !app.view.phonemes;
-                    if !app.view.phonemes {
-                        super::phonemes::phoneme_deactivate(app);
-                    }
-                }
-                for lane in &mut app.view.lanes {
-                    let (response, closed) = tab(
-                        ui,
-                        Icon::Curve,
-                        &format!("{}/{}", lane.foreground.label(), lane.background.label()),
-                        lane.visible,
-                        Some(lane.id),
-                    );
-                    if closed {
-                        close = Some(lane.id);
-                    } else if response.clicked() || response.secondary_clicked() {
-                        lane.visible = !lane.visible;
-                    }
-                }
-                if ui
-                    .add_enabled(
-                        app.view.lanes.len() < 16,
-                        IconButton::new(Icon::Plus, "新增参数区域")
-                            .size(vec2(30.0, 26.0))
-                            .icon_size(14.0),
-                    )
-                    .clicked()
-                {
-                    app.view.lanes.push(Lane::new());
-                }
+                tabs(app, ui, &mut close);
             });
         });
+    #[cfg(target_os = "android")]
+    ScrollArea::vertical()
+        .id_salt("lane-tabs-scroll")
+        .max_height((ui.ctx().content_rect().height() * 0.55).max(28.0))
+        .show(ui, |ui| tabs(app, ui, &mut close));
     if let Some(id) = close {
         // Closing a view never removes the project's parameter curves.
         app.view.lanes.retain(|lane| lane.id != id);
@@ -57,6 +27,48 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
             super::lanes::finish_parameter(app, ui.ctx());
         }
         ui.ctx().request_repaint();
+    }
+}
+
+fn tabs(app: &mut App, ui: &mut Ui, close: &mut Option<u64>) {
+    if tab(ui, Icon::Phonemes, "音素时值", app.view.phonemes, None)
+        .0
+        .clicked()
+    {
+        app.view.phonemes = !app.view.phonemes;
+        if !app.view.phonemes {
+            super::phonemes::phoneme_deactivate(app);
+        }
+    }
+    for lane in &mut app.view.lanes {
+        let (response, closed) = tab(
+            ui,
+            Icon::Curve,
+            &format!("{}/{}", lane.foreground.label(), lane.background.label()),
+            lane.visible,
+            Some(lane.id),
+        );
+        if closed {
+            *close = Some(lane.id);
+        } else if response.clicked() || response.secondary_clicked() {
+            lane.visible = !lane.visible;
+        }
+    }
+    #[cfg(not(target_os = "android"))]
+    let added = ui
+        .add_enabled(
+            app.view.lanes.len() < 16,
+            IconButton::new(Icon::Plus, "新增参数区域")
+                .size(vec2(30.0, 26.0))
+                .icon_size(14.0),
+        )
+        .clicked();
+    #[cfg(target_os = "android")]
+    let added = ui
+        .add_enabled(app.view.lanes.len() < 16, Button::new("新增参数区域"))
+        .clicked();
+    if added {
+        app.view.lanes.push(Lane::new());
     }
 }
 
