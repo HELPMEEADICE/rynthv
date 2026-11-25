@@ -1,17 +1,13 @@
-use std::{
-    borrow::Cow,
-    collections::HashMap,
-    fs,
-    ops::Range,
-    path::Path,
-    sync::{Arc, OnceLock},
-};
+use std::{borrow::Cow, collections::HashMap, ops::Range, path::Path, sync::OnceLock};
 
 use num_bigint::BigUint;
 use sha2::{Digest, Sha256};
 use xxhash_rust::xxh3::{Xxh3, xxh3_128};
 
 use super::{Result, VoiceError, array, format::FormatContext, product, range, stream, u32_at};
+
+mod bytes;
+use bytes::ArchiveBytes;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) struct ResourceId(pub [u8; 16]);
@@ -27,7 +23,7 @@ pub(super) struct Resource {
 
 /// Owned immutable file snapshot. Resource state contains offsets, never pointers.
 pub(super) struct Archive {
-    bytes: Arc<[u8]>,
+    bytes: ArchiveBytes,
     constants: [u8; 16],
     material: [u8; 32],
     pub resources: Vec<Resource>,
@@ -37,7 +33,7 @@ pub(super) struct Archive {
 
 impl Archive {
     pub fn load(path: &Path, context: &FormatContext) -> Result<Self> {
-        let bytes: Arc<[u8]> = fs::read(path)?.into();
+        let bytes = ArchiveBytes::open(path)?;
         if bytes.len() < 0x149 || bytes[..8] != [0xff, 0, 0xca, 0x7f, 3, 0, 0, 0] {
             return Err(VoiceError::new("Invalid DNNI v3 magic or truncated header"));
         }
@@ -112,7 +108,7 @@ impl Archive {
             });
         }
         Ok(Self {
-            sha256: super::hex(&Sha256::digest(&bytes)),
+            sha256: super::hex(&Sha256::digest(&bytes[..])),
             bytes,
             constants: context.constants,
             material,

@@ -43,6 +43,8 @@ Android 通过 Storage Access Framework 打开 `content://` 文档。应用通�
 
 Android 图形与模型推理使用独立设备。推理的权重缓存、临时缓冲区及注意力分块会根据设备内存和 Vulkan 限制调整。不同 Adreno、Mali、Immortalis、PowerVR 驱动的 WGSL 计算和大型声库峰值内存仍待实机覆盖。若遇到失败，可在记录设备与驱动信息后选择 CPU 继续工作。
 
+从系统选择器导入私有目录的 DNNI 模型使用只读内存映射。重新导入时替换文件路径，已加载模型可安全读完先前的文件版本。
+
 ## GitHub Actions
 
 Android 工作流在 GitHub Hosted Runner 上使用 Rust 1.99.0、JDK 17、Gradle 9.6.0、AGP 9.5.2、API 36、Build Tools 36.0.0 和 NDK 28.2.13676358。每个 ABI 独立运行依赖隔离检查、Cargo check、Clippy、链接、Gradle 打包和签名验证。产物检查涵盖应用 ID、入口 Activity、目标 SDK、ABI、ELF LOAD 对齐以及 APK 内未压缩原生库的 16 KiB ZIP 对齐。Gradle 仅包装 GitHub Actions 上预先链接的 Rust 共享库。

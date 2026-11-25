@@ -3123,6 +3123,7 @@ dependencies = [
  "image",
  "jni",
  "log",
+ "memmap2",
  "midly",
  "num-bigint",
  "pollster 0.4.0",
