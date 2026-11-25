@@ -18,7 +18,7 @@ pub(super) fn status(
             });
         }
         VoiceState::Loaded(_) if app.synthesis.voice_error(selection).is_none() => {
-            text(ui, RichText::new("已加载").color(GREEN));
+            text(ui, RichText::new("已加载").color(green_color()));
             weak(ui, "编辑音符后自动合成，按空格键试听。");
         }
         _ => {}

@@ -159,20 +159,20 @@ impl Widget for IconButton {
         let hovered = response.hovered() && enabled;
         if (self.framed && !self.shared_background) || self.selected || hovered {
             let fill = if self.selected || response.is_pointer_button_down_on() {
-                self.background.unwrap_or(BUTTON_ACTIVE)
+                self.background.unwrap_or(button_active_color())
             } else if hovered {
-                BUTTON_HOVER
+                button_hover_color()
             } else {
-                self.background.unwrap_or(BUTTON)
+                self.background.unwrap_or(button_color())
             };
             ui.painter().rect_filled(rect, 3, fill);
         }
         let tint = if self.selected {
-            TEXT
+            text_color()
         } else if self.framed {
-            ICON_TOOL
+            icon_tool_color()
         } else {
-            MUTED
+            muted_color()
         };
         let tint = if enabled {
             tint

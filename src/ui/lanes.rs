@@ -34,7 +34,7 @@ pub fn show(app: &mut App, ui: &mut Ui, id: u64) {
     let mut lane = app.view.lanes[index].clone();
     let previous = lane.foreground.clone();
     let rect = ui.max_rect();
-    ui.painter().rect_filled(rect, 0, PANEL);
+    ui.painter().rect_filled(rect, 0, panel_color());
     let header = Rect::from_min_size(rect.min, vec2(rect.width(), 32.0));
     header::show(app, &mut child(ui, header, ("lane-header", id)), &mut lane);
     if previous != lane.foreground {
@@ -58,7 +58,7 @@ pub fn show(app: &mut App, ui: &mut Ui, id: u64) {
     if canvas.height() < 5.0 || canvas.width() < 5.0 {
         return;
     }
-    ui.painter().rect_filled(canvas, 0, CANVAS);
+    ui.painter().rect_filled(canvas, 0, canvas_color());
     let response = ui.interact(
         canvas,
         Id::new(("parameter-canvas", id)),

@@ -32,7 +32,7 @@ pub(super) fn show(app: &mut App, ui: &mut Ui, rect: Rect) -> bool {
                 .color(INK),
         );
         if wide {
-            ui.label(RichText::new("歌声").size(13.0).color(MUTED));
+            ui.label(RichText::new("歌声").size(13.0).color(muted_color()));
         }
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             close = ui

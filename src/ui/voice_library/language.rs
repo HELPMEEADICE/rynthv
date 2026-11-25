@@ -57,7 +57,7 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
     ui.scope(|ui| {
         ui.spacing_mut().interact_size.y = 28.0;
         ui.spacing_mut().button_padding = vec2(8.0, 5.0);
-        ui.visuals_mut().widgets.inactive.bg_fill = BORDER;
+        ui.visuals_mut().widgets.inactive.bg_fill = border_color();
         ui.visuals_mut().widgets.inactive.corner_radius = CornerRadius::same(4);
         ComboBox::from_id_salt("voice-language")
             .width(ui.available_width())

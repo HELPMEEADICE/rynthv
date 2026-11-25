@@ -46,7 +46,10 @@ impl VoiceLibrary {
         self.error.as_deref()
     }
     pub fn settings_error(&self) -> Option<&str> {
-        self.error.as_deref()
+        self.catalog
+            .is_none()
+            .then_some(self.error.as_deref())
+            .flatten()
     }
     pub fn resource_busy(&self) -> bool {
         self.task.is_some()
@@ -126,6 +129,11 @@ impl Runtime {
         self.update_settings(|settings| settings.dictionaries = Some(path));
     }
     pub fn set_compute_settings(&mut self, backend: Backend, adapter: Option<AdapterId>) {
+        if self.library.settings.compute_backend != backend
+            || self.library.settings.compute_adapter != adapter
+        {
+            self.diagnostics = None;
+        }
         self.update_settings(|settings| {
             settings.compute_backend = backend;
             settings.compute_adapter = adapter;

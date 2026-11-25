@@ -75,6 +75,7 @@ pub struct Visuals {
     pub phones: RenderedPhonemeTrack,
     pub note_ids: BTreeMap<u64, String>,
     pub origin: f64,
+    pub frames: usize,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -96,9 +97,20 @@ pub struct ComputeDiagnostics {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Event {
-    Progress { stage: String },
-    Chunk { group: String, origin: f64 },
-    Mix { origin: f64 },
+    Progress {
+        stage: String,
+    },
+    Chunk {
+        group: String,
+        origin: f64,
+    },
+    Mix {
+        origin: f64,
+    },
     Visuals(Box<Visuals>),
-    Audio { channels: usize, rate: u32 },
+    Audio {
+        channels: usize,
+        rate: u32,
+        frames: usize,
+    },
 }

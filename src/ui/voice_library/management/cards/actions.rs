@@ -53,7 +53,7 @@ pub(super) fn primary(
         && app.synthesis.library.settings_error().is_none();
     let outline = loaded || problem || missing_dictionary;
     let button = Button::new(RichText::new(label).size(13.0).color(if !enabled {
-        MUTED
+        muted_color()
     } else if outline {
         ACCENT
     } else {
@@ -61,7 +61,10 @@ pub(super) fn primary(
     }))
     .corner_radius(13)
     .fill(if !enabled || outline { CARD } else { ACCENT })
-    .stroke(Stroke::new(0.8, if enabled { ACCENT } else { BORDER }));
+    .stroke(Stroke::new(
+        0.8,
+        if enabled { ACCENT } else { border_color() },
+    ));
     if ui
         .add_enabled(enabled, button.min_size(vec2(ui.available_width(), 36.0)))
         .clicked()
@@ -91,11 +94,11 @@ pub(super) fn menu(
 ) {
     let (rect, response) = ui.allocate_exact_size(Vec2::splat(26.0), Sense::click());
     if response.hovered() {
-        ui.painter().rect_filled(rect, 13, BORDER);
+        ui.painter().rect_filled(rect, 13, border_color());
     }
     for offset in [-5.0, 0.0, 5.0] {
         ui.painter()
-            .circle_filled(rect.center() + vec2(0.0, offset), 1.5, MUTED);
+            .circle_filled(rect.center() + vec2(0.0, offset), 1.5, muted_color());
     }
     response.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, "更多声库操作"));
     Popup::menu(&response).show(|ui| {
@@ -127,11 +130,15 @@ pub(super) fn menu(
             app.synthesis.open_context_import(entry.selection());
             ui.close();
         }
-        if entry.flat.as_ref().is_some_and(|flat| flat.managed)
+        let managed = entry.flat.as_ref().is_some_and(|flat| flat.managed)
+            || cfg!(target_arch = "wasm32")
+                && entry.database_id.starts_with("sv1:")
+                && entry.directory.starts_with("/RynthV/sv1-voices");
+        if managed
             && ui
                 .add_enabled(
                     !app.synthesis.library.resource_busy(),
-                    Button::new("移除 Flat 导入副本"),
+                    Button::new("移除导入副本"),
                 )
                 .clicked()
         {

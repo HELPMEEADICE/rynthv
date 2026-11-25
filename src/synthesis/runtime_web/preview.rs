@@ -7,7 +7,6 @@ use crate::{
         protocol::{Event, Preview, Request, Visuals},
     },
     synthesis::{
-        audio::{ChannelLayout, RenderedAudio},
         plan::OwnerId,
         rendered::{PhonemeSnapshot, RenderVisuals, VisualSnapshot, Waveform},
     },
@@ -172,6 +171,7 @@ impl Runtime {
         let Some(project) = self.preview.project.as_ref() else {
             return;
         };
+        self.publish_audio_schedule(project);
         let serialized = match serde_json::to_string(project) {
             Ok(project) => project,
             Err(error) => {
@@ -220,7 +220,46 @@ impl Runtime {
         });
     }
 
-    fn publish_visuals(&mut self, mut visual: Visuals, pcm: Float32Array) {
+    fn publish_audio_schedule(&self, project: &Project) {
+        let plan = self.planner.plan();
+        let solo = super::super::mixer::solo_tracks(project).unwrap_or_default();
+        let mut changes = BTreeMap::<i64, i32>::new();
+        for (owner, request) in &plan.requests {
+            let controls = &plan.output_controls[owner];
+            if request.input.voice.model_content_identity.is_none()
+                || controls.reference_muted
+                || controls
+                    .mixer
+                    .get("mute")
+                    .and_then(serde_json::Value::as_bool)
+                    == Some(true)
+                || (!solo.is_empty() && !solo.contains(&controls.track_id))
+            {
+                continue;
+            }
+            let coverage = request.coverage;
+            let frame = |sample: i64| {
+                (sample.max(0) as f64 * 48_000.0 / f64::from(coverage.sample_rate)).ceil() as i64
+            };
+            *changes.entry(frame(coverage.sample_start.0)).or_default() += 1;
+            *changes.entry(frame(coverage.sample_end.0)).or_default() -= 1;
+        }
+        let mut count = 0;
+        let (boundaries, counts): (Vec<_>, Vec<_>) = changes
+            .into_iter()
+            .map(|(frame, delta)| {
+                count += delta;
+                (frame as f64, count.clamp(0, i32::from(u16::MAX)) as u16)
+            })
+            .unzip();
+        let has_recordings = project
+            .tracks
+            .iter()
+            .any(|track| track.audio_clip().is_some());
+        audio::schedule(&boundaries, &counts, has_recordings);
+    }
+
+    fn publish_visuals(&mut self, mut visual: Visuals, peaks: Float32Array) {
         let Some(project) = &self.preview.project else {
             return;
         };
@@ -254,8 +293,8 @@ impl Runtime {
                 phone.source.note_id = *id;
             }
         }
-        let Ok(audio) =
-            RenderedAudio::new(48_000, visual.origin, ChannelLayout::Mono, pcm.to_vec())
+        let Some(waveform) =
+            Waveform::from_peaks(visual.origin, 48_000, visual.frames, &peaks.to_vec())
         else {
             return;
         };
@@ -264,7 +303,7 @@ impl Runtime {
             data: Arc::new(RenderVisuals {
                 pitch: visual.pitch,
                 phonemes: visual.phones.clone(),
-                waveform: Waveform::new(&audio),
+                waveform,
             }),
         };
         let timeline = self.visuals.entry(owner).or_default();

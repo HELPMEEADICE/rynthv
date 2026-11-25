@@ -31,6 +31,11 @@ impl Worker {
         settings: SynthesisSettings,
     ) -> Result<String, String> {
         settings.save()?;
+        if self.settings().compute_backend != settings.compute_backend
+            || self.settings().compute_adapter != settings.compute_adapter
+        {
+            self.offline.reset_compute();
+        }
         self.settings = Some(settings);
         self.offline.refresh();
         self.library(None)

@@ -1,7 +1,7 @@
 use super::decoration::KeyboardDecoration;
 use crate::ui::{
     scale::ScaleGuide,
-    theme::{BLACK_ROW, GREEN},
+    theme::{black_row_color, green_color},
 };
 use eframe::egui::*;
 
@@ -96,7 +96,7 @@ impl KeyboardLayout {
         let decoration = KeyboardDecoration::new(scale, accent);
         let fill = |key: &Key, normal| {
             if active.is_some_and(|pitch| i32::from(pitch) == key.pitch) {
-                GREEN
+                green_color()
             } else {
                 normal
             }
@@ -118,7 +118,7 @@ impl KeyboardLayout {
                 sw: 0,
                 se: 2,
             };
-            painter.rect_filled(key.rect, rounding, fill(key, BLACK_ROW));
+            painter.rect_filled(key.rect, rounding, fill(key, black_row_color()));
             decoration.draw(&painter, key, true, rounding);
         }
     }

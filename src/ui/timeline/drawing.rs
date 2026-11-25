@@ -1,7 +1,7 @@
 use super::{Viewport, grid_step, x_at};
 use crate::{
     model::{TimeAxis, beats},
-    ui::theme::{EDGE, TEXT},
+    ui::theme::{edge_color, text_color},
 };
 use eframe::egui::*;
 
@@ -76,22 +76,22 @@ pub fn draw_ruler(ui: &Ui, rect: Rect, view: &Viewport, time: &TimeAxis, step: f
             let text = painter.layout_no_wrap(
                 (i64::from(index) + 1).to_string(),
                 FontId::proportional(12.0),
-                TEXT,
+                text_color(),
             );
             let pos = pos2(x + 7.0, baseline - number_offset - text.size().y / 2.0);
             if Rect::from_min_size(pos, text.size()).intersects(clip) {
-                painter.galley(pos, text, TEXT);
+                painter.galley(pos, text, text_color());
             }
         },
     );
-    painter.hline(rect.x_range(), baseline, Stroke::new(1.0, EDGE));
+    painter.hline(rect.x_range(), baseline, Stroke::new(1.0, edge_color()));
 }
 
 pub fn playhead_line(ui: &Ui, rect: Rect, view: &Viewport, position: i64) {
     let x = x_at(rect, view, beats(position));
     ui.painter()
         .with_clip_rect(rect.intersect(ui.clip_rect()))
-        .vline(x, rect.y_range(), Stroke::new(1.0, TEXT));
+        .vline(x, rect.y_range(), Stroke::new(1.0, text_color()));
 }
 
 pub fn playhead(ui: &Ui, rect: Rect, baseline: f32, view: &Viewport, position: i64) {
@@ -112,7 +112,7 @@ pub fn playhead(ui: &Ui, rect: Rect, baseline: f32, view: &Viewport, position: i
             sw: 0,
             se: 0,
         },
-        TEXT,
+        text_color(),
     );
     painter.add(Shape::convex_polygon(
         vec![
@@ -122,7 +122,7 @@ pub fn playhead(ui: &Ui, rect: Rect, baseline: f32, view: &Viewport, position: i
             pos2(x, baseline),
             pos2(x - 4.0, top + 9.0),
         ],
-        TEXT,
+        text_color(),
         Stroke::NONE,
     ));
 }

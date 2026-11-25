@@ -38,6 +38,8 @@ pub struct Offline {
     owner_ids: BTreeMap<String, OwnerId>,
     note_ids: BTreeMap<String, u64>,
     revision: u64,
+    #[cfg(target_arch = "wasm32")]
+    recordings: BTreeMap<std::path::PathBuf, Arc<AudioAsset>>,
 }
 
 pub struct Options {
@@ -120,6 +122,36 @@ impl Output {
 }
 
 impl Offline {
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn reset_compute(&mut self) {
+        self.compute = None;
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn recording(
+        &mut self,
+        path: &std::path::Path,
+        cancelled: &AtomicBool,
+    ) -> Result<Arc<AudioAsset>, String> {
+        if let Some(recording) = self.recordings.get(path) {
+            return Ok(recording.clone());
+        }
+        let asset = Arc::new(
+            AudioAsset::read_with_waveforms(path, cancelled)
+                .map_err(|error| format!("AUDIO_RESOURCE: {}: {error}", path.display()))?,
+        );
+        let stored: usize = self
+            .recordings
+            .values()
+            .map(|asset| std::mem::size_of_val(asset.audio.samples()))
+            .sum();
+        if stored.saturating_add(std::mem::size_of_val(asset.audio.samples())) > 192 << 20 {
+            self.recordings.clear();
+        }
+        self.recordings.insert(path.to_owned(), Arc::clone(&asset));
+        Ok(asset)
+    }
+
     pub fn refresh(&mut self) {
         self.library = None;
         self.voices.clear();
@@ -299,12 +331,27 @@ impl Offline {
         let mut assets = BTreeMap::new();
         for clip in accompaniment.iter().filter_map(|track| track.audio_clip()) {
             if !assets.contains_key(&clip.path) {
+                #[cfg(not(target_arch = "wasm32"))]
                 let asset = AudioAsset::read_for_mix(&clip.path, &cancelled)
                     .map_err(|error| format!("AUDIO_RESOURCE: {}: {error}", clip.path.display()))?;
+                #[cfg(target_arch = "wasm32")]
+                let asset = self.recording(&clip.path, &cancelled)?;
                 assets.insert(clip.path.clone(), asset);
             }
         }
-        let recordings = mixer::recordings(accompaniment, &solo, |path| assets.get(path).map(Ok))?;
+        #[cfg(target_arch = "wasm32")]
+        self.recordings.retain(|path, _| {
+            project
+                .tracks
+                .iter()
+                .any(|track| track.audio_clip().is_some_and(|clip| &clip.path == path))
+        });
+        let recordings = mixer::recordings(accompaniment, &solo, |path| {
+            let asset = assets.get(path)?;
+            #[cfg(target_arch = "wasm32")]
+            let asset = asset.as_ref();
+            Some(Ok(asset))
+        })?;
         let owners = self.cache.snapshot();
         let stats = self.cache.stats();
         let rendered_owners = timings.len();
@@ -342,6 +389,15 @@ impl Offline {
                 .2
                 .take_diagnostics()
         };
+        #[cfg(target_arch = "wasm32")]
+        if options.backend == Backend::WebGpu
+            && rendered_owners != 0
+            && diagnostics.activity.completed_gpu_submissions == 0
+            && !diagnostics.activity.cpu_operators.is_empty()
+        {
+            self.cache.reset();
+            return Err("WebGPU 未完成任何模型算子。请检查设备限制，或选择 Auto／CPU。".into());
+        }
         if stats.current_render_bytes > options.cache_bytes {
             self.cache.reset();
         }

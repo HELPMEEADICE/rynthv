@@ -92,7 +92,7 @@ pub fn draw_notes(app: &App, ui: &Ui, canvas: Rect, groups: &[SceneGroup]) {
             );
             let selected = active && !drawing_pitch && app.editor.selected.contains(&note.id);
             let color = if note.muted() {
-                MUTED.gamma_multiply(0.4)
+                muted_color().gamma_multiply(0.4)
             } else if selected {
                 colors.accent
             } else if active {
@@ -136,11 +136,11 @@ pub fn draw_notes(app: &App, ui: &Ui, canvas: Rect, groups: &[SceneGroup]) {
                     &note.lyrics,
                     FontId::proportional(12.0),
                     if drawing_pitch || (note.muted() && active) {
-                        TEXT
+                        text_color()
                     } else if active {
                         foreground(color)
                     } else {
-                        MUTED
+                        muted_color()
                     },
                 );
         }

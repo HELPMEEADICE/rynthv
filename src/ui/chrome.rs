@@ -35,7 +35,7 @@ fn menus(app: &mut App, ui: &mut Ui) {
     });
 }
 
-#[cfg(target_os = "android")]
+#[cfg(any(target_os = "android", target_arch = "wasm32"))]
 pub(super) fn mobile_menus(app: &mut App, ui: &mut Ui, separate: bool) {
     if separate {
         file_menu(app, ui);
@@ -104,11 +104,19 @@ fn file_menu(app: &mut App, ui: &mut Ui) {
             app.commit_lyric();
             app.import_audio(None, &ctx);
         }
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
         item(ui, "导出音频", "", false);
         #[cfg(target_os = "android")]
         if item(ui, "导出音频…", "", true) {
             super::mobile::open_panel(app, &ctx, Column::Render);
+        }
+        #[cfg(target_arch = "wasm32")]
+        if item(ui, "导出音频…", "", true) {
+            if super::mobile::compact(&ctx) {
+                super::mobile::open_panel(app, &ctx, Column::Render);
+            } else if !app.view.columns.contains(&Column::Render) {
+                app.view.toggle(Column::Render);
+            }
         }
     });
 }

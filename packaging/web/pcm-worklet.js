@@ -16,6 +16,9 @@ class PcmPlayer extends AudioWorkletProcessor {
         this.report = 0;
         this.clicks = undefined;
         this.beat = 0;
+        this.schedule = undefined;
+        this.boundary = 0;
+        this.finalMix = false;
         this.port.onmessage = ({ data }) => this.message(data);
     }
 
@@ -25,9 +28,12 @@ class PcmPlayer extends AudioWorkletProcessor {
                 this.generation = data.generation;
                 this.blocks.clear();
                 this.duration = Infinity;
+                this.schedule = undefined;
+                this.finalMix = false;
                 break;
             case "pcm":
                 if (data.replace) this.blocks.clear();
+                this.finalMix = data.finalMix || this.finalMix;
                 this.append(data);
                 break;
             case "end":
@@ -38,6 +44,7 @@ class PcmPlayer extends AudioWorkletProcessor {
                 this.position = Math.max(0, data.seconds * SOURCE_RATE);
                 this.report = 0;
                 this.locateBeat();
+                this.locateBoundary();
                 break;
             case "loop":
                 this.loopStart = data.start * SOURCE_RATE;
@@ -47,7 +54,32 @@ class PcmPlayer extends AudioWorkletProcessor {
                 this.clicks = data;
                 this.locateBeat();
                 break;
+            case "schedule":
+                this.schedule = data;
+                this.locateBoundary();
+                break;
         }
+    }
+
+    locateBoundary() {
+        const points = this.schedule?.boundaries;
+        this.boundary = 0;
+        if (!points?.length) return;
+        let end = points.length;
+        while (this.boundary < end) {
+            const mid = (this.boundary + end) >>> 1;
+            if (points[mid] <= this.position) this.boundary = mid + 1;
+            else end = mid;
+        }
+    }
+
+    expected(frame) {
+        const schedule = this.schedule;
+        if (this.finalMix || this.duration !== Infinity) return 0;
+        if (!schedule || schedule.waitForMix || !schedule.boundaries.length) return Infinity;
+        while (this.boundary < schedule.boundaries.length && schedule.boundaries[this.boundary] <= frame) this.boundary++;
+        if (this.boundary === schedule.boundaries.length) return Infinity;
+        return this.boundary ? schedule.counts[this.boundary - 1] : 0;
     }
 
     locateBeat() {
@@ -85,17 +117,18 @@ class PcmPlayer extends AudioWorkletProcessor {
                     this.port.postMessage({ generation: this.generation, error: "预览音频超过浏览器缓冲上限，请导出 WAV 播放。" });
                     return;
                 }
-                block = { samples: new Float32Array(BLOCK * 2), ready: new Uint8Array(BLOCK) };
+                block = { samples: new Float32Array(BLOCK * 2), ready: new Uint16Array(BLOCK) };
                 this.blocks.set(index, block);
             }
             if (finalMix) {
                 block.samples.set(pcm.subarray(offset * 2, (offset + length) * 2), from * 2);
+                block.ready.fill(1, from, from + length);
             } else {
                 for (let sample = 0; sample < length * 2; sample++) {
                     block.samples[from * 2 + sample] += pcm[offset * 2 + sample];
                 }
+                for (let frame = from; frame < from + length; frame++) block.ready[frame]++;
             }
-            block.ready.fill(1, from, from + length);
             offset += length;
         }
     }
@@ -108,6 +141,7 @@ class PcmPlayer extends AudioWorkletProcessor {
                 if (this.loopEnd > this.loopStart && this.position >= this.loopEnd) {
                     this.position = this.loopStart + (this.position - this.loopEnd) % (this.loopEnd - this.loopStart);
                     this.locateBeat();
+                    this.locateBoundary();
                 }
                 const times = this.clicks?.times;
                 const lastClick = times?.length ? (Math.abs(times[times.length - 1]) + 0.04) * SOURCE_RATE : 0;
@@ -119,8 +153,9 @@ class PcmPlayer extends AudioWorkletProcessor {
                 const blockIndex = Math.floor(frame / BLOCK);
                 const offset = frame % BLOCK;
                 const block = this.blocks.get(blockIndex);
+                if ((block?.ready[offset] ?? 0) < this.expected(frame)) break;
                 if (!block?.ready[offset]) {
-                    if (this.duration === Infinity) break;
+                    if (this.finalMix && this.duration === Infinity) break;
                     left[index] = right[index] = this.click();
                     this.position += this.step;
                     continue;

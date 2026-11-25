@@ -1,4 +1,4 @@
-use js_sys::{Float32Array, Float64Array};
+use js_sys::{Float32Array, Float64Array, Uint16Array};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(raw_module = "./audio.js")]
@@ -13,6 +13,15 @@ extern "C" {
     pub fn audio_error() -> Option<String>;
     fn audio_note(samples: Option<Float32Array>);
     fn audio_clicks(times: Float64Array, strong: Float32Array, weak: Float32Array);
+    fn audio_schedule(boundaries: Float64Array, counts: Uint16Array, wait_for_mix: bool);
+}
+
+pub fn schedule(boundaries: &[f64], counts: &[u16], wait_for_mix: bool) {
+    audio_schedule(
+        Float64Array::from(boundaries),
+        Uint16Array::from(counts),
+        wait_for_mix,
+    );
 }
 
 pub fn metronome(times: &[f64]) {

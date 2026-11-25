@@ -9,6 +9,8 @@ let generation = 0;
 let duration;
 let firstFinal = true;
 const queued = [];
+let queuedFrames = 0;
+let schedule;
 let piano;
 let clicks;
 
@@ -25,7 +27,9 @@ async function resume() {
                 else clock = data.active ? data.seconds : undefined;
             };
             output.port.postMessage({ kind: "reset", generation });
+            if (schedule) output.port.postMessage(schedule);
             for (const part of queued.splice(0)) output.port.postMessage(part, [part.pcm.buffer]);
+            queuedFrames = 0;
             output.port.postMessage(bounds);
             output.port.postMessage(lastCommand);
             if (clicks) output.port.postMessage(clicks);
@@ -48,7 +52,9 @@ export function audio_reset() {
     duration = undefined;
     firstFinal = true;
     clock = undefined;
+    schedule = undefined;
     queued.length = 0;
+    queuedFrames = 0;
     output?.port.postMessage({ kind: "reset", generation });
 }
 
@@ -57,10 +63,22 @@ export function audio_pcm(seconds, pcm, finalMix) {
     if (replace) {
         firstFinal = false;
         queued.length = 0;
+        queuedFrames = 0;
     }
     const part = { kind: "pcm", start: Math.round(seconds * 48_000), pcm, finalMix, replace };
-    if (output) output.port.postMessage(part, [pcm.buffer]);
-    else queued.push(part);
+    if (output) {
+        output.port.postMessage(part, [pcm.buffer]);
+    } else if (queuedFrames + pcm.length / 2 <= 33_554_432) {
+        queuedFrames += pcm.length / 2;
+        queued.push(part);
+    } else {
+        error = "预览音频超过浏览器缓冲上限，请导出 WAV 播放。";
+    }
+}
+
+export function audio_schedule(boundaries, counts, waitForMix) {
+    schedule = { kind: "schedule", boundaries, counts, waitForMix };
+    output?.port.postMessage(schedule);
 }
 
 export function audio_end(seconds) {

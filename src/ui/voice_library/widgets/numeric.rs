@@ -190,8 +190,13 @@ pub(super) fn control(
         } else {
             (geometry.number.right_center(), Align2::RIGHT_CENTER)
         };
-        ui.painter()
-            .text(position, align, text, FontId::proportional(12.0), TEXT);
+        ui.painter().text(
+            position,
+            align,
+            text,
+            FontId::proportional(12.0),
+            text_color(),
+        );
     }
     result.changed = before != values;
     result.active = state.drag.is_some() || state.text.is_some();

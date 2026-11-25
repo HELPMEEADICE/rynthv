@@ -36,10 +36,10 @@ fn search(ui: &mut Ui, query: &mut String, width: f32) {
         .rect_filled(rect, 5, Color32::from_rgb(43, 43, 43));
     let center = rect.left_center() + vec2(19.0, -1.0);
     ui.painter()
-        .circle_stroke(center, 5.5, Stroke::new(1.8, TEXT));
+        .circle_stroke(center, 5.5, Stroke::new(1.8, text_color()));
     ui.painter().line_segment(
         [center + vec2(4.0, 4.0), center + vec2(9.0, 9.0)],
-        Stroke::new(1.8, TEXT),
+        Stroke::new(1.8, text_color()),
     );
     let has_text = !query.is_empty();
     let mut input = child(
@@ -167,7 +167,7 @@ fn actions(app: &mut App, ui: &mut Ui, state: &mut State) {
 
 fn sorting(ui: &mut Ui, state: &mut State, reverse: bool) {
     if !reverse {
-        ui.label(RichText::new("排序方式").color(MUTED));
+        ui.label(RichText::new("排序方式").color(muted_color()));
     }
     ComboBox::from_id_salt("voice-manager-sort")
         .width(90.0)
@@ -178,7 +178,7 @@ fn sorting(ui: &mut Ui, state: &mut State, reverse: bool) {
             }
         });
     if reverse {
-        ui.label(RichText::new("排序方式").color(MUTED));
+        ui.label(RichText::new("排序方式").color(muted_color()));
     }
 }
 

@@ -83,13 +83,19 @@ impl Worker {
                 json(&result?)
             }
             Request::Audio { path } => {
-                let audio = crate::synthesis::instrumental::read_audio(&path, &cancelled)?;
+                let asset = self.offline.recording(&path, &cancelled)?;
+                let mut peaks = Vec::new();
+                for wave in &asset.waveforms {
+                    wave.append_peaks(&mut peaks);
+                }
+                let audio = &asset.audio;
                 event(
                     Event::Audio {
                         channels: audio.layout().channels(),
                         rate: audio.sample_rate(),
+                        frames: audio.frames(),
                     },
-                    Some(audio.samples()),
+                    Some(&peaks),
                 );
                 json(&())
             }

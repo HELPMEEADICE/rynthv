@@ -9,6 +9,9 @@ pub struct Preferences {
     pub zoom: f32,
     pub show_status_bar: bool,
     pub control_hints: bool,
+    #[cfg(target_arch = "wasm32")]
+    #[serde(default)]
+    pub light_theme: bool,
 }
 
 impl Default for Preferences {
@@ -17,6 +20,8 @@ impl Default for Preferences {
             zoom: 1.0,
             show_status_bar: true,
             control_hints: false,
+            #[cfg(target_arch = "wasm32")]
+            light_theme: false,
         }
     }
 }
@@ -44,8 +49,10 @@ impl Preferences {
     }
 
     pub fn apply(&self, ctx: &Context) {
+        #[cfg(target_arch = "wasm32")]
+        crate::ui::theme::set_light(ctx, self.light_theme);
         ctx.set_zoom_factor(self.zoom);
-        ctx.style_mut_of(eframe::egui::Theme::Dark, |style| {
+        ctx.style_mut_of(ctx.theme(), |style| {
             style.explanation_tooltips = self.control_hints
         });
     }

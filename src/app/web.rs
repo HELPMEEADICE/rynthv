@@ -20,6 +20,7 @@ use projects::{ProjectEntry, Save, Snapshot};
 #[wasm_bindgen(raw_module = "./browser.js")]
 extern "C" {
     pub fn set_title(title: &str);
+    fn storage_usage() -> js_sys::Promise;
 }
 
 pub(crate) struct Startup {
@@ -60,6 +61,14 @@ pub(super) struct State {
     persistence: Option<Task<()>>,
     last_recovery: Option<(String, u64, bool)>,
     ctx: Option<Context>,
+    storage: Option<Task<Usage>>,
+    storage_report: Option<Usage>,
+}
+
+#[derive(Deserialize)]
+struct Usage {
+    usage: f64,
+    quota: f64,
 }
 
 pub(super) fn task<T: 'static>(
@@ -105,6 +114,13 @@ impl App {
             }
         }
         self.poll_web_projects(ctx);
+        if let Some(result) = self.browser.storage.as_ref().and_then(poll) {
+            self.browser.storage = None;
+            match result {
+                Ok(usage) => self.browser.storage_report = Some(usage),
+                Err(error) => self.error = Some(error),
+            }
+        }
         if let Some(result) = self.browser.persistence.as_ref().and_then(poll) {
             self.browser.persistence = None;
             if let Err(error) = result {
@@ -115,6 +131,39 @@ impl App {
             }
         }
         self.poll_drop(ctx);
+    }
+
+    pub(crate) fn browser_storage_panel(&mut self, ui: &mut eframe::egui::Ui) {
+        if let Some(usage) = &self.browser.storage_report {
+            ui.weak(format!(
+                "当前源约占用 {:.1} MiB／配额 {:.1} MiB",
+                usage.usage / 1048576.0,
+                usage.quota / 1048576.0
+            ));
+        }
+        ui.horizontal_wrapped(|ui| {
+            let idle = self.browser.storage.is_none();
+            if ui
+                .add_enabled(idle, eframe::egui::Button::new("估算存储用量"))
+                .clicked()
+            {
+                self.browser.storage = Some(task(ui.ctx(), documents::json(storage_usage())));
+            }
+            if ui
+                .add_enabled(
+                    idle && !self.synthesis.is_exporting(),
+                    eframe::egui::Button::new("清理 WAV 导出缓存"),
+                )
+                .clicked()
+            {
+                self.synthesis.export_result = None;
+                let clear = documents::clear_exports();
+                self.browser.storage = Some(task(ui.ctx(), async move {
+                    JsFuture::from(clear).await.map_err(js_error)?;
+                    documents::json(storage_usage()).await
+                }));
+            }
+        });
     }
 
     fn poll_drop(&mut self, ctx: &Context) {
@@ -130,7 +179,18 @@ impl App {
                 self.error = Some(error);
             }
             if let Some(paths) = result.paths {
-                self.browser.dropped.extend(paths);
+                let includes_project = paths.iter().any(|path| {
+                    path.extension()
+                        .is_some_and(|ext| ext.eq_ignore_ascii_case("svp"))
+                });
+                self.browser
+                    .dropped
+                    .extend(paths.into_iter().filter(|path| {
+                        !includes_project
+                            || path
+                                .extension()
+                                .is_some_and(|ext| ext.eq_ignore_ascii_case("svp"))
+                    }));
             }
         }
         if self.pending.is_some()

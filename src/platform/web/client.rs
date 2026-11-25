@@ -10,7 +10,7 @@ use wasm_bindgen_futures::{JsFuture, spawn_local};
 
 #[wasm_bindgen(raw_module = "./browser.js")]
 extern "C" {
-    fn start_request(request: &str, listener: &Function) -> Array;
+    fn start_request(request: &str, writes: bool, listener: &Function) -> Array;
     fn cancel_request(id: u32);
 }
 
@@ -42,6 +42,14 @@ pub fn submit<T: DeserializeOwned + 'static>(
     repaint: crate::synthesis::notify::Notify,
     mut event: impl FnMut(Event, Option<Float32Array>) + 'static,
 ) -> Pending<T> {
+    let writes = matches!(
+        &request,
+        Request::ImportVoices { .. }
+            | Request::ImportDictionaries { .. }
+            | Request::Settings { .. }
+            | Request::RemoveVoice { .. }
+            | Request::Context { .. }
+    );
     let request = serde_json::to_string(&request).expect("serializable worker request");
     let listener =
         Closure::<dyn FnMut(String, Option<Float32Array>)>::new(move |message: String, pcm| {
@@ -49,7 +57,7 @@ pub fn submit<T: DeserializeOwned + 'static>(
                 event(message, pcm);
             }
         });
-    let response = start_request(&request, listener.as_ref().unchecked_ref());
+    let response = start_request(&request, writes, listener.as_ref().unchecked_ref());
     let id = response.get(0).as_f64().expect("worker request id") as u32;
     let promise = response.get(1).unchecked_into::<Promise>();
     let (sender, receiver) = mpsc::channel();

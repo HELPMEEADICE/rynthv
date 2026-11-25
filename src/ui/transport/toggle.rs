@@ -1,6 +1,6 @@
 use crate::ui::{
     icons::Icon,
-    theme::{MUTED, PANEL},
+    theme::{muted_color, panel_color},
 };
 use eframe::egui::*;
 
@@ -26,12 +26,12 @@ pub(super) fn show(
             sw: 0,
             se: 3,
         },
-        PANEL,
+        panel_color(),
     );
     let tint = if selected {
         Color32::from_rgb(235, 232, 240)
     } else {
-        MUTED
+        muted_color()
     };
     icon.paint(
         ui,
@@ -42,7 +42,7 @@ pub(super) fn show(
         ui.painter().rect_stroke(
             rect.shrink(1.0),
             2,
-            Stroke::new(1.0, MUTED),
+            Stroke::new(1.0, muted_color()),
             StrokeKind::Inside,
         );
     }

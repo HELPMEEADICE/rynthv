@@ -94,7 +94,7 @@ fn token(painter: &Painter, mapping: &Mapping, phone: &RenderedPhoneme, rect: Re
         Align2::CENTER_CENTER,
         &phone.token,
         FontId::proportional(12.0),
-        TEXT,
+        text_color(),
     );
 }
 

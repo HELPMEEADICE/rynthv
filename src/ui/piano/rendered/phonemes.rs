@@ -5,7 +5,7 @@ use crate::{
     synthesis::{plan::OwnerId, rendered::RenderedPhoneme},
     ui::{
         group_geometry::{clip_rect, visible_note_rect},
-        theme::{MUTED, TEXT},
+        theme::{muted_color, text_color},
     },
 };
 use eframe::egui::*;
@@ -36,9 +36,9 @@ pub fn draw(app: &App, ui: &Ui, canvas: Rect, groups: &[SceneGroup]) {
             clip_rect(reference, canvas, &app.view.piano).intersect(ui.clip_rect()),
         );
         let color = if app.editor.reference == Some(reference.id) {
-            TEXT
+            text_color()
         } else {
-            MUTED
+            muted_color()
         };
         for note in &scene.notes {
             if visible_note_rect(

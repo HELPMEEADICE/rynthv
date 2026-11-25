@@ -41,6 +41,9 @@ async function stage(files, folder) {
             paths.push(`${prefix}/${files[0].webkitRelativePath.split("/")[0]}`);
         } else {
             const grouped = files.some(file => file.name.toLowerCase().endsWith(".svp"));
+            if (grouped && new Set(files.map(file => file.name)).size !== files.length) {
+                throw new Error("同一批工程文件中有重名文件，请分别导入。");
+            }
             for (let index = 0; index < files.length; index++) {
                 const file = files[index];
                 const path = `${prefix}/${grouped || files.length === 1 ? "" : `${index}/`}${file.name}`;
@@ -124,6 +127,15 @@ export function download_bytes(bytes, name, type) { download(new Blob([bytes], {
 export async function download_file(path) {
     const file = await (await fileHandle(path)).getFile();
     download(file, file.name);
+}
+
+export async function clear_exports() {
+    const library = await directory(["RynthV"], true);
+    try {
+        await library.removeEntry("exports", { recursive: true });
+    } catch (error) {
+        if (error.name !== "NotFoundError") throw error;
+    }
 }
 
 function db() {

@@ -27,9 +27,9 @@ pub fn horizontal(
         handle,
         1,
         if response.hovered() || response.dragged_by(PointerButton::Primary) {
-            TEXT
+            text_color()
         } else {
-            MUTED
+            muted_color()
         },
     );
     if response.dragged_by(PointerButton::Primary) {
@@ -79,9 +79,9 @@ fn vertical_handle(ui: &mut Ui, id: &str, rect: Rect, height: f32, scroll: f32, 
         handle,
         1,
         if response.hovered() || response.dragged_by(PointerButton::Primary) {
-            TEXT
+            text_color()
         } else {
-            MUTED
+            muted_color()
         },
     );
     if response.dragged_by(PointerButton::Primary) {

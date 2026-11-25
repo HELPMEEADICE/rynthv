@@ -32,9 +32,9 @@ pub(crate) fn show(app: &mut App, ui: &mut Ui) {
             } else {
                 &app.status
             };
-            ui.label(RichText::new(hint).size(11.0).color(ui::theme::MUTED));
+            ui.label(RichText::new(hint).size(11.0).color(ui::theme::muted_color()));
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                ui.label(RichText::new(app.synthesis.status()).size(11.0).color(ui::theme::MUTED));
+                ui.label(RichText::new(app.synthesis.status()).size(11.0).color(ui::theme::muted_color()));
             });
         });
     }

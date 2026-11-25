@@ -19,8 +19,12 @@ pub(super) fn selected_card(app: &mut App, ui: &mut Ui) {
     ui.painter().rect(
         rect,
         4,
-        if response.hovered() { BUTTON } else { BORDER },
-        Stroke::new(0.7, BUTTON),
+        if response.hovered() {
+            button_color()
+        } else {
+            border_color()
+        },
+        Stroke::new(0.7, button_color()),
         StrokeKind::Inside,
     );
     let art = Rect::from_min_size(rect.min, Vec2::splat(60.0));
@@ -39,7 +43,7 @@ pub(super) fn selected_card(app: &mut App, ui: &mut Ui) {
                 |entry| entry.display_name.as_str(),
             ),
             FontId::proportional(13.0),
-            TEXT,
+            text_color(),
         );
     if let Some(entry) = entry {
         ui.painter()
@@ -49,13 +53,13 @@ pub(super) fn selected_card(app: &mut App, ui: &mut Ui) {
                 Align2::LEFT_CENTER,
                 family_name(entry),
                 FontId::proportional(10.5),
-                MUTED,
+                muted_color(),
             );
     }
     Icon::ChevronDown.paint(
         ui,
         Rect::from_center_size(rect.right_center() - vec2(16.0, 0.0), Vec2::splat(12.0)),
-        MUTED,
+        muted_color(),
     );
     response.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, "选择歌声"));
     popup(app, &response.on_hover_cursor(CursorIcon::Default));
@@ -69,7 +73,7 @@ pub fn popup(app: &mut App, anchor: &Response) {
         .frame(
             Frame::popup(&anchor.ctx.style_of(Theme::Dark))
                 .fill(POPUP_FILL)
-                .stroke(Stroke::new(0.8, BUTTON_ACTIVE))
+                .stroke(Stroke::new(0.8, button_active_color()))
                 .corner_radius(5)
                 .inner_margin(4),
         )
@@ -196,17 +200,17 @@ fn header(ui: &mut Ui) {
         Align2::LEFT_CENTER,
         "歌声",
         section_title_font(),
-        TEXT,
+        text_color(),
     );
     let origin = rect.right_center() - vec2(24.0, 7.0);
     for row in 0..3 {
         let p = origin + vec2(0.0, row as f32 * 5.0);
         ui.painter()
-            .rect_filled(Rect::from_min_size(p, vec2(5.0, 4.0)), 0, ICON_TOOL);
+            .rect_filled(Rect::from_min_size(p, vec2(5.0, 4.0)), 0, icon_tool_color());
         ui.painter().rect_filled(
             Rect::from_min_size(p + vec2(7.0, 0.0), vec2(9.0, 2.0)),
             0,
-            ICON_TOOL,
+            icon_tool_color(),
         );
     }
 }
@@ -221,14 +225,14 @@ fn menu_row(ui: &mut Ui, label: &str, icon: Option<Icon>, enabled: bool) -> Resp
         },
     );
     if enabled && response.hovered() {
-        ui.painter().rect_filled(rect, 3, BUTTON_HOVER);
+        ui.painter().rect_filled(rect, 3, button_hover_color());
     }
     let mut x = rect.left() + 8.0;
     if let Some(icon) = icon {
         icon.paint(
             ui,
             Rect::from_center_size(pos2(x + 10.0, rect.center().y), Vec2::splat(20.0)),
-            TEXT,
+            text_color(),
         );
         x += 28.0;
     }
@@ -237,7 +241,7 @@ fn menu_row(ui: &mut Ui, label: &str, icon: Option<Icon>, enabled: bool) -> Resp
         Align2::LEFT_CENTER,
         label,
         FontId::proportional(12.0),
-        if enabled { TEXT } else { MUTED },
+        if enabled { text_color() } else { muted_color() },
     );
     response.widget_info(|| WidgetInfo::labeled(WidgetType::Button, enabled, label));
     response.on_hover_cursor(CursorIcon::Default)
@@ -248,7 +252,7 @@ fn separator(ui: &mut Ui) {
     ui.painter().hline(
         rect.x_range(),
         rect.center().y,
-        Stroke::new(1.0, BUTTON_ACTIVE),
+        Stroke::new(1.0, button_active_color()),
     );
 }
 
@@ -263,8 +267,15 @@ fn card(ui: &mut Ui, entry: &VoiceCatalogEntry, selected: bool) -> Response {
         },
     );
     if selected || (enabled && response.hovered()) {
-        ui.painter()
-            .rect_filled(rect, 5, if selected { BUTTON_HOVER } else { BUTTON });
+        ui.painter().rect_filled(
+            rect,
+            5,
+            if selected {
+                button_hover_color()
+            } else {
+                button_color()
+            },
+        );
     }
     let art = Rect::from_min_size(rect.min + vec2(8.0, 6.0), Vec2::splat(64.0));
     artwork::paint(ui, art, entry.icon_path.as_deref());
@@ -280,7 +291,7 @@ fn card(ui: &mut Ui, entry: &VoiceCatalogEntry, selected: bool) -> Response {
         Align2::LEFT_TOP,
         &entry.display_name,
         section_title_font(),
-        if enabled { TEXT } else { MUTED },
+        if enabled { text_color() } else { muted_color() },
     );
     painter.text(
         content.min + vec2(0.0, 23.0),
@@ -290,7 +301,7 @@ fn card(ui: &mut Ui, entry: &VoiceCatalogEntry, selected: bool) -> Response {
             VoiceAvailability::Unsupported(reason) => reason.clone(),
         },
         FontId::proportional(12.0),
-        MUTED,
+        muted_color(),
     );
     let mut x = content.left();
     let mut tags = Vec::new();
@@ -299,16 +310,17 @@ fn card(ui: &mut Ui, entry: &VoiceCatalogEntry, selected: bool) -> Response {
     }
     tags.extend(entry.languages.iter().map(|s| language_tag(s)));
     for tag in tags {
-        let galley = painter.layout_no_wrap(tag.to_owned(), FontId::proportional(10.5), TEXT);
+        let galley =
+            painter.layout_no_wrap(tag.to_owned(), FontId::proportional(10.5), text_color());
         let badge = Rect::from_min_size(
             pos2(x, content.top() + 44.0),
             vec2(galley.size().x + 8.0, 18.0),
         );
-        painter.rect_filled(badge, 2, BUTTON_ACTIVE);
+        painter.rect_filled(badge, 2, button_active_color());
         painter.galley(
             badge.left_center() + vec2(4.0, -galley.size().y / 2.0),
             galley,
-            TEXT,
+            text_color(),
         );
         x = badge.right() + 4.0;
     }

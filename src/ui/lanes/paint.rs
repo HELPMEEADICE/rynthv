@@ -23,14 +23,14 @@ pub(super) fn show(app: &App, ui: &Ui, lane: &Lane, mapping: &Mapping, selected:
     {
         let y = mapping.point((0, value)).y;
         if mapping.canvas.y_range().contains(y) {
-            painter.hline(mapping.canvas.x_range(), y, Stroke::new(0.8, GRID));
+            painter.hline(mapping.canvas.x_range(), y, Stroke::new(0.8, grid_color()));
         }
     }
     curve(
         ui,
         &background,
         app.editor.automation(&lane.background),
-        MUTED.gamma_multiply(0.65),
+        muted_color().gamma_multiply(0.65),
     );
     curve(
         ui,
@@ -112,9 +112,9 @@ fn axes(ui: &Ui, mapping: &Mapping, right: bool) {
     let first = (low / step).ceil() as i64;
     let last = (high / step).floor() as i64;
     let color = if right {
-        MUTED.gamma_multiply(0.7)
+        muted_color().gamma_multiply(0.7)
     } else {
-        MUTED
+        muted_color()
     };
     let painter = ui.painter();
     let x = if right {

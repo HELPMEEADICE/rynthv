@@ -3,6 +3,7 @@ use crate::{
     platform::web::protocol::{ComputeDiagnostics, Event, Preview, Visuals},
     synthesis::{
         audio,
+        execution::{self, Cancellation},
         export_request::ExportRequest,
         offline::{Options, Progress},
     },
@@ -74,20 +75,25 @@ impl Worker {
             let directory = PathBuf::from("/RynthV/exports").join(uuid::Uuid::new_v4().to_string());
             let request = ExportRequest::with_directory(&project, Some(directory.clone()))?;
             fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
-            let export = (|| -> Result<Vec<PathBuf>, String> {
-                let mut paths = Vec::new();
-                for target in request.outputs {
-                    if let Some(pcm) = output.mix_stem(target.track, target.stem)? {
-                        audio::save_wav_policy(&target.path, &pcm, request.format, false)
-                            .map_err(|error| error.to_string())?;
-                        paths.push(target.path);
+            let export = execution::scope(
+                Cancellation::from_flag(cancelled),
+                || -> Result<Vec<PathBuf>, String> {
+                    let mut paths = Vec::new();
+                    for target in request.outputs {
+                        yield_events()?;
+                        execution::checkpoint().map_err(|error| error.to_string())?;
+                        if let Some(pcm) = output.mix_stem(target.track, target.stem)? {
+                            audio::save_wav_policy(&target.path, &pcm, request.format, false)
+                                .map_err(|error| error.to_string())?;
+                            paths.push(target.path);
+                        }
                     }
-                }
-                if paths.is_empty() {
-                    return Err("所选音轨没有可导出的音频".into());
-                }
-                Ok(paths)
-            })();
+                    if paths.is_empty() {
+                        return Err("所选音轨没有可导出的音频".into());
+                    }
+                    Ok(paths)
+                },
+            );
             if export.is_err() {
                 let _ = fs::remove_dir_all(&directory);
             }
@@ -98,6 +104,8 @@ impl Worker {
         for owner in &output.report.owners {
             let data = &owner.owner.visuals;
             let origin = owner.owner.audio.start_seconds();
+            let mut peaks = Vec::new();
+            data.waveform.append_peaks(&mut peaks);
             event(
                 Event::Visuals(Box::new(Visuals {
                     group: owner.group_ref_id.clone(),
@@ -105,8 +113,9 @@ impl Worker {
                     phones: data.phonemes.clone(),
                     note_ids: owner.note_ids.clone(),
                     origin,
+                    frames: owner.owner.audio.frames(),
                 })),
-                Some(owner.owner.audio.samples()),
+                Some(&peaks),
             );
         }
         if let Some(mix) = output.mix(None)? {

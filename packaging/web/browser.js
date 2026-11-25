@@ -29,13 +29,13 @@ function workerInstance() {
     return worker;
 }
 
-export function start_request(request, listener) {
+export function start_request(request, writes, listener) {
     const id = nextRequest++;
     const promise = new Promise((resolve, reject) => {
         try {
             const instance = workerInstance();
             requests.set(id, { resolve, reject, listener });
-            instance.postMessage({ id, request });
+            instance.postMessage({ id, request, writes });
         } catch (error) {
             requests.delete(id);
             reject(error);

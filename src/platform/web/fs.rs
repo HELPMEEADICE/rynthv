@@ -85,6 +85,12 @@ fn resource_path(path: &Path) -> io::Result<String> {
             }
         }
     }
+    if parts.first() != Some(&"RynthV") {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "File is outside RynthV browser storage",
+        ));
+    }
     Ok(format!("/{}", parts.join("/")))
 }
 

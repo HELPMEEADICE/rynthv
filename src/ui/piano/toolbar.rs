@@ -27,7 +27,7 @@ fn contents(app: &mut App, ui: &mut Ui) {
         overlays(app, ui, 24.0);
         super::scale_guide::toggle(app, ui);
         ui.add_space(7.0);
-        ui.label(RichText::new("网格").color(MUTED));
+        ui.label(RichText::new("网格").color(muted_color()));
         ui.add_space(8.0);
         grid_selector(app, ui, 96.0);
         ui.add_space(9.0);
@@ -159,7 +159,7 @@ const TOOLS: [(Icon, &str, super::Tool); 4] = [
 
 fn editing_tools(app: &mut App, ui: &mut Ui, height: f32) {
     let (rect, _) = ui.allocate_exact_size(vec2(160.0, height), Sense::hover());
-    ui.painter().rect_filled(rect, 3, BUTTON);
+    ui.painter().rect_filled(rect, 3, button_color());
     let mut group = crate::ui::child(ui, rect, "piano-editing-tools");
     group.horizontal_centered(|ui| {
         ui.spacing_mut().item_spacing.x = 0.0;

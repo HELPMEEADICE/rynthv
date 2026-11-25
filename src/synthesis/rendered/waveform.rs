@@ -24,9 +24,11 @@ impl Peak {
 /// are project seconds. The retained audio shares its immutable sample Arc.
 #[derive(Debug)]
 pub struct Waveform {
-    audio: RenderedAudio,
+    exact: Option<(RenderedAudio, Option<usize>)>,
+    start: f64,
+    rate: u32,
+    frames: usize,
     levels: Vec<Vec<Peak>>,
-    channel: Option<usize>,
 }
 
 impl Waveform {
@@ -45,6 +47,22 @@ impl Waveform {
         for samples in audio.samples().chunks(BASE_FRAMES * channels) {
             base.push(sample_peak(samples, channels, channel));
         }
+        Self::from_base(
+            audio.start_seconds(),
+            audio.sample_rate(),
+            audio.frames(),
+            base,
+            Some((audio.clone(), channel)),
+        )
+    }
+
+    fn from_base(
+        start: f64,
+        rate: u32,
+        frames: usize,
+        base: Vec<Peak>,
+        exact: Option<(RenderedAudio, Option<usize>)>,
+    ) -> Self {
         let mut levels = vec![base];
         while levels.last().is_some_and(|level| level.len() > 1) {
             let previous = levels.last().expect("waveform has a base level");
@@ -59,18 +77,35 @@ impl Waveform {
             levels.push(next);
         }
         Self {
-            audio: audio.clone(),
+            exact,
+            start,
+            rate,
+            frames,
             levels,
-            channel,
         }
     }
 
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn append_peaks(&self, values: &mut Vec<f32>) {
+        values.extend(self.levels[0].iter().flat_map(|peak| [peak.min, peak.max]));
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn from_peaks(start: f64, rate: u32, frames: usize, values: &[f32]) -> Option<Self> {
+        let (pairs, remainder) = values.as_chunks::<2>();
+        if !remainder.is_empty() || pairs.len() != frames.div_ceil(BASE_FRAMES) || rate == 0 {
+            return None;
+        }
+        let base = pairs.iter().map(|&[min, max]| Peak { min, max }).collect();
+        Some(Self::from_base(start, rate, frames, base, None))
+    }
+
     pub fn start_seconds(&self) -> f64 {
-        self.audio.start_seconds()
+        self.start
     }
 
     pub fn end_seconds(&self) -> f64 {
-        self.audio.end_seconds()
+        self.start + self.frames as f64 / f64::from(self.rate)
     }
 
     /// Exact sample extrema intersecting a half-open display interval. Whole
@@ -85,36 +120,41 @@ impl Waveform {
         if end_seconds <= start_seconds {
             return None;
         }
-        let rate = f64::from(self.audio.sample_rate());
+        let rate = f64::from(self.rate);
         let first = ((start_seconds - self.start_seconds()) * rate)
             .floor()
-            .clamp(0.0, self.audio.frames() as f64) as usize;
+            .clamp(0.0, self.frames as f64) as usize;
         let end = ((end_seconds - self.start_seconds()) * rate)
             .ceil()
-            .clamp(0.0, self.audio.frames() as f64) as usize;
+            .clamp(0.0, self.frames as f64) as usize;
         if first >= end {
             return None;
         }
-        let channels = self.audio.layout().channels();
+        let Some((audio, channel)) = &self.exact else {
+            let mut peak = Peak::EMPTY;
+            self.include_blocks(first / BASE_FRAMES, end.div_ceil(BASE_FRAMES), &mut peak);
+            return Some((peak.min, peak.max));
+        };
+        let channels = audio.layout().channels();
         let left_block = first.div_ceil(BASE_FRAMES);
         let right_block = end / BASE_FRAMES;
         let mut peak = Peak::EMPTY;
         if left_block >= right_block {
             peak.include(sample_peak(
-                &self.audio.samples()[first * channels..end * channels],
+                &audio.samples()[first * channels..end * channels],
                 channels,
-                self.channel,
+                *channel,
             ));
         } else {
             peak.include(sample_peak(
-                &self.audio.samples()[first * channels..left_block * BASE_FRAMES * channels],
+                &audio.samples()[first * channels..left_block * BASE_FRAMES * channels],
                 channels,
-                self.channel,
+                *channel,
             ));
             peak.include(sample_peak(
-                &self.audio.samples()[right_block * BASE_FRAMES * channels..end * channels],
+                &audio.samples()[right_block * BASE_FRAMES * channels..end * channels],
                 channels,
-                self.channel,
+                *channel,
             ));
             self.include_blocks(left_block, right_block, &mut peak);
         }

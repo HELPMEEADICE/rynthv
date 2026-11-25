@@ -25,19 +25,46 @@ pub fn read_audio(path: &Path, cancelled: &AtomicBool) -> Result<RenderedAudio, 
 }
 
 impl AudioAsset {
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn read_for_mix(path: &Path, cancelled: &AtomicBool) -> Result<Self, String> {
         decode::load(path, cancelled, false)
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn duration_seconds(&self) -> f64 {
+        self.audio.duration_seconds()
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn read_with_waveforms(path: &Path, cancelled: &AtomicBool) -> Result<Self, String> {
+        decode::load(path, cancelled, true)
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub type EditorAudioAsset = AudioAsset;
+
+#[cfg(target_arch = "wasm32")]
+pub struct EditorAudioAsset {
+    duration: f64,
+    pub waveforms: Vec<Waveform>,
+}
+
+#[cfg(target_arch = "wasm32")]
+impl EditorAudioAsset {
+    pub fn duration_seconds(&self) -> f64 {
+        self.duration
     }
 }
 
 enum Entry {
     Loading {
-        rx: mpsc::Receiver<Result<Arc<AudioAsset>, String>>,
+        rx: mpsc::Receiver<Result<Arc<EditorAudioAsset>, String>>,
         cancel: Arc<AtomicBool>,
         #[cfg(target_arch = "wasm32")]
         web: crate::platform::web::client::Pending<()>,
     },
-    Ready(Arc<AudioAsset>),
+    Ready(Arc<EditorAudioAsset>),
     Failed(String),
 }
 
@@ -113,7 +140,7 @@ impl AudioLibrary {
         }
     }
 
-    pub fn asset(&self, path: &Path) -> Option<&Arc<AudioAsset>> {
+    pub fn asset(&self, path: &Path) -> Option<&Arc<EditorAudioAsset>> {
         match self.entries.get(path) {
             Some(Entry::Ready(asset)) => Some(asset),
             _ => None,
@@ -160,32 +187,43 @@ impl AudioLibrary {
                 client,
                 protocol::{Event, Request},
             };
-            use crate::synthesis::audio::ChannelLayout;
             let pending = client::submit::<()>(
                 Request::Audio { path: file },
                 ctx.clone(),
                 move |event, samples| {
-                    if let (Event::Audio { channels, rate }, Some(samples)) = (event, samples) {
-                        let layout = if channels == 1 {
-                            ChannelLayout::Mono
-                        } else {
-                            ChannelLayout::Stereo
-                        };
-                        let asset = RenderedAudio::new(rate, 0.0, layout, samples.to_vec())
-                            .map(|audio| {
-                                let waveforms = (0..channels)
-                                    .map(|channel| Waveform::new_channel(&audio, channel))
-                                    .collect();
-                                Arc::new(AudioAsset {
-                                    audio: Arc::new(audio),
+                    if let (
+                        Event::Audio {
+                            channels,
+                            rate,
+                            frames,
+                        },
+                        Some(samples),
+                    ) = (event, samples)
+                        && !worker_cancel.load(Ordering::Relaxed)
+                    {
+                        let samples = samples.to_vec();
+                        let per_channel = samples.len() / channels.max(1);
+                        let asset = (0..channels)
+                            .map(|channel| {
+                                let first = channel * per_channel;
+                                Waveform::from_peaks(
+                                    0.0,
+                                    rate,
+                                    frames,
+                                    &samples[first..first + per_channel],
+                                )
+                            })
+                            .collect::<Option<Vec<_>>>()
+                            .filter(|waves| !waves.is_empty())
+                            .map(|waveforms| {
+                                Arc::new(EditorAudioAsset {
+                                    duration: frames as f64 / f64::from(rate),
                                     waveforms,
                                 })
                             })
-                            .map_err(|error| error.to_string());
-                        if !worker_cancel.load(Ordering::Relaxed) {
-                            let _ = tx.send(asset);
-                            ctx.wake();
-                        }
+                            .ok_or_else(|| "无效的伴奏波形".into());
+                        let _ = tx.send(asset);
+                        ctx.wake();
                     }
                 },
             );

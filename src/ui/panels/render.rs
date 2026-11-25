@@ -142,13 +142,13 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
             .collect();
         let mut mix_changed = false;
         Frame::new()
-            .fill(BACKGROUND)
+            .fill(background_color())
             .inner_margin(4)
             .show(ui, |ui| {
                 ui.set_min_height(190.0);
                 ui.set_width(ui.available_width());
                 ui.spacing_mut().item_spacing.y = 3.0;
-                if track_row(ui, &mut mix, "混音导出", TEXT) {
+                if track_row(ui, &mut mix, "混音导出", text_color()) {
                     mix_changed = true;
                 }
                 for (id, name, _, enabled, color) in &mut tracks {
@@ -346,7 +346,7 @@ fn numeric(
 }
 fn track_row(ui: &mut Ui, checked: &mut bool, name: &str, color: Color32) -> bool {
     let row = Frame::new()
-        .fill(PANEL)
+        .fill(panel_color())
         .corner_radius(2)
         .inner_margin(Margin {
             left: 12,
@@ -372,11 +372,11 @@ fn folder_button(ui: &mut Ui) -> Response {
         rect,
         3,
         if response.hovered() {
-            BUTTON_HOVER
+            button_hover_color()
         } else {
-            BORDER
+            border_color()
         },
-        Stroke::new(0.6, BUTTON),
+        Stroke::new(0.6, button_color()),
         StrokeKind::Inside,
     );
     let c = rect.center();
@@ -392,7 +392,7 @@ fn folder_button(ui: &mut Ui) -> Response {
     ];
     ui.painter().add(Shape::line(
         points.into_iter().map(|(x, y)| c + vec2(x, y)).collect(),
-        Stroke::new(1.1, MUTED),
+        Stroke::new(1.1, muted_color()),
     ));
     response.on_hover_text("选择目标文件夹")
 }
@@ -449,7 +449,7 @@ fn directory_field(app: &App, ui: &mut Ui, editable: bool) -> DirectoryField {
             TextEdit::singleline(&mut dir_draft.text)
                 .vertical_align(Align::Center)
                 .margin(vec2(7.0, 5.0))
-                .background_color(BORDER),
+                .background_color(border_color()),
         );
         dir_has_focus = response.has_focus();
         if dir_draft.text != directory

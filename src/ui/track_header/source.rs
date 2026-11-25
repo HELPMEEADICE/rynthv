@@ -37,14 +37,14 @@ pub(super) fn show(app: &mut App, ui: &mut Ui, rect: Rect, text_rect: Rect, trac
         Icon::Waveform.paint(
             ui,
             Rect::from_center_size(rect.min + vec2(24.0, 39.0), Vec2::splat(12.0)),
-            MUTED,
+            muted_color(),
         );
         painter.text(
             rect.min + vec2(35.0, 39.0),
             Align2::LEFT_CENTER,
             text,
             FontId::proportional(12.0),
-            MUTED,
+            muted_color(),
         );
         let click = Rect::from_min_max(
             rect.min + vec2(16.0, 29.0),
@@ -67,14 +67,14 @@ pub(super) fn show(app: &mut App, ui: &mut Ui, rect: Rect, text_rect: Rect, trac
     Icon::Microphone.paint(
         ui,
         Rect::from_center_size(rect.min + vec2(24.0, 39.0), vec2(12.0, 12.0)),
-        MUTED,
+        muted_color(),
     );
     painter.text(
         rect.min + vec2(35.0, 39.0),
         Align2::LEFT_CENTER,
         voice_name.unwrap_or_default(),
         FontId::proportional(12.0),
-        MUTED,
+        muted_color(),
     );
     let voice_rect = Rect::from_min_max(
         rect.min + vec2(16.0, 29.0),

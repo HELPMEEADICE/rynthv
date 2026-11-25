@@ -108,7 +108,7 @@ pub fn show(app: &mut App, ui: &mut Ui, rect: Rect, track_index: usize) {
         Align2::LEFT_CENTER,
         &track_name,
         FontId::proportional(12.0),
-        TEXT,
+        text_color(),
     );
     source::show(app, ui, rect, text_rect, track_index);
     if rect.width() < 210.0 {
@@ -193,7 +193,7 @@ pub fn show(app: &mut App, ui: &mut Ui, rect: Rect, track_index: usize) {
                 ui.painter().vline(
                     x + i as f32 * 2.0,
                     rect.top() + 45.0 - (1.0 + i as f32)..=rect.top() + 45.0,
-                    Stroke::new(1.0, MUTED.gamma_multiply(0.55)),
+                    Stroke::new(1.0, muted_color().gamma_multiply(0.55)),
                 );
             }
         }
@@ -209,11 +209,11 @@ pub fn show(app: &mut App, ui: &mut Ui, rect: Rect, track_index: usize) {
             r,
             2,
             if value {
-                GREEN
+                green_color()
             } else if response.hovered() {
-                BUTTON_HOVER
+                button_hover_color()
             } else {
-                BUTTON
+                button_color()
             },
         );
         ui.painter().text(
@@ -221,7 +221,7 @@ pub fn show(app: &mut App, ui: &mut Ui, rect: Rect, track_index: usize) {
             Align2::CENTER_CENTER,
             text,
             FontId::proportional(9.0),
-            if value { CANVAS } else { TEXT },
+            if value { canvas_color() } else { text_color() },
         );
         if response
             .on_hover_text(if field == "mute" {
@@ -260,7 +260,7 @@ fn knob(
         center,
         9.5,
         if response.hovered() {
-            BUTTON_HOVER
+            button_hover_color()
         } else {
             Color32::from_rgb(77, 75, 81)
         },
@@ -273,7 +273,7 @@ fn knob(
     let angle = (-225.0 + normalized as f32 * 270.0).to_radians();
     let end = center + vec2(angle.cos(), angle.sin()) * 8.0;
     ui.painter()
-        .line_segment([center, end], Stroke::new(1.0, MUTED));
+        .line_segment([center, end], Stroke::new(1.0, muted_color()));
     let next = if response.double_clicked_by(PointerButton::Primary) {
         reset
     } else if response.dragged_by(PointerButton::Primary) {

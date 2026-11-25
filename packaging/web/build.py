@@ -74,7 +74,12 @@ def main():
     if not target_dir.is_absolute():
         target_dir = ROOT / target_dir
     env["CARGO_TARGET_DIR"] = str(target_dir)
-    env["CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS"] = "-C target-feature=+simd128"
+    if "CARGO_ENCODED_RUSTFLAGS" in env:
+        flags = env["CARGO_ENCODED_RUSTFLAGS"]
+        env["CARGO_ENCODED_RUSTFLAGS"] = "\x1f".join(filter(None, (flags, "-C", "target-feature=+simd128")))
+    else:
+        flags = env.get("RUSTFLAGS", env.get("CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS", ""))
+        env["RUSTFLAGS"] = f"{flags} -C target-feature=+simd128".strip()
     if args.check:
         run(cargo, "check", *FEATURES, env=env)
         run(cargo, "clippy", *FEATURES, "--", "-D", "warnings", env=env)

@@ -37,7 +37,7 @@ pub fn show(app: &mut App, ui: &mut Ui, body: Rect, track_index: usize) {
                 "双击导入伴奏音频…"
             },
             FontId::proportional(12.0),
-            MUTED,
+            muted_color(),
         );
         if response.double_clicked() {
             app.import_audio(Some(track_id), ui.ctx());

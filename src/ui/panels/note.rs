@@ -174,7 +174,7 @@ fn phonemes(app: &mut App, ui: &mut Ui) {
             .hint_text(if mixed { "多个值" } else { "自动" })
             .vertical_align(Align::Center)
             .margin(vec2(7.0, 5.0))
-            .background_color(crate::ui::theme::BORDER),
+            .background_color(crate::ui::theme::border_color()),
     );
     draft.dirty |= response.changed();
     if (response.has_focus() || response.lost_focus()) && ui.input(|i| i.key_pressed(Key::Escape)) {

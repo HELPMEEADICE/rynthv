@@ -538,11 +538,17 @@ impl eframe::App for App {
         #[cfg(not(target_os = "android"))]
         self.update_title(&ctx);
         ui.painter()
-            .rect_filled(ui.max_rect(), 0, ui::theme::BACKGROUND);
+            .rect_filled(ui.max_rect(), 0, ui::theme::background_color());
         #[cfg(target_os = "android")]
         ui::mobile::show(self, ui, ctx.content_rect().intersect(ui.max_rect()));
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
         ui::chrome::desktop(self, ui);
+        #[cfg(target_arch = "wasm32")]
+        if ui::mobile::compact(&ctx) {
+            ui::mobile::show(self, ui, ctx.content_rect().intersect(ui.max_rect()));
+        } else {
+            ui::chrome::desktop(self, ui);
+        }
         ui::instrumental::update_drag(self, &ctx);
         ui::group_edit::end_frame(self, &ctx);
         self.dialogs(&ctx);

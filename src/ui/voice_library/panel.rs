@@ -42,7 +42,7 @@ fn version(app: &mut App, ui: &mut Ui) {
     let mut revision = selected.revision;
     ui.scope(|ui| {
         ui.spacing_mut().interact_size.y = 28.0;
-        ui.visuals_mut().widgets.inactive.bg_fill = BORDER;
+        ui.visuals_mut().widgets.inactive.bg_fill = border_color();
         ui.visuals_mut().widgets.inactive.corner_radius = CornerRadius::same(4);
         ComboBox::from_id_salt("voice-revision")
             .width(ui.available_width())
@@ -105,7 +105,7 @@ fn section(ui: &mut Ui, title: &str, content: impl FnOnce(&mut Ui)) {
     ui.painter().hline(
         ui.available_rect_before_wrap().x_range(),
         y,
-        Stroke::new(1.0, EDGE),
+        Stroke::new(1.0, edge_color()),
     );
     Frame::new()
         .inner_margin(Margin {

@@ -1,12 +1,12 @@
 use super::{Scale, Tonic};
-use crate::{app::App, ui::theme::BORDER};
+use crate::{app::App, ui::theme::border_color};
 use eframe::egui::*;
 use serde_json::{Value, json};
 
 #[cfg(not(target_os = "android"))]
 pub fn toolbar(app: &mut App, ui: &mut Ui) {
     ui.add_space(15.0);
-    ui.label(RichText::new("调式音阶").color(crate::ui::theme::MUTED));
+    ui.label(RichText::new("调式音阶").color(crate::ui::theme::muted_color()));
     ui.add_space(8.0);
     ui.push_id("scale-toolbar", |ui| controls(app, ui, false));
 }
@@ -14,7 +14,7 @@ pub fn toolbar(app: &mut App, ui: &mut Ui) {
 pub fn panel(app: &mut App, ui: &mut Ui) {
     ui.push_id("voice-scale", |ui| {
         ui.spacing_mut().interact_size.y = 28.0;
-        ui.visuals_mut().widgets.inactive.bg_fill = BORDER;
+        ui.visuals_mut().widgets.inactive.bg_fill = border_color();
         ui.visuals_mut().widgets.inactive.corner_radius = CornerRadius::same(4);
         controls(app, ui, true);
     });

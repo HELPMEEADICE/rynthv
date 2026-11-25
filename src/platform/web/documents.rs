@@ -14,6 +14,7 @@ extern "C" {
     pub fn delete_document(path: &str) -> Promise;
     pub fn download_bytes(bytes: &[u8], name: &str, mime: &str);
     pub fn download_file(path: &str) -> Promise;
+    pub fn clear_exports() -> Promise;
     fn read_record(key: &str) -> Promise;
     pub fn write_record(key: &str, value: &str) -> Promise;
     pub fn save_project(id: &str, name: &str, snapshot: &str) -> Promise;
@@ -28,7 +29,11 @@ pub async fn json<T: DeserializeOwned>(promise: Promise) -> Result<T, String> {
 }
 
 pub async fn read(path: &Path) -> Result<Vec<u8>, String> {
-    let value = JsFuture::from(read_document(&path.to_string_lossy(), 64 << 20))
+    read_limited(path, 64 << 20).await
+}
+
+pub async fn read_limited(path: &Path, limit: u32) -> Result<Vec<u8>, String> {
+    let value = JsFuture::from(read_document(&path.to_string_lossy(), limit))
         .await
         .map_err(js_error)?;
     Ok(Uint8Array::new(&value).to_vec())
