@@ -54,7 +54,7 @@ AppImage 在 Ubuntu 24.04 上构建。运行依赖系统的 glibc 和 `libgcc_s.
 
 ## 声库与配置
 
-首次使用可在设置中选择声库和发音词典目录，或者执行 `rynthv -cli config set`。
+在 **管理歌声** 或 **设置 → 歌声资源** 中，选择 **导入声库…** 可打开原生 SV1 AI 的 `.svpk` 或 Flat 的 `.sfpk`、`.sfpks`。在 **发音词典目录（clf-data）** 下选择 **导入词典压缩包…**，可直接导入 `clf-data.zip` 或 `clf-data.7z` 并启用词典。已有资源目录也可在设置中选择，或用 `rynthv -cli config set` 配置。
 声库、词典和用户模型上下文由用户提供。
 
 | 声库类型 | Windows | Linux | Android |

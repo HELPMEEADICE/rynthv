@@ -18,7 +18,7 @@ pub(super) fn resources() -> Vec<Command> {
                     .about("Read styles, supported languages and phoneme inventory")
                     .args(voice_key()),
                 Command::new("import")
-                    .about("Import a Flat voice package into the configured registry")
+                    .about("Import an SVPK, SFPK or SFPKS voice package")
                     .arg(input().required(true)),
                 Command::new("context")
                     .about("Import an existing portable model context for an installed voice")
@@ -40,6 +40,9 @@ pub(super) fn resources() -> Vec<Command> {
             "Query native dictionaries and manage project pronunciations",
             [
                 Command::new("list").about("List configured language dictionaries"),
+                Command::new("import")
+                    .about("Import and activate a clf-data ZIP or 7z archive")
+                    .arg(input().required(true)),
                 Command::new("lookup")
                     .about("Resolve a word through the engine language frontend")
                     .args([
@@ -73,17 +76,13 @@ pub(super) fn resources() -> Vec<Command> {
                 Command::new("set")
                     .about("Set synthesis configuration without starting the GUI")
                     .args(
-                        [
-                            "databases",
-                            "sv1-databases",
-                            "flat-databases",
-                            "flat-models",
-                            "dictionaries",
-                        ]
-                        .map(|key| {
-                            option(key, "Existing resource directory or supported archive path")
-                        }),
+                        ["databases", "flat-databases", "flat-models", "dictionaries"]
+                            .map(|key| option(key, "Existing resource directory")),
                     )
+                    .arg(option(
+                        "sv1-databases",
+                        "Existing SV1 directory or NOFS file",
+                    ))
                     .args([
                         choice("compute-backend", "Default inference backend", BACKENDS),
                         option("compute-adapter", "Default WebGPU adapter ID, or auto"),

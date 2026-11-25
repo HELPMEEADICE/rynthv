@@ -27,10 +27,11 @@ rynthv -cli voice list --json
 rynthv -cli dictionary lookup --language japanese --word '世界' --json
 ```
 
-`--sv1-databases` 也接受单个 SV1 NOFS 文件。使用 `voice import --input` 导入 `.sfpk` 或 `.sfpks` 文件。共享 Flat 模型放在 `--flat-models` 指定的目录。版本和缺失依赖可用 `voice list` 查询。`config set` 的任一目录参数可用值 `none` 清除。
+`--sv1-databases` 也接受单个 SV1 NOFS 文件。`voice import --input` 支持含 `voice.nofs` 的原生 SV1 AI `.svpk`，也支持 Flat 的 `.sfpk` 或 `.sfpks`。导入的 SV1 声库保存在配置目录下的 `sv1-voices` 中。使用 `dictionary import --input` 导入并启用 `clf-data.zip` 或 `clf-data.7z`，词典文件可直接位于压缩包根目录或位于 `clf-data` 文件夹内。两个导入命令均支持 `--dry-run`。共享 Flat 模型放在 `--flat-models` 指定的目录。版本和缺失依赖可用 `voice list` 查询。`config set` 的任一目录参数可用值 `none` 清除。
 
 ```sh
-rynthv -cli voice import --input /resources/bank.sfpk
+rynthv -cli voice import --input /resources/bank.svpk
+rynthv -cli dictionary import --input /resources/clf-data.7z
 rynthv -cli voice inspect "$VOICE_ID" --json
 rynthv -cli voice modes "$VOICE_ID" --json
 rynthv -cli voice validate "$VOICE_ID" --json

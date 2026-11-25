@@ -18,6 +18,7 @@ mod preparation;
 mod prepared;
 pub mod session_identity;
 mod stream;
+pub mod svpk;
 mod tensor;
 mod tree;
 

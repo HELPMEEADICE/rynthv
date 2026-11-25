@@ -1,8 +1,8 @@
 use super::{
     settings::SynthesisSettings,
-    voice::{VoiceAvailability, VoiceCatalog, flat::FlatModelRegistry},
+    voice::{Result, VoiceAvailability, VoiceCatalog, flat::FlatModelRegistry, svpk},
 };
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 
 pub struct LibraryScan {
     pub catalog: VoiceCatalog,
@@ -14,22 +14,28 @@ pub fn scan_roots(settings: &SynthesisSettings) -> LibraryScan {
     let flat_registry = Arc::new(settings.flat_registry());
     let mut catalog = VoiceCatalog::from_flat(&flat_registry);
     let mut errors = Vec::new();
-    for (label, root) in settings.database_roots() {
-        match VoiceCatalog::scan(root) {
-            Ok(found) => {
-                catalog.entries.extend(found.entries);
-                catalog.warnings.extend(
-                    found
-                        .warnings
-                        .into_iter()
-                        .map(|warning| format!("{label} {}：{warning}", root.display())),
-                );
-            }
-            Err(error) => errors.push(format!(
-                "无法扫描 {label} 声库目录 {}：{error}",
-                root.display()
-            )),
+    let mut append = |label: &str, root: &Path, result: Result<VoiceCatalog>| match result {
+        Ok(found) => {
+            catalog.entries.extend(found.entries);
+            catalog.warnings.extend(
+                found
+                    .warnings
+                    .into_iter()
+                    .map(|warning| format!("{label} {}：{warning}", root.display())),
+            );
         }
+        Err(error) => errors.push(format!(
+            "无法扫描 {label} 声库目录 {}：{error}",
+            root.display()
+        )),
+    };
+    for (label, root) in settings.database_roots() {
+        append(label, root, VoiceCatalog::scan(root));
+    }
+    if let Ok(root) = svpk::root()
+        && root.is_dir()
+    {
+        append("SVPK", &root, svpk::scan(&root));
     }
     catalog.entries.sort_by(|left, right| {
         left.database_id

@@ -1,3 +1,5 @@
+mod import;
+
 use super::{project::Selection, target, *};
 use crate::{
     editor::Editor,
@@ -7,7 +9,7 @@ use crate::{
         inference::compute::{self, AdapterId, Backend},
         score::LyricFrontend,
         settings::{SynthesisSettings, VoiceSelection},
-        voice::{VoiceCatalog, VoiceCatalogEntry, VoiceFamily, flat, session_identity},
+        voice::{VoiceCatalog, VoiceCatalogEntry, VoiceFamily, session_identity},
     },
 };
 use std::collections::BTreeMap;
@@ -235,6 +237,14 @@ impl Workstation {
             ("dictionary", "list") => Ok(
                 json!({"directory":settings.dictionaries,"files":dictionary_files(&settings)?,"languages":Language::ALL}),
             ),
+            ("dictionary", "import") => {
+                let dry_run = call.flag("dry-run");
+                let result = import::dictionaries(settings, call.path("input")?, dry_run)?;
+                if !dry_run {
+                    self.offline.refresh();
+                }
+                Ok(result)
+            }
             ("dictionary", "lookup") => {
                 let language = Language::parse(call.required("language")?)
                     .ok_or_else(|| invalid("Unsupported language"))?;
@@ -258,17 +268,12 @@ impl Workstation {
                 )
             }
             ("voice", "import") => {
-                let path = call.path("input")?;
-                let root = settings.flat_voice_directory()?;
-                if call.flag("dry-run") {
-                    let manifests = flat::inspect_import(path)
-                        .map_err(|error| Failure::new("VOICE_RESOURCE", error.to_string()))?;
-                    return Ok(json!({"dry_run":true,"destination":root,"voices":manifests}));
+                let dry_run = call.flag("dry-run");
+                let result = import::voices(&settings, call.path("input")?, dry_run)?;
+                if !dry_run {
+                    self.offline.refresh();
                 }
-                let voices = flat::import(path, &root)
-                    .map_err(|error| Failure::new("VOICE_RESOURCE", error.to_string()))?;
-                self.offline.refresh();
-                Ok(json!({"voices":voices}))
+                Ok(result)
             }
             ("voice", "inspect" | "validate" | "modes" | "context") => {
                 let (key, entry) = {

@@ -6,7 +6,7 @@ mod flat;
 mod header;
 mod toolbar;
 
-use super::{context, error_label, paths, text, weak};
+use super::{context, error_label, paths, resource_import, text, weak};
 use crate::{
     app::App,
     ui::{child, theme::*},
@@ -110,7 +110,7 @@ fn show(app: &mut App, ctx: &Context, state: &mut State) {
                 .show(&mut content, |ui| {
                     ui.set_width(ui.available_width());
                     toolbar::show(app, ui, state);
-                    flat::operation_status(app, ui);
+                    resource_import::status(app, ui);
                     ui.add_space(28.0);
                     let entries = catalog::entries(app, state);
                     if app.synthesis.library.is_scanning() {
@@ -196,7 +196,7 @@ fn empty(app: &mut App, ui: &mut Ui, state: &mut State) {
                         .font(section_title_font())
                         .size(16.0),
                 );
-                weak(ui, "选择声库目录，或导入 .sfpk / .sfpks 文件。");
+                weak(ui, "选择声库目录，或导入 .svpk、.sfpk、.sfpks 文件。");
                 ui.menu_button("选择声库目录…", |ui| paths::directory_menu(app, ui));
             }
             if let Some(catalog) = app.synthesis.library.catalog()

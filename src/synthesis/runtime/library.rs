@@ -1,4 +1,4 @@
-mod flat;
+mod operations;
 
 use super::{Runtime, events::WakeOnExit};
 use crate::synthesis::{
@@ -23,8 +23,8 @@ pub struct VoiceLibrary {
     settings_error: Option<String>,
     invalid_settings: bool,
     pub(super) flat_registry: Arc<FlatModelRegistry>,
-    flat_operation: Option<Receiver<flat::OperationResult>>,
-    flat_feedback: Option<Result<String, String>>,
+    resource_operation: Option<Receiver<operations::OperationResult>>,
+    resource_feedback: Option<Result<String, String>>,
 }
 
 impl VoiceLibrary {
@@ -42,8 +42,8 @@ impl VoiceLibrary {
             settings_error,
             invalid_settings,
             flat_registry: Arc::default(),
-            flat_operation: None,
-            flat_feedback: None,
+            resource_operation: None,
+            resource_feedback: None,
         };
         if !invalid_settings {
             library.rescan(repaint);
@@ -176,9 +176,7 @@ impl Runtime {
         self.library.rescan(self.repaint.clone());
     }
     pub(super) fn poll_library(&mut self) {
-        if self.library.poll_flat_operation() {
-            self.rescan_voices();
-        }
+        self.poll_resource_operation();
         if self.library.poll() {
             self.last_revision = None;
         }

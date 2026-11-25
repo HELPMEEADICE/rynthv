@@ -5,6 +5,7 @@ mod management;
 mod panel;
 mod parameters;
 mod paths;
+mod resource_import;
 mod selector;
 mod widgets;
 

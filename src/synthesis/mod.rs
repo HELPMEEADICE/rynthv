@@ -1,5 +1,6 @@
 //! Native voice preparation, neural synthesis, render scheduling and audio output.
 pub mod audio;
+pub mod dictionary_import;
 pub mod engine;
 pub mod execution;
 pub mod inference;
@@ -14,6 +15,7 @@ pub mod plan;
 pub mod profiling;
 pub mod render_cache;
 pub mod rendered;
+mod resource_archive;
 #[cfg(feature = "gui")]
 pub mod runtime;
 pub mod score;

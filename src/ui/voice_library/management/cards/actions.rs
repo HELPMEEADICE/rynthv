@@ -130,7 +130,7 @@ pub(super) fn menu(
         if entry.flat.as_ref().is_some_and(|flat| flat.managed)
             && ui
                 .add_enabled(
-                    !app.synthesis.library.flat_busy(),
+                    !app.synthesis.library.resource_busy(),
                     Button::new("移除 Flat 导入副本"),
                 )
                 .clicked()

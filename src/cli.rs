@@ -179,7 +179,7 @@ impl<'a> Call<'a> {
                 ("project" | "batch", "apply")
                     | ("project", "save")
                     | ("config", "set")
-                    | ("voice", "import")
+                    | ("voice" | "dictionary", "import")
             )
     }
 }
@@ -237,7 +237,7 @@ impl Workstation {
                 "voice",
                 "list" | "scan" | "inspect" | "validate" | "modes" | "context" | "import",
             )
-            | ("dictionary", "list" | "lookup") => self.resource_command(call),
+            | ("dictionary", "list" | "lookup" | "import") => self.resource_command(call),
             ("midi", "inspect") | ("audio", "analyze") => self.media_query(call),
             ("render" | "export", _) => self.render_command(call),
             _ if call.mutation() => self.mutate(call),

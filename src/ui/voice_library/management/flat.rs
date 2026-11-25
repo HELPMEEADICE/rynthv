@@ -1,43 +1,9 @@
-use super::super::{error_label, text, weak};
+use super::super::{text, weak};
 use crate::{
     app::App,
-    app::picker::{Picker, Selection},
     synthesis::voice::{VoiceCatalogEntry, flat::ModelRole},
 };
 use eframe::egui::*;
-
-pub(super) fn import_button(app: &mut App, ui: &mut Ui) {
-    let library = &app.synthesis.library;
-    if ui
-        .add_enabled(
-            !library.flat_busy() && library.settings_error().is_none(),
-            Button::new("导入 Flat…").min_size(vec2(98.0, 36.0)),
-        )
-        .clicked()
-    {
-        app.pick(
-            ui.ctx(),
-            Picker::new(Selection::Files, "导入 Flat 声库")
-                .filter("SynthV Flat", &["sfpk", "sfpks"]),
-            |app, _, paths| app.synthesis.import_flat_voices(paths),
-        );
-    }
-}
-
-pub(super) fn operation_status(app: &App, ui: &mut Ui) {
-    let library = &app.synthesis.library;
-    if library.flat_busy() {
-        ui.horizontal(|ui| {
-            ui.spinner();
-            weak(ui, "正在处理 Flat 声库…");
-        });
-    } else if let Some(result) = library.flat_feedback() {
-        match result {
-            Ok(message) => weak(ui, message),
-            Err(error) => error_label(ui, error),
-        }
-    }
-}
 
 pub(super) fn details(app: &mut App, ui: &mut Ui, entry: &VoiceCatalogEntry) {
     let Some(flat) = &entry.flat else { return };

@@ -1,4 +1,4 @@
-use super::{super::language_name, CARD, INK, Sort, State, flat};
+use super::{super::language_name, CARD, INK, Sort, State, resource_import};
 use crate::{
     app::App,
     ui::{
@@ -156,9 +156,9 @@ fn actions(app: &mut App, ui: &mut Ui, state: &mut State) {
         filters(app, ui, state);
         sorting(ui, state, true);
         refresh(app, ui);
-        flat::import_button(app, ui);
+        resource_import::voices(app, ui);
     } else {
-        flat::import_button(app, ui);
+        resource_import::voices(app, ui);
         refresh(app, ui);
         sorting(ui, state, false);
         filters(app, ui, state);
@@ -186,7 +186,7 @@ fn refresh(app: &mut App, ui: &mut Ui) {
     if ui
         .add_enabled(
             !app.synthesis.library.is_scanning()
-                && !app.synthesis.library.flat_busy()
+                && !app.synthesis.library.resource_busy()
                 && app.synthesis.library.settings.has_databases(),
             Button::new("刷新").min_size(vec2(52.0, 36.0)),
         )

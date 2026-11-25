@@ -4,9 +4,9 @@ RynthV loads supported plaintext Flat voice packages and processes their notes, 
 
 ## Install and use a voice
 
-1. Open **管理歌声** (Manage Voices) and select **导入 Flat…**. Choose one or more `.sfpk` or `.sfpks` files.
+1. Open **管理歌声** (Manage Voices) and select **导入声库…**. Choose one or more `.sfpk` or `.sfpks` files.
 2. Open **详情与诊断** for the voice. **Flat 模型依赖** lists the acoustic, vocoder, duration, and F0 model IDs and their available sources. Set **SynthV Flat Base Model 目录** to resolve external models, then select **刷新**.
-3. Set **发音词典目录** to the existing `clf-data` resources and select the voice for a singing track. Enter lyrics or explicit phonemes, edit notes, and export through the project's WAV workflow.
+3. In **发音词典目录**, choose an existing `clf-data` directory or import a `clf-data.zip` or `clf-data.7z` archive. Select the voice for a singing track. Enter lyrics or explicit phonemes, edit notes, and export through the project's WAV workflow.
 4. Change the timbre weights under **唱法** in the voice panel, or expand **调整当前唱法** in the selected voice's details. The same controls accept multiple simultaneous modes.
 
 **SynthV Flat 声库目录** scans top-level SFPKs and RynthV's managed imports. The default is the `flat-voices` folder in RynthV's configuration directory. Batch import stages the individual packages and publishes the batch together. **移除 Flat 导入副本** removes the managed copy. The source package and shared model directory remain outside this operation. The **仅显示 SynthV Flat** filter restricts the voice list to Flat packages.

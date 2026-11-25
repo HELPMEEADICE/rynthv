@@ -2,7 +2,7 @@
 
 use super::{
     inference::compute::{AdapterId, Backend},
-    voice::{VoiceCatalog, flat::FlatModelRegistry},
+    voice::{flat::FlatModelRegistry, svpk},
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -47,6 +47,7 @@ impl SynthesisSettings {
             || self.sv1_databases.is_some()
             || self.flat_databases.is_some()
             || self.flat_voice_directory().is_ok_and(|path| path.is_dir())
+            || svpk::root().is_ok_and(|path| path.is_dir())
     }
 
     pub fn flat_voice_directory(&self) -> Result<PathBuf, String> {
@@ -113,45 +114,26 @@ impl SynthesisSettings {
             .selected_voice
             .as_ref()
             .ok_or_else(|| "尚未选择声库。".to_owned())?;
-        let mut directories = Vec::new();
-        let mut errors = Vec::new();
-        if selected.database_id.starts_with("flat:") {
-            let catalog = VoiceCatalog::from_flat(&self.flat_registry());
-            directories.extend(
-                catalog.entries.into_iter().filter_map(|entry| {
-                    (entry.selection() == *selected).then_some(entry.directory)
-                }),
-            );
-            errors.extend(catalog.warnings);
-        }
-        for (label, root) in self.database_roots() {
-            match VoiceCatalog::scan(root) {
-                Ok(catalog) => {
-                    directories.extend(catalog.entries.into_iter().filter_map(|entry| {
-                        (entry.database_id == selected.database_id
-                            && entry.revision == selected.revision)
-                            .then_some(entry.directory)
-                    }))
-                }
-                Err(error) => errors.push(format!("{label} {}：{error}", root.display())),
-            }
-        }
-        directories.sort();
-        directories.dedup();
-        match directories.len() {
-            1 => Ok(directories.pop().expect("one selected directory")),
-            0 => {
+        let scan = super::library::scan_roots(self);
+        let mut directories = scan
+            .catalog
+            .entries
+            .into_iter()
+            .filter_map(|entry| (entry.selection() == *selected).then_some(entry.directory));
+        match (directories.next(), directories.next()) {
+            (Some(directory), None) => Ok(directory),
+            (None, _) => {
                 let mut message = format!(
                     "声库 {}/{} 不在已配置的声库目录中。",
                     selected.database_id, selected.revision
                 );
-                if !errors.is_empty() {
+                if let Some(error) = scan.error {
                     message.push('\n');
-                    message.push_str(&errors.join("\n"));
+                    message.push_str(&error);
                 }
                 Err(message)
             }
-            _ => Err(format!(
+            (Some(_), Some(_)) => Err(format!(
                 "声库 {}/{} 对应多个文件，请检查声库目录配置。",
                 selected.database_id, selected.revision
             )),

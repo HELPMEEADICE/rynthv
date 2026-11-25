@@ -56,6 +56,8 @@ blowfish = { version = "=0.10.0", features = ["zeroize"] }
 zeroize = { version = "=1.9.1", features = ["alloc"] }
 midly = { version = "=0.5.3", default-features = false, features = ["std", "strict"] }
 zip = { version = "=9.7.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+sevenz-rust2 = { version = "=0.25.0", default-features = false, features = ["bzip2", "deflate", "ppmd"] }
+tempfile = "=3.27.0"
 
 [target.'cfg(windows)'.dependencies]
 eframe = { version = "=0.36.2", optional = true, default-features = false, features = ["accesskit"] }

@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use super::{error_label, text, weak};
+use super::{error_label, resource_import, text, weak};
 use crate::app::{
     App,
     picker::{Picker, Selection},
@@ -9,6 +9,7 @@ use eframe::egui::*;
 
 pub fn settings(app: &mut App, ui: &mut Ui) {
     text(ui, RichText::new("歌声资源").strong());
+    resource_import::voices(app, ui);
     text(ui, "SV2 声库根目录（databases）");
     path_label(ui, app.synthesis.library.settings.databases.as_deref());
     ui.horizontal(|ui| {
@@ -36,7 +37,7 @@ pub fn settings(app: &mut App, ui: &mut Ui) {
     text(ui, "SynthV Flat 声库目录");
     let flat_path = app.synthesis.library.settings.flat_voice_directory().ok();
     path_label(ui, flat_path.as_deref());
-    ui.add_enabled_ui(!app.synthesis.library.flat_busy(), |ui| {
+    ui.add_enabled_ui(!app.synthesis.library.resource_busy(), |ui| {
         if ui.button("选择 Flat 声库目录…").clicked() {
             choose_flat_databases(app, ui.ctx());
         }
@@ -58,16 +59,23 @@ pub fn settings(app: &mut App, ui: &mut Ui) {
     ui.add_space(8.0);
     text(ui, "发音词典目录（clf-data）");
     path_label(ui, app.synthesis.dictionaries());
-    if ui.button("选择词典目录…").clicked() {
-        choose_dictionaries(app, ui.ctx());
-    }
+    ui.horizontal_wrapped(|ui| {
+        if ui
+            .add_enabled(
+                !app.synthesis.library.resource_busy(),
+                Button::new("选择词典目录…"),
+            )
+            .clicked()
+        {
+            choose_dictionaries(app, ui.ctx());
+        }
+        resource_import::dictionaries(app, ui);
+    });
+    resource_import::status(app, ui);
     if let Some(error) = app.synthesis.library.settings_error() {
         error_label(ui, error);
     }
-    weak(
-        ui,
-        "请手动选择资源目录。路径和所选歌声会自动保存，下次启动恢复。",
-    );
+    weak(ui, "资源路径和所选歌声会自动保存，下次启动恢复。");
 }
 
 pub(super) fn choose_databases(app: &mut App, ctx: &Context) {
@@ -95,7 +103,7 @@ pub(super) fn directory_menu(app: &mut App, ui: &mut Ui) {
         ui.close();
         choose_sv1_databases(app, ui.ctx());
     }
-    ui.add_enabled_ui(!app.synthesis.library.flat_busy(), |ui| {
+    ui.add_enabled_ui(!app.synthesis.library.resource_busy(), |ui| {
         if ui.button("SynthV Flat 声库目录…").clicked() {
             ui.close();
             choose_flat_databases(app, ui.ctx());
