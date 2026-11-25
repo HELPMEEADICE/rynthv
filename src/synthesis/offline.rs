@@ -122,9 +122,18 @@ impl Output {
 }
 
 impl Offline {
-    #[cfg(target_arch = "wasm32")]
-    pub(crate) fn reset_compute(&mut self) {
-        self.compute = None;
+    pub(crate) fn prepare_compute(
+        &mut self,
+        backend: Backend,
+        adapter: Option<&AdapterId>,
+    ) -> &Session {
+        if self.compute.as_ref().is_none_or(|(current, selected, _)| {
+            *current != backend || selected.as_ref() != adapter
+        }) {
+            self.compute = Some((backend, adapter.cloned(), Session::new(backend, adapter)));
+            self.cache.reset();
+        }
+        &self.compute.as_ref().expect("prepared compute session").2
     }
 
     #[cfg(target_arch = "wasm32")]
@@ -376,7 +385,7 @@ impl Offline {
                     .collect(),
             })
             .collect();
-        let diagnostics = if routes.is_empty() {
+        let diagnostics = if cfg!(not(target_arch = "wasm32")) && routes.is_empty() {
             Session::unavailable(
                 options.backend,
                 "No vocal inference in selected sources".into(),

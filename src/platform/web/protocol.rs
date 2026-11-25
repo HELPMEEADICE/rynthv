@@ -1,5 +1,5 @@
 use crate::synthesis::{
-    inference::compute::Status,
+    inference::compute::{AdapterInfo, Diagnostics, Status},
     rendered::{PitchTrack, RenderedPhonemeTrack},
     settings::{SynthesisSettings, VoiceSelection},
     voice::{VoiceCatalog, VoiceConfiguration},
@@ -53,6 +53,8 @@ pub struct Library {
     pub catalog: VoiceCatalog,
     pub warning: Option<String>,
     pub message: Option<String>,
+    pub adapters: Vec<AdapterInfo>,
+    pub diagnostics: ComputeDiagnostics,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -84,7 +86,7 @@ pub struct Preview {
     pub rendered: usize,
     pub reused: usize,
     pub cache_bytes: usize,
-    pub diagnostics: Option<ComputeDiagnostics>,
+    pub diagnostics: ComputeDiagnostics,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -92,6 +94,19 @@ pub struct ComputeDiagnostics {
     pub actual: String,
     pub status: Status,
     pub activity: serde_json::Value,
+}
+
+impl TryFrom<Diagnostics> for ComputeDiagnostics {
+    type Error = String;
+
+    fn try_from(diagnostics: Diagnostics) -> Result<Self, Self::Error> {
+        Ok(Self {
+            actual: diagnostics.actual.into(),
+            status: diagnostics.status,
+            activity: serde_json::to_value(diagnostics.activity)
+                .map_err(|error| error.to_string())?,
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize)]

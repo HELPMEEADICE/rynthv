@@ -18,11 +18,18 @@ impl Worker {
     pub(super) fn library(&mut self, message: Option<String>) -> Result<String, String> {
         let settings = self.settings().clone();
         let scan = self.offline.library(&settings);
+        let catalog = scan.catalog.clone();
+        let warning = scan.error.clone();
+        let compute = self
+            .offline
+            .prepare_compute(settings.compute_backend, settings.compute_adapter.as_ref());
         json(&Library {
             settings,
-            catalog: scan.catalog.clone(),
-            warning: scan.error.clone(),
+            catalog,
+            warning,
             message,
+            adapters: compute.adapters().to_vec(),
+            diagnostics: compute.diagnostics().try_into()?,
         })
     }
 
@@ -31,11 +38,6 @@ impl Worker {
         settings: SynthesisSettings,
     ) -> Result<String, String> {
         settings.save()?;
-        if self.settings().compute_backend != settings.compute_backend
-            || self.settings().compute_adapter != settings.compute_adapter
-        {
-            self.offline.reset_compute();
-        }
         self.settings = Some(settings);
         self.offline.refresh();
         self.library(None)

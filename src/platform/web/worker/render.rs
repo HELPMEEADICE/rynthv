@@ -1,6 +1,6 @@
 use super::{Worker, event, fs, json, yield_events};
 use crate::{
-    platform::web::protocol::{ComputeDiagnostics, Event, Preview, Visuals},
+    platform::web::protocol::{Event, Preview, Visuals},
     synthesis::{
         audio,
         execution::{self, Cancellation},
@@ -129,20 +129,12 @@ impl Worker {
                 );
             }
         }
-        let diagnostics = &output.report.diagnostics;
         json(&Preview {
             duration,
             rendered: output.report.rendered_owners,
             reused: output.report.reused_owners,
             cache_bytes: output.report.cache_bytes,
-            diagnostics: Some(ComputeDiagnostics {
-                actual: diagnostics.actual.into(),
-                status: serde_json::from_value(
-                    serde_json::to_value(&diagnostics.status).map_err(|e| e.to_string())?,
-                )
-                .map_err(|e| e.to_string())?,
-                activity: serde_json::to_value(&diagnostics.activity).map_err(|e| e.to_string())?,
-            }),
+            diagnostics: output.report.diagnostics.try_into()?,
         })
     }
 }

@@ -17,6 +17,7 @@ use std::path::{Path, PathBuf};
 pub struct VoiceLibrary {
     pub settings: SynthesisSettings,
     catalog: Option<VoiceCatalog>,
+    adapters: Option<Vec<AdapterInfo>>,
     error: Option<String>,
     feedback: Option<Result<String, String>>,
     pub(super) task: Option<Pending<Library>>,
@@ -27,6 +28,7 @@ impl VoiceLibrary {
         Self {
             settings: SynthesisSettings::default(),
             catalog: None,
+            adapters: None,
             error: None,
             feedback: None,
             task: Some(submit(Request::Scan, repaint, |_, _| {})),
@@ -129,11 +131,6 @@ impl Runtime {
         self.update_settings(|settings| settings.dictionaries = Some(path));
     }
     pub fn set_compute_settings(&mut self, backend: Backend, adapter: Option<AdapterId>) {
-        if self.library.settings.compute_backend != backend
-            || self.library.settings.compute_adapter != adapter
-        {
-            self.diagnostics = None;
-        }
         self.update_settings(|settings| {
             settings.compute_backend = backend;
             settings.compute_adapter = adapter;
@@ -144,7 +141,7 @@ impl Runtime {
         self.diagnostics.as_ref()
     }
     pub fn compute_adapters(&self) -> Option<&[AdapterInfo]> {
-        Some(self.diagnostics.as_ref()?.status.device.as_slice())
+        self.library.adapters.as_deref()
     }
 
     pub(super) fn library_request(&mut self, request: Request) -> bool {
@@ -171,6 +168,8 @@ impl Runtime {
             Ok(result) => {
                 self.library.settings = result.settings;
                 self.library.catalog = Some(result.catalog);
+                self.library.adapters = Some(result.adapters);
+                self.diagnostics = Some(result.diagnostics);
                 self.library.error = result.warning;
                 self.library.feedback = result.message.clone().map(Ok);
                 if importing {

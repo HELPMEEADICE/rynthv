@@ -146,7 +146,7 @@ impl Runtime {
                         self.preview.duration = result.duration;
                         self.stats.ready = result.rendered + result.reused;
                         self.stats.current_render_bytes = result.cache_bytes;
-                        self.diagnostics = result.diagnostics;
+                        self.diagnostics = Some(result.diagnostics);
                         audio::audio_end(result.duration.unwrap_or(0.0));
                     }
                     Err(error) => {

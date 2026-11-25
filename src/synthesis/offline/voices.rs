@@ -91,26 +91,18 @@ impl Offline {
             .retain(|owner, _| identities.contains_key(owner));
         plan.output_controls
             .retain(|owner, _| identities.contains_key(owner));
+        if cfg!(target_arch = "wasm32") || !routes.is_empty() {
+            self.prepare_compute(options.backend, options.adapter.as_ref())
+                .take_diagnostics();
+        }
         self.cache.reconcile(&plan);
         if routes.is_empty() {
             return Ok(BTreeMap::new());
-        }
-        if self.compute.as_ref().is_none_or(|(backend, adapter, _)| {
-            *backend != options.backend || *adapter != options.adapter
-        }) {
-            self.compute = Some((
-                options.backend,
-                options.adapter.clone(),
-                Session::new(options.backend, options.adapter.as_ref()),
-            ));
-            self.cache.reset();
-            self.cache.reconcile(&plan);
         }
         let compute = &self.compute.as_ref().expect("render compute").2;
         compute
             .check()
             .map_err(|error| format!("COMPUTE_UNAVAILABLE: {error}"))?;
-        compute.take_diagnostics();
         let mut timings = BTreeMap::new();
         for (key, owners) in routes {
             let resource = self.voices.get_mut(key).expect("loaded voice");
