@@ -71,7 +71,7 @@ impl App {
         ui::theme::install(&cc.egui_ctx);
         egui_extras::install_image_loaders(&cc.egui_ctx);
         let mut error = ui::theme::fonts(&cc.egui_ctx).err();
-        let settings_path = match rynthv::platform::config_directory() {
+        let settings_path = match crate::platform::config_directory() {
             Ok(directory) => Some(directory.join("workspace.json")),
             Err(message) => {
                 error = Some(message);

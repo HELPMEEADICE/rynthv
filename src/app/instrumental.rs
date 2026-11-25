@@ -133,7 +133,7 @@ impl App {
     }
 }
 
-fn notify(ctx: &eframe::egui::Context) -> rynthv::synthesis::notify::Notify {
+fn notify(ctx: &eframe::egui::Context) -> crate::synthesis::notify::Notify {
     let ctx = ctx.clone();
-    rynthv::synthesis::notify::Notify::new(move || ctx.request_repaint())
+    crate::synthesis::notify::Notify::new(move || ctx.request_repaint())
 }
