@@ -8,6 +8,11 @@ use eframe::egui::*;
 
 pub fn show(app: &mut App, ui: &mut Ui) {
     let rect = ui.max_rect();
+    #[cfg(target_os = "android")]
+    if rect.width() < 980.0 {
+        super::mobile::workspace(app, ui);
+        return;
+    }
     let rail = Rect::from_min_max(
         pos2(rect.right() - super::tool_rail::WIDTH, rect.top()),
         rect.max,
@@ -74,17 +79,20 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         app.view.columns.insert(index, source);
     }
 }
-fn editor(app: &mut App, ui: &mut Ui) {
+pub(super) fn editor(app: &mut App, ui: &mut Ui) {
     let rect = ui.max_rect();
     let available = (rect.height() - 5.0).max(0.0);
+    let arrangement_limit = if cfg!(target_os = "android") {
+        (available * 0.34).max(42.0)
+    } else {
+        (available - 170.0).max(80.0)
+    };
     let arrangement_height = if app.view.arrangement_collapsed {
         42.0
     } else if app.piano_collapsed {
         available - super::piano::TOOLBAR_HEIGHT
     } else {
-        app.view
-            .arrangement_height
-            .min((available - 170.0).max(80.0))
+        app.view.arrangement_height.min(arrangement_limit)
     }
     .clamp(0.0, available);
     let piano_height = if app.piano_collapsed {

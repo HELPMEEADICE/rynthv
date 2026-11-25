@@ -9,6 +9,8 @@ pub mod instrumental;
 mod lane_tabs;
 pub mod lanes;
 pub mod midi_import;
+#[cfg(target_os = "android")]
+pub mod mobile;
 pub mod panels;
 pub mod phonemes;
 pub mod piano;

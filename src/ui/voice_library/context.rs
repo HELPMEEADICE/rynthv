@@ -62,7 +62,7 @@ pub(super) fn dialog(app: &mut App, ctx: &Context) {
     let mut source = dialog.source;
     let importing = dialog.phase == ContextImportPhase::Importing;
     let modal = Modal::new(Id::new("voice-model-context-import")).show(ctx, |ui| {
-        ui.set_width(420.0);
+        ui.set_width((ctx.content_rect().width() - 28.0).clamp(220.0, 420.0));
         ui.spacing_mut().item_spacing.y = 8.0;
         text(ui, RichText::new("导入模型上下文").strong().size(16.0));
         text(ui, format!("当前声库：{}", dialog.voice_name));

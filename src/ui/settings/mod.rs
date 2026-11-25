@@ -90,32 +90,52 @@ pub fn show(app: &mut App, ctx: &Context) {
                 header.bottom(),
                 Stroke::new(1.0, Color32::from_rgb(44, 42, 45)),
             );
-            let nav_width = if size.x >= 680.0 { 188.0 } else { 148.0 };
-            let split = rect.left() + nav_width;
-            let nav_rect = Rect::from_min_max(
-                pos2(rect.left() + 12.0, header.bottom() + 16.0),
-                pos2(split - 16.0, rect.bottom() - 12.0),
-            );
-            let mut nav = child(ui, nav_rect, "settings-navigation");
-            ScrollArea::vertical()
-                .id_salt("settings-navigation-scroll")
-                .show(&mut nav, |ui| {
-                    ui.spacing_mut().item_spacing.y = 12.0;
-                    for candidate in Page::ALL {
-                        if navigation(ui, candidate, page == candidate).clicked() {
-                            page = candidate;
+            let compact = cfg!(target_os = "android") && size.x < 540.0;
+            let content_rect = if compact {
+                let nav = Rect::from_min_size(
+                    header.left_bottom() + vec2(12.0, 8.0),
+                    vec2(size.x - 24.0, 42.0),
+                );
+                ComboBox::from_id_salt("mobile-settings-navigation")
+                    .width(nav.width() - 10.0)
+                    .selected_text(page.label())
+                    .show_ui(&mut child(ui, nav, "settings-navigation"), |ui| {
+                        for candidate in Page::ALL {
+                            ui.selectable_value(&mut page, candidate, candidate.label());
                         }
-                    }
-                });
-            ui.painter().vline(
-                split,
-                header.bottom() + 8.0..=rect.bottom() - 8.0,
-                Stroke::new(1.0, DIVIDER),
-            );
-            let content_rect = Rect::from_min_max(
-                pos2(split + 20.0, header.bottom() + 18.0),
-                rect.max - vec2(20.0, 18.0),
-            );
+                    });
+                Rect::from_min_max(
+                    nav.left_bottom() + vec2(0.0, 4.0),
+                    rect.max - vec2(12.0, 12.0),
+                )
+            } else {
+                let nav_width = if size.x >= 680.0 { 188.0 } else { 148.0 };
+                let split = rect.left() + nav_width;
+                let nav_rect = Rect::from_min_max(
+                    pos2(rect.left() + 12.0, header.bottom() + 16.0),
+                    pos2(split - 16.0, rect.bottom() - 12.0),
+                );
+                let mut nav = child(ui, nav_rect, "settings-navigation");
+                ScrollArea::vertical()
+                    .id_salt("settings-navigation-scroll")
+                    .show(&mut nav, |ui| {
+                        ui.spacing_mut().item_spacing.y = 12.0;
+                        for candidate in Page::ALL {
+                            if navigation(ui, candidate, page == candidate).clicked() {
+                                page = candidate;
+                            }
+                        }
+                    });
+                ui.painter().vline(
+                    split,
+                    header.bottom() + 8.0..=rect.bottom() - 8.0,
+                    Stroke::new(1.0, DIVIDER),
+                );
+                Rect::from_min_max(
+                    pos2(split + 20.0, header.bottom() + 18.0),
+                    rect.max - vec2(20.0, 18.0),
+                )
+            };
             let mut content = child(ui, content_rect, ("settings-content", page));
             content.spacing_mut().item_spacing.y = 8.0;
             content.spacing_mut().interact_size.y = 30.0;
