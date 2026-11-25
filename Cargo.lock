@@ -3122,6 +3122,7 @@ dependencies = [
  "find-msvc-tools",
  "image",
  "jni",
+ "log",
  "midly",
  "num-bigint",
  "pollster 0.4.0",

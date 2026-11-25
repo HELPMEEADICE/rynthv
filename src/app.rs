@@ -402,7 +402,7 @@ impl App {
                 ui.heading(format!("RynthV {}", env!("CARGO_PKG_VERSION")));
                 ui.label("Rust + egui 歌声合成引擎");
                 ui.label("多音轨编辑、歌词与音高调整、MIDI 导入和 WAV 导出。");
-                ui.label("支持 Windows 和 Linux。");
+                ui.label("支持 Windows、Linux 和 Android。");
                 if ui.button("关闭").clicked() {
                     self.about = false;
                 }

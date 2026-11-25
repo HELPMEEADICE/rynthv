@@ -13,7 +13,7 @@ resolver = "3"
 
 [features]
 default = ["gui", "cli"]
-gui = ["dep:eframe", "dep:egui_extras", "dep:rfd", "dep:cpal", "dep:android-activity", "dep:jni", "wgpu/gles"]
+gui = ["dep:eframe", "dep:egui_extras", "dep:rfd", "dep:cpal", "dep:android-activity", "dep:jni", "dep:log", "wgpu/gles"]
 cli = ["dep:clap", "dep:ctrlc", "dep:rustyline", "dep:shell-words"]
 # Opt-in CPU timing spans; absent from normal editor builds.
 synth-profile = []
@@ -71,6 +71,7 @@ rfd = { version = "=0.17.2", optional = true, default-features = false, features
 android-activity = { version = "=0.6.1", optional = true, features = ["native-activity"] }
 eframe = { version = "=0.36.2", optional = true, default-features = false, features = ["android-native-activity"] }
 jni = { version = "=0.22.4", optional = true }
+log = { version = "=0.4.34", optional = true }
 wgpu = { version = "=30.0.1", default-features = false, features = ["vulkan"] }
 
 [build-dependencies]
