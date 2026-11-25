@@ -14,43 +14,8 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
     let editable = !app.editor.is_editing();
 
     padded(ui, |ui| {
-        ui.weak("目标文件夹");
-        let directory = string(&app.editor.project.render_config, "destination");
-        let dir_id = ui.make_persistent_id(("render-field", "destination"));
-        let mut dir_draft = ui
-            .ctx()
-            .data_mut(|d| d.get_temp::<RenderDraft>(dir_id))
-            .filter(|draft| draft.committed == directory)
-            .unwrap_or_else(|| RenderDraft::synced(&directory));
-        let mut dir_commit = false;
-        let mut dir_has_focus = false;
-        ui.horizontal(|ui| {
-            let width = (ui.available_width() - 34.0).max(20.0);
-            let response = ui.add_sized(
-                vec2(width, 28.0),
-                TextEdit::singleline(&mut dir_draft.text)
-                    .vertical_align(Align::Center)
-                    .margin(vec2(7.0, 5.0))
-                    .background_color(BORDER),
-            );
-            dir_has_focus = response.has_focus();
-            if dir_draft.text != directory
-                && (response.lost_focus()
-                    || dir_has_focus && ui.input(|i| i.key_pressed(Key::Enter)))
-            {
-                dir_commit = true;
-            }
-            if folder_button(ui).clicked() && editable {
-                let mut picker = rfd::FileDialog::new().set_title("选择导出文件夹");
-                if !dir_draft.text.is_empty() {
-                    picker = picker.set_directory(&dir_draft.text);
-                }
-                if let Some(path) = picker.pick_folder() {
-                    dir_draft.text = path.display().to_string();
-                    dir_commit = true;
-                }
-            }
-        });
+        #[cfg(not(target_os = "android"))]
+        let directory = directory_field(app, ui, editable);
         ui.weak("文件名称");
         let name = string(&app.editor.project.render_config, "filename");
         let name_id = ui.make_persistent_id(("render-field", "filename"));
@@ -77,18 +42,14 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
                     .unwrap_or("等待伴奏加载和当前歌声合成完成后导出"),
             )
             .clicked();
-        if editable && (dir_commit || (export_clicked && dir_draft.text != directory)) {
-            pending_config.push(("destination", dir_draft.text.clone().into()));
-            dir_draft.committed = dir_draft.text.clone();
+        #[cfg(not(target_os = "android"))]
+        if let Some(path) = directory.commit(ui, editable, export_clicked) {
+            pending_config.push(("destination", path.into()));
         }
+
         if editable && (name_commit || (export_clicked && name_draft.text != name)) {
             pending_config.push(("filename", name_draft.text.clone().into()));
             name_draft.committed = name_draft.text.clone();
-        }
-        if dir_has_focus || dir_draft.text != dir_draft.committed {
-            ui.ctx().data_mut(|d| d.insert_temp(dir_id, dir_draft));
-        } else {
-            ui.ctx().data_mut(|d| d.remove::<RenderDraft>(dir_id));
         }
         if name_response.has_focus() || name_draft.text != name_draft.committed {
             ui.ctx().data_mut(|d| d.insert_temp(name_id, name_draft));
@@ -100,6 +61,26 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
                 ui.spinner();
                 ui.label("正在导出…");
             });
+        }
+        #[cfg(target_os = "android")]
+        if let Some(Ok(paths)) = app.synthesis.export_result.clone() {
+            for path in paths {
+                ui.label(path.file_name().unwrap_or_default().to_string_lossy());
+                ui.horizontal_wrapped(|ui| {
+                    if ui.button("保存 WAV…").clicked() {
+                        app.pick(
+                            ui.ctx(),
+                            crate::app::picker::Picker::publish(path.clone(), "audio/wav"),
+                            |app, _, _| app.status = "WAV 已保存".into(),
+                        );
+                    }
+                    if ui.button("分享 WAV…").clicked()
+                        && let Err(error) = crate::platform::android::share(&path, "audio/wav")
+                    {
+                        app.error = Some(error);
+                    }
+                });
+            }
         }
         if let Some(result) = &app.synthesis.export_result {
             match result {
@@ -275,20 +256,40 @@ impl RenderDraft {
 }
 
 fn start_export(app: &mut App) {
-    let request = match ExportRequest::from_project(&app.editor.project) {
+    #[cfg(not(target_os = "android"))]
+    let request = ExportRequest::from_project(&app.editor.project);
+    #[cfg(target_os = "android")]
+    let request = crate::platform::config_directory().and_then(|root| {
+        ExportRequest::with_directory(
+            &app.editor.project,
+            Some(root.join("renders").join(uuid::Uuid::new_v4().to_string())),
+        )
+    });
+    let request = match request {
         Ok(request) => request,
         Err(message) => {
             app.synthesis.export_result = Some(Err(message));
             return;
         }
     };
+    #[cfg(not(target_os = "android"))]
+    if !confirm_overwrite(&request) {
+        return;
+    }
+    app.synthesis
+        .sync_project(&app.editor.project, app.editor.revision);
+    app.synthesis.export_project(request, app.editor.revision);
+}
+
+#[cfg(not(target_os = "android"))]
+fn confirm_overwrite(request: &ExportRequest) -> bool {
     let existing: Vec<_> = request
         .paths()
         .filter(|path| path.exists())
         .map(|path| path.display().to_string())
         .collect();
-    if !existing.is_empty()
-        && rfd::MessageDialog::new()
+    existing.is_empty()
+        || rfd::MessageDialog::new()
             .set_title("覆盖音频文件")
             .set_description(format!(
                 "以下文件已存在，是否覆盖？\n{}",
@@ -296,13 +297,7 @@ fn start_export(app: &mut App) {
             ))
             .set_buttons(rfd::MessageButtons::YesNo)
             .show()
-            != rfd::MessageDialogResult::Yes
-    {
-        return;
-    }
-    app.synthesis
-        .sync_project(&app.editor.project, app.editor.revision);
-    app.synthesis.export_project(request, app.editor.revision);
+            == rfd::MessageDialogResult::Yes
 }
 
 fn string(config: &Extra, key: &str) -> String {
@@ -347,6 +342,7 @@ fn track_row(ui: &mut Ui, checked: &mut bool, name: &str, color: Color32) -> boo
     );
     row.inner
 }
+#[cfg(not(target_os = "android"))]
 fn folder_button(ui: &mut Ui) -> Response {
     let (rect, response) = ui.allocate_exact_size(Vec2::splat(28.0), Sense::click());
     ui.painter().rect(
@@ -376,4 +372,84 @@ fn folder_button(ui: &mut Ui) -> Response {
         Stroke::new(1.1, MUTED),
     ));
     response.on_hover_text("选择目标文件夹")
+}
+
+#[cfg(not(target_os = "android"))]
+struct DirectoryField {
+    id: Id,
+    original: String,
+    draft: RenderDraft,
+    has_focus: bool,
+    changed: bool,
+}
+
+#[cfg(not(target_os = "android"))]
+impl DirectoryField {
+    fn commit(self, ui: &Ui, editable: bool, export_clicked: bool) -> Option<String> {
+        let Self {
+            id,
+            original,
+            mut draft,
+            has_focus,
+            changed,
+        } = self;
+        let saved = (editable && (changed || (export_clicked && draft.text != original)))
+            .then(|| draft.text.clone());
+        if let Some(path) = &saved {
+            draft.committed.clone_from(path);
+        }
+        if has_focus || draft.text != draft.committed {
+            ui.ctx().data_mut(|d| d.insert_temp(id, draft));
+        } else {
+            ui.ctx().data_mut(|d| d.remove::<RenderDraft>(id));
+        }
+        saved
+    }
+}
+
+#[cfg(not(target_os = "android"))]
+fn directory_field(app: &App, ui: &mut Ui, editable: bool) -> DirectoryField {
+    ui.weak("目标文件夹");
+    let directory = string(&app.editor.project.render_config, "destination");
+    let dir_id = ui.make_persistent_id(("render-field", "destination"));
+    let mut dir_draft = ui
+        .ctx()
+        .data_mut(|d| d.get_temp::<RenderDraft>(dir_id))
+        .filter(|draft| draft.committed == directory)
+        .unwrap_or_else(|| RenderDraft::synced(&directory));
+    let mut dir_commit = false;
+    let mut dir_has_focus = false;
+    ui.horizontal(|ui| {
+        let width = (ui.available_width() - 34.0).max(20.0);
+        let response = ui.add_sized(
+            vec2(width, 28.0),
+            TextEdit::singleline(&mut dir_draft.text)
+                .vertical_align(Align::Center)
+                .margin(vec2(7.0, 5.0))
+                .background_color(BORDER),
+        );
+        dir_has_focus = response.has_focus();
+        if dir_draft.text != directory
+            && (response.lost_focus() || dir_has_focus && ui.input(|i| i.key_pressed(Key::Enter)))
+        {
+            dir_commit = true;
+        }
+        if folder_button(ui).clicked() && editable {
+            let mut picker = rfd::FileDialog::new().set_title("选择导出文件夹");
+            if !dir_draft.text.is_empty() {
+                picker = picker.set_directory(&dir_draft.text);
+            }
+            if let Some(path) = picker.pick_folder() {
+                dir_draft.text = path.display().to_string();
+                dir_commit = true;
+            }
+        }
+    });
+    DirectoryField {
+        id: dir_id,
+        original: directory,
+        draft: dir_draft,
+        has_focus: dir_has_focus,
+        changed: dir_commit,
+    }
 }

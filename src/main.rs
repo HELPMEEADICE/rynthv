@@ -19,7 +19,7 @@ fn main() -> std::process::ExitCode {
         }
     }
 
-    #[cfg(feature = "gui")]
+    #[cfg(all(feature = "gui", not(target_os = "android")))]
     {
         let result = launch_gui(first.map(std::path::PathBuf::from));
         if let Err(error) = result {
@@ -28,14 +28,14 @@ fn main() -> std::process::ExitCode {
         }
         std::process::ExitCode::SUCCESS
     }
-    #[cfg(not(feature = "gui"))]
+    #[cfg(not(all(feature = "gui", not(target_os = "android"))))]
     {
         eprintln!("RynthV was built for headless use. Use rynthv -cli --help.");
         std::process::ExitCode::from(2)
     }
 }
 
-#[cfg(feature = "gui")]
+#[cfg(all(feature = "gui", not(target_os = "android")))]
 fn launch_gui(path: Option<std::path::PathBuf>) -> Result<(), String> {
     #[cfg(all(windows, feature = "cli", not(debug_assertions)))]
     {

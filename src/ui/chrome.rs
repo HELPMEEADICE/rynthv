@@ -34,10 +34,10 @@ pub fn menus(app: &mut App, ui: &mut Ui) {
             }
             ui.separator();
             if item(ui, "保存", "Ctrl+S", true) {
-                app.save_project(false);
+                app.save_project(false, &ctx);
             }
             if item(ui, "另存为…", "Ctrl+Shift+S", true) {
-                app.save_project(true);
+                app.save_project(true, &ctx);
             }
             ui.separator();
             if item(ui, "导入…", "Ctrl+Shift+I", true) {
@@ -270,9 +270,9 @@ pub fn shortcuts(app: &mut App, ctx: &Context) {
         return;
     }
     if command(Key::S, shift) {
-        app.save_project(true);
+        app.save_project(true, ctx);
     } else if command(Key::S, ctrl) {
-        app.save_project(false);
+        app.save_project(false, ctx);
     }
     if command(Key::I, shift) {
         app.request_file(FileAction::ImportMidi, ctx);

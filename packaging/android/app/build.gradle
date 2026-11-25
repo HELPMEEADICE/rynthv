@@ -1,0 +1,62 @@
+plugins {
+    id 'com.android.application' version '9.5.2'
+}
+
+def abi = providers.environmentVariable("ANDROID_ABI").get()
+def official = providers.environmentVariable("ANDROID_SIGNING_MODE").get() == "release"
+
+android {
+    namespace = "org.rynthv.app"
+    compileSdk = 37
+    buildToolsVersion = "36.0.0"
+
+    defaultConfig {
+        applicationId = "org.rynthv.app"
+        minSdk = 26
+        targetSdk = 37
+        versionCode = providers.environmentVariable("ANDROID_VERSION_CODE").get().toInteger()
+        versionName = providers.environmentVariable("ANDROID_VERSION_NAME").get()
+        manifestPlaceholders = [appLabel: official ? "RynthV" : "RynthV (Test)"]
+        if (!official) applicationIdSuffix = ".test"
+        ndk {
+            abiFilters.add(abi)
+        }
+    }
+
+    signingConfigs {
+        ci {
+            storeFile = file(providers.environmentVariable("ANDROID_SIGNING_FILE").get())
+            storePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSWORD").get()
+            keyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS").get()
+            keyPassword = providers.environmentVariable("ANDROID_KEY_PASSWORD").get()
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.ci
+        }
+    }
+
+    packaging {
+        jniLibs.useLegacyPackaging = false
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    sourceSets.main.res.srcDir(layout.buildDirectory.dir("branding"))
+}
+
+def copyBranding = tasks.register("copyBranding", Copy) {
+    from("../../../assets/branding/app-icon.png")
+    into(layout.buildDirectory.dir("branding/drawable-nodpi"))
+    rename { "rynthv_icon.png" }
+}
+tasks.named("preBuild").configure { dependsOn(copyBranding) }
+
+dependencies {
+    implementation("androidx.core:core:1.16.0")
+}

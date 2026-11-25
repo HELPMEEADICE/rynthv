@@ -31,6 +31,13 @@ impl ExportRequest {
     }
 
     pub fn from_project(project: &Project) -> Result<Self, String> {
+        Self::with_directory(project, None)
+    }
+
+    pub(crate) fn with_directory(
+        project: &Project,
+        directory: Option<PathBuf>,
+    ) -> Result<Self, String> {
         let config = &project.render_config;
         crate::synthesis::mixing_options::validate_export_bypass(config)?;
         crate::synthesis::mixing_options::validate_project_mixer(
@@ -52,7 +59,7 @@ impl ExportRequest {
                 .and_then(serde_json::Value::as_u64)
                 .unwrap_or(0)
         };
-        let directory = PathBuf::from(text("destination"));
+        let directory = directory.unwrap_or_else(|| PathBuf::from(text("destination")));
         if directory.as_os_str().is_empty() || (directory.exists() && !directory.is_dir()) {
             return Err("请选择有效的目标文件夹".into());
         }

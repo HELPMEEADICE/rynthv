@@ -1,0 +1,13 @@
+[package]
+name = "rynthv-android"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[target.'cfg(target_os = "android")'.dependencies]
+android-activity = { version = "=0.6.1", features = ["native-activity"] }
+rynthv = { path = "../../..", default-features = false, features = ["gui"] }

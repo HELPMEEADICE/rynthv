@@ -58,6 +58,7 @@ pub(super) fn dialog(app: &mut App, ctx: &Context) {
     let mut import = false;
     let mut cancel = false;
     let mut edited = false;
+    let mut picker = None;
     let mut source = dialog.source;
     let importing = dialog.phase == ContextImportPhase::Importing;
     let modal = Modal::new(Id::new("voice-model-context-import")).show(ctx, |ui| {
@@ -99,7 +100,7 @@ pub(super) fn dialog(app: &mut App, ctx: &Context) {
         });
         ui.separator();
         ui.add_enabled_ui(!importing, |ui| {
-            edited = fields::show(ui, dialog);
+            edited = fields::show(ui, dialog, &mut picker);
         });
         if edited {
             dialog.error = None;
@@ -147,5 +148,18 @@ pub(super) fn dialog(app: &mut App, ctx: &Context) {
         app.synthesis.import_context();
     } else if refresh {
         app.synthesis.refresh_context_sources();
+    } else if let Some(picker) = picker {
+        app.pick_one(ctx, picker, move |app, _, path| {
+            if let Some(dialog) = &mut app.synthesis.context_import.dialog
+                && dialog.source == source
+            {
+                match source {
+                    ContextImportSource::SessionFile => dialog.session_path = Some(path),
+                    ContextImportSource::File => dialog.file_path = Some(path),
+                    _ => return,
+                }
+                app.synthesis.clear_context_import_error();
+            }
+        });
     }
 }

@@ -1,3 +1,9 @@
+#[cfg(target_os = "android")]
+mod android;
+#[cfg(target_os = "android")]
+pub use android::{run_android, wake_android};
+
+#[cfg(not(target_os = "android"))]
 pub fn run_desktop(path: Option<std::path::PathBuf>) -> eframe::Result {
     let mut gpu = eframe::egui_wgpu::WgpuSetupCreateNew::without_display_handle();
     #[cfg(windows)]

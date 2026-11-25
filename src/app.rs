@@ -1,5 +1,6 @@
 mod instrumental;
 mod midi;
+pub(crate) mod picker;
 mod voice;
 pub use midi::{MidiImport, MidiImportMode, MidiImportPhase};
 
@@ -58,11 +59,14 @@ pub struct App {
     pub phoneme_draft: ui::panels::PhonemeDraft,
     pub fill_lyrics: Option<ui::fill_lyrics::FillLyrics>,
     pub pending: Option<FileAction>,
+    #[cfg(target_os = "android")]
+    picker: Option<picker::Completion>,
     pub allow_close: bool,
     pub status: String,
     settings_path: Option<PathBuf>,
     last_layout: String,
     last_preferences: String,
+    #[cfg(not(target_os = "android"))]
     last_title: String,
     last_persist: Instant,
 }
@@ -155,11 +159,14 @@ impl App {
             phoneme_draft: ui::panels::PhonemeDraft::default(),
             fill_lyrics: None,
             pending: None,
+            #[cfg(target_os = "android")]
+            picker: None,
             allow_close: false,
             status: String::new(),
             settings_path,
             last_layout,
             last_preferences,
+            #[cfg(not(target_os = "android"))]
             last_title: String::new(),
             last_persist: Instant::now(),
         };
@@ -222,12 +229,13 @@ impl App {
             Err(e) => self.error = Some(e),
         }
     }
-    pub fn save_project(&mut self, save_as: bool) -> bool {
+    pub fn save_project(&mut self, save_as: bool, _ctx: &Context) -> bool {
         ui::phonemes::phoneme_deactivate(self);
         ui::piano::cancel_audition(self);
         ui::tempo_input::finish(self);
         self.commit_lyric();
         self.editor.finish();
+        #[cfg(not(target_os = "android"))]
         let path = if save_as || self.path.is_none() {
             let name = self
                 .path
@@ -239,6 +247,27 @@ impl App {
                 .add_filter("Synthesizer V 工程", &["svp"])
                 .set_file_name(name)
                 .save_file()
+        } else {
+            self.path.clone()
+        };
+        #[cfg(target_os = "android")]
+        let path = if save_as || self.path.is_none() {
+            let name = self
+                .path
+                .as_deref()
+                .and_then(std::path::Path::file_name)
+                .unwrap_or_else(|| std::ffi::OsStr::new("未命名.svp"));
+            match crate::platform::config_directory().and_then(|root| {
+                let directory = root.join("projects").join(uuid::Uuid::new_v4().to_string());
+                std::fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
+                Ok(directory.join(name))
+            }) {
+                Ok(path) => Some(path),
+                Err(error) => {
+                    self.error = Some(error);
+                    return false;
+                }
+            }
         } else {
             self.path.clone()
         };
@@ -260,9 +289,17 @@ impl App {
         match result {
             Ok(revision) => {
                 self.editor.mark_saved();
-                self.path = Some(path);
+                self.path = Some(path.clone());
                 self.project_revision = Some(revision);
                 self.status = "工程已保存".into();
+                #[cfg(target_os = "android")]
+                if save_as {
+                    self.pick(
+                        _ctx,
+                        picker::Picker::publish(path, "application/octet-stream"),
+                        |app, _, _| app.status = "工程副本已导出".into(),
+                    );
+                }
                 true
             }
             Err(e) => {
@@ -309,20 +346,25 @@ impl App {
                 self.editor = Editor::new(Project::default());
                 self.synthesis.reset_project();
                 self.path = None;
+                self.project_revision = None;
             }
-            FileAction::Open => {
-                if let Some(path) = rfd::FileDialog::new()
-                    .add_filter("Synthesizer V 工程", &["svp"])
-                    .pick_file()
-                {
-                    self.open_path(path);
-                }
-            }
+            FileAction::Open => self.pick_one(
+                ctx,
+                picker::Picker::new(picker::Selection::File, "打开工程")
+                    .filter("Synthesizer V 工程", &["svp"]),
+                |app, _, path| app.open_path(path),
+            ),
             FileAction::ImportMidi => self.begin_midi_import(MidiImportMode::NewProject, ctx),
             FileAction::Close => {
                 self.allow_close = true;
                 self.persist_layout();
+                #[cfg(not(target_os = "android"))]
                 ctx.send_viewport_cmd(ViewportCommand::Close);
+                #[cfg(target_os = "android")]
+                if let Err(error) = crate::platform::android::finish() {
+                    self.error = Some(error);
+                    self.allow_close = false;
+                }
             }
         }
     }
@@ -368,6 +410,23 @@ impl App {
             }
         }
     }
+    #[cfg(not(target_os = "android"))]
+    fn update_title(&mut self, ctx: &Context) {
+        let title = format!(
+            "RynthV - {}{}",
+            self.path
+                .as_ref()
+                .and_then(|p| p.file_stem())
+                .and_then(|p| p.to_str())
+                .unwrap_or("未命名"),
+            if self.editor.dirty() { " *" } else { "" }
+        );
+        if title != self.last_title {
+            self.last_title = title.clone();
+            ctx.send_viewport_cmd(ViewportCommand::Title(title));
+        }
+    }
+
     fn persist_layout(&mut self) {
         self.last_persist = Instant::now();
         let Some(settings_path) = self.settings_path.as_ref() else {
@@ -403,7 +462,7 @@ impl App {
                 ui.heading("保存工程更改？");
                 ui.label("当前工程包含尚未保存的编辑。");
                 ui.horizontal(|ui| {
-                    if ui.button("保存").clicked() && self.save_project(false) {
+                    if ui.button("保存").clicked() && self.save_project(false, ctx) {
                         self.pending = None;
                         self.perform_file(action, ctx);
                     }
@@ -447,6 +506,8 @@ impl App {
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        #[cfg(target_os = "android")]
+        self.poll_picker(&ctx);
         ui::piano::begin_keyboard_frame(self, &ctx);
         self.synthesis.poll();
         self.poll_audio_import();
@@ -480,19 +541,8 @@ impl eframe::App for App {
         {
             ui::chrome::shortcuts(self, &ctx);
         }
-        let title = format!(
-            "RynthV - {}{}",
-            self.path
-                .as_ref()
-                .and_then(|p| p.file_stem())
-                .and_then(|p| p.to_str())
-                .unwrap_or("未命名"),
-            if self.editor.dirty() { " *" } else { "" }
-        );
-        if title != self.last_title {
-            self.last_title = title.clone();
-            ctx.send_viewport_cmd(ViewportCommand::Title(title));
-        }
+        #[cfg(not(target_os = "android"))]
+        self.update_title(&ctx);
         let rect = ui.max_rect();
         ui.painter().rect_filled(rect, 0, ui::theme::BACKGROUND);
         let menu = Rect::from_min_max(rect.min, pos2(rect.right(), rect.top() + 27.0));

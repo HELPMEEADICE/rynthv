@@ -67,7 +67,13 @@ fn system_font(bold: bool) -> Result<FontData, String> {
     linux::load(bold)
 }
 
-#[cfg(not(any(target_os = "windows", target_os = "linux")))]
+#[cfg(target_os = "android")]
+fn system_font(bold: bool) -> Result<FontData, String> {
+    let _ = bold;
+    read_font(Path::new("/system/fonts/NotoSansCJK-Regular.ttc"), 2)
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "android")))]
 fn system_font(_bold: bool) -> Result<FontData, String> {
     Err("UI system font loading is supported on Windows and Linux only".into())
 }
