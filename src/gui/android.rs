@@ -38,6 +38,9 @@ pub fn run_android(app: AndroidApp) {
         options,
         Box::new(|cc| {
             android::install_repaint(cc.egui_ctx.clone());
+            if let Some(state) = &cc.wgpu_render_state {
+                monitor_graphics_device(&state.device);
+            }
             Ok(Box::new(App::new(cc, None)))
         }),
     );
@@ -55,6 +58,30 @@ pub fn run_android(app: AndroidApp) {
         });
     }
     android::release_activity();
+}
+
+fn monitor_graphics_device(device: &wgpu::Device) {
+    let activity = android::with_activity(|env, activity| env.new_global_ref(activity));
+    let (Ok(activity), Ok(vm)) = (activity, jni::JavaVM::singleton()) else {
+        return;
+    };
+    device.set_device_lost_callback(move |reason, message| {
+        if reason == wgpu::DeviceLostReason::Destroyed {
+            return;
+        }
+        let message = format!("Android 图形设备已丢失（{reason:?}）：{message}");
+        log::error!("{message}");
+        let _: jni::errors::Result<()> = vm.attach_current_thread(|env| {
+            let message = env.new_string(&message)?;
+            env.call_method(
+                &activity,
+                jni::jni_str!("rynthvGraphicsLost"),
+                jni::jni_sig!("(Ljava/lang/String;)V"),
+                &[(&message).into()],
+            )?;
+            Ok(())
+        });
+    });
 }
 
 pub fn wake_android() {

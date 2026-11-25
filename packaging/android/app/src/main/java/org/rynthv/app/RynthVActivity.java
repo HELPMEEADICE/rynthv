@@ -55,6 +55,8 @@ public final class RynthVActivity extends NativeActivity {
     private int pickerKind;
     private String pickerExtensions;
     private File publishSource;
+    private String graphicsFailure;
+    private AlertDialog graphicsDialog;
 
     private static native void nativeWake();
     private static native void nativeEvent(int event);
@@ -81,6 +83,7 @@ public final class RynthVActivity extends NativeActivity {
         super.onResume();
         playbackFocus.setActive(true);
         nativeEvent(1);
+        showGraphicsRecovery();
     }
 
     @Override
@@ -156,6 +159,31 @@ public final class RynthVActivity extends NativeActivity {
             .setTitle("RynthV").setMessage(message)
             .setPositiveButton(android.R.string.ok, (dialog, which) -> finish())
             .setOnCancelListener(dialog -> finish()).show());
+    }
+
+    void rynthvGraphicsLost(String message) {
+        Log.e("RynthV", message);
+        runOnUiThread(() -> {
+            graphicsFailure = message;
+            showGraphicsRecovery();
+        });
+    }
+
+    private void showGraphicsRecovery() {
+        if (graphicsFailure == null || graphicsDialog != null || isFinishing() || isDestroyed()
+                || !hasWindowFocus()) return;
+        graphicsDialog = new AlertDialog.Builder(this)
+            .setTitle("图形设备需要恢复")
+            .setMessage(graphicsFailure + "\n重新打开 RynthV 可恢复最近的自动保存。")
+            .setPositiveButton("恢复工作区", (dialog, which) -> GraphicsRecoveryActivity.recover(this))
+            .setCancelable(false)
+            .show();
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean focused) {
+        super.onWindowFocusChanged(focused);
+        if (focused) showGraphicsRecovery();
     }
 
     void rynthvPick(int kind, String title, String extensions, String source, String mime) {

@@ -43,6 +43,8 @@ Android 通过 Storage Access Framework 打开 `content://` 文档。应用通�
 
 Android 图形与模型推理使用独立设备。推理的权重缓存、临时缓冲区及注意力分块会根据设备内存和 Vulkan 限制调整。不同 Adreno、Mali、Immortalis、PowerVR 驱动的 WGSL 计算和大型声库峰值内存仍待实机覆盖。若遇到失败，可在记录设备与驱动信息后选择 CPU 继续工作。
 
+窗口 Surface 会随 Activity 生命周期重建。若显示用的 GPU 设备失效，系统对话框提供 **恢复工作区**，重新初始化图形设备并读取最近的自动保存。
+
 从系统选择器导入私有目录的 DNNI 模型使用只读内存映射。重新导入时替换文件路径，已加载模型可安全读完先前的文件版本。
 
 ## GitHub Actions
