@@ -77,7 +77,7 @@ pub enum Completion {
     Discarded,
 }
 
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct CacheStats {
     pub queued: usize,
     pub running: usize,

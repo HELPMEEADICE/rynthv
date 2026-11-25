@@ -38,7 +38,11 @@ pub(super) fn settings(app: &mut App, ui: &mut Ui) {
         return;
     };
     let status = &diagnostics.status;
-    let execution = match diagnostics.actual {
+    #[cfg(not(target_arch = "wasm32"))]
+    let actual = diagnostics.actual;
+    #[cfg(target_arch = "wasm32")]
+    let actual = diagnostics.actual.as_str();
+    let execution = match actual {
         "cpu" => "CPU",
         "webgpu" => "WebGPU",
         "mixed" => "WebGPU + CPU",
@@ -47,6 +51,22 @@ pub(super) fn settings(app: &mut App, ui: &mut Ui) {
     row(ui, "实际执行", |ui| {
         ui.label(execution);
     });
+    #[cfg(target_arch = "wasm32")]
+    {
+        let count = |key: &str| diagnostics.activity.get(key).and_then(serde_json::Value::as_u64).unwrap_or_default();
+        let ms = diagnostics.activity.get("readback_ms").and_then(serde_json::Value::as_f64).unwrap_or_default();
+        ui.weak(format!(
+            "GPU 提交 {}/{} 次 · 回读 {} 次／{ms:.1} ms",
+            count("completed_gpu_submissions"), count("gpu_submissions"), count("readback_count"),
+        ));
+        ui.collapsing("算子与缓存诊断", |ui| {
+            for key in ["gpu_dispatches", "cpu_operators", "weight_hits", "pipeline_hits", "peak_weight_cache_bytes"] {
+                if let Some(value) = diagnostics.activity.get(key) {
+                    ui.label(format!("{key}  {value}"));
+                }
+            }
+        });
+    }
     if let Some(device) = &status.device {
         row(ui, "当前显卡", |ui| {
             ui.add(Label::new(device.id.to_string()).truncate());

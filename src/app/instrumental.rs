@@ -58,7 +58,13 @@ impl App {
         }
     }
 
-    fn begin_audio_import(&mut self, track: EntityId, path: PathBuf, relink: bool, ctx: &Context) {
+    pub(super) fn begin_audio_import(
+        &mut self,
+        track: EntityId,
+        path: PathBuf,
+        relink: bool,
+        ctx: &Context,
+    ) {
         let clip = self
             .editor
             .project

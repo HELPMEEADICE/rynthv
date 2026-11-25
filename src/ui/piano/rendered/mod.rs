@@ -7,10 +7,8 @@ mod waveform_flash;
 
 pub use phonemes::draw as phonemes;
 
-use std::{
-    ops::Range,
-    time::{Duration, Instant},
-};
+use std::{ops::Range, time::Duration};
+use web_time::Instant;
 
 use super::scene::SceneGroup;
 use crate::{

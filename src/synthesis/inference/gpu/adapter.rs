@@ -24,7 +24,7 @@ impl fmt::Display for AdapterId {
     }
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, serde::Deserialize)]
 pub struct AdapterInfo {
     #[serde(flatten)]
     pub id: AdapterId,

@@ -59,15 +59,33 @@ fn file_menu(app: &mut App, ui: &mut Ui) {
         if item(ui, "打开…", "Ctrl+O", true) {
             app.request_file(FileAction::Open, &ctx);
         }
-        #[cfg(target_os = "android")]
-        if item(ui, "本机工程…", "", true) {
+        #[cfg(any(target_os = "android", target_arch = "wasm32"))]
+        if item(
+            ui,
+            if cfg!(target_arch = "wasm32") {
+                "浏览器工程…"
+            } else {
+                "本机工程…"
+            },
+            "",
+            true,
+        ) {
             app.request_file(FileAction::OpenLocal, &ctx);
         }
         ui.separator();
         if item(ui, "保存", "Ctrl+S", true) {
             app.save_project(false, &ctx);
         }
-        if item(ui, "另存为…", "Ctrl+Shift+S", true) {
+        if item(
+            ui,
+            if cfg!(target_arch = "wasm32") {
+                "下载 SVP…"
+            } else {
+                "另存为…"
+            },
+            "Ctrl+Shift+S",
+            true,
+        ) {
             app.save_project(true, &ctx);
         }
         #[cfg(target_os = "android")]

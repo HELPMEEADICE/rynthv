@@ -28,6 +28,9 @@ pub struct VoiceLibrary {
 }
 
 impl VoiceLibrary {
+    pub fn has_databases(&self) -> bool {
+        self.settings.has_databases()
+    }
     pub(super) fn new(repaint: crate::synthesis::notify::Notify) -> Self {
         let (settings, settings_error) = match SynthesisSettings::load() {
             Ok(settings) => (settings, None),

@@ -1,6 +1,9 @@
 use eframe::egui::*;
 mod fonts;
+#[cfg(not(target_arch = "wasm32"))]
 pub use fonts::install as fonts;
+#[cfg(target_arch = "wasm32")]
+pub use fonts::install_web as web_fonts;
 pub const BACKGROUND: Color32 = Color32::from_rgb(27, 27, 29);
 pub const PANEL: Color32 = Color32::from_rgb(45, 43, 46);
 pub const CANVAS: Color32 = Color32::from_rgb(35, 35, 37);

@@ -1,4 +1,5 @@
-use std::{ops::Range, time::Instant};
+use std::ops::Range;
+use web_time::Instant;
 
 /// A newly published interval's transient waveform-edge highlight.
 #[derive(Clone, Debug)]

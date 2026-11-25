@@ -1,5 +1,9 @@
 use super::App;
-use crate::synthesis::{runtime::VoiceState, settings::VoiceSelection, voice::VoiceInventory};
+#[cfg(target_arch = "wasm32")]
+use crate::platform::web::protocol::Inventory as VoiceInventory;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::synthesis::voice::VoiceInventory;
+use crate::synthesis::{runtime::VoiceState, settings::VoiceSelection};
 
 impl App {
     pub fn voice_name(&self) -> Option<&str> {

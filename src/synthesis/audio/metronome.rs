@@ -1,5 +1,6 @@
 //! Preview clicks use the same sample position as vocals and accompaniment.
 //! Only the current/next beat is located; no project-length click PCM is built.
+use super::click::click;
 use super::live::LIVE_SAMPLE_RATE;
 use crate::model::{QUARTER, TimeAxis};
 use std::sync::{
@@ -111,18 +112,4 @@ impl ClickSounds {
             weak: click(1250.0, 0.16),
         }
     }
-}
-
-fn click(frequency: f64, gain: f64) -> Vec<f32> {
-    let frames = (f64::from(LIVE_SAMPLE_RATE) * 0.040) as usize;
-    (0..frames)
-        .map(|frame| {
-            let seconds = frame as f64 / f64::from(LIVE_SAMPLE_RATE);
-            let phase = std::f64::consts::TAU * frequency * seconds;
-            let attack = (seconds / 0.0005).min(1.0);
-            let tail = 1.0 - frame as f64 / frames as f64;
-            let envelope = attack * (-seconds * 110.0).exp() * tail * tail;
-            ((phase.sin() * 0.8 + (phase * 2.0).sin() * 0.2) * envelope * gain) as f32
-        })
-        .collect()
 }

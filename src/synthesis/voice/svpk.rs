@@ -35,6 +35,19 @@ pub fn is_package(path: &Path) -> bool {
         .is_some_and(|ext| ext.eq_ignore_ascii_case("svpk"))
 }
 
+#[cfg(target_arch = "wasm32")]
+pub fn remove_import(path: &Path) -> Result<()> {
+    let root = root().map_err(VoiceError::new)?;
+    let path = fs::canonicalize(path)?;
+    let valid = path.file_name().is_some_and(|name| name == VOICE)
+        && path.ancestors().nth(3).is_some_and(|parent| parent == root);
+    if !valid {
+        return Err(VoiceError::new("只能移除由 RynthV 导入的 SVPK 声库"));
+    }
+    fs::remove_dir_all(path.parent().expect("managed SVPK has a parent directory"))?;
+    Ok(())
+}
+
 pub fn import(input: &Path, dry_run: bool) -> Result<ImportedVoice> {
     let root = root().map_err(VoiceError::new)?;
     let staging = if dry_run {

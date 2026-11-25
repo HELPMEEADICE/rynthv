@@ -307,6 +307,40 @@ fn native_bound(project_sample: i64, project_rate: u32) -> Result<usize, String>
     usize::try_from(frame).map_err(|_| "音符组覆盖范围超出地址范围".into())
 }
 
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn preview_chunk(
+    audio: RenderedAudio,
+    coverage: super::plan::Coverage,
+    output: &super::plan::OwnerOutputControls,
+) -> Result<Option<RenderedAudio>, String> {
+    let controls = Controls::read(&output.mixer)?;
+    if controls.mute || output.reference_muted {
+        return Ok(None);
+    }
+    let start = native_bound(coverage.sample_start.0, coverage.sample_rate)?;
+    let end = native_bound(coverage.sample_end.0, coverage.sample_rate)?;
+    let origin = (audio.start_seconds() * f64::from(NATIVE_SAMPLE_RATE)).round() as i64;
+    let first = (start as i64 - origin).max(0) as usize;
+    let last = (end as i64 - origin).clamp(0, audio.frames() as i64) as usize;
+    if first >= last {
+        return Ok(None);
+    }
+    let (left, right) = controls.gains(audio.layout());
+    let channels = audio.layout().channels();
+    let samples = audio.samples()[first * channels..last * channels]
+        .chunks_exact(channels)
+        .flat_map(|frame| [frame[0] * left as f32, frame[channels - 1] * right as f32])
+        .collect();
+    RenderedAudio::new(
+        NATIVE_SAMPLE_RATE,
+        (origin + first as i64) as f64 / f64::from(NATIVE_SAMPLE_RATE),
+        ChannelLayout::Stereo,
+        samples,
+    )
+    .map(Some)
+    .map_err(|error| error.to_string())
+}
+
 impl Controls {
     fn read(extra: &Extra) -> Result<Self, String> {
         crate::synthesis::mixing_options::validate_mixer(extra)?;

@@ -7,7 +7,7 @@ use std::{ops::Range, sync::Arc};
 
 /// Pitch on the model's frame clock, expressed in editor score coordinates.
 /// The group's pitch offset is included; voice tuning is removed for display.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct PitchTrack {
     pub start_seconds: f64,
     pub frame_seconds: f64,

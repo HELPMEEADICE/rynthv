@@ -3,7 +3,12 @@ use wasm_bindgen::JsValue;
 #[allow(deprecated)]
 use wasm_bindgen_futures::{future_to_promise, jspi_block_on_promise};
 
+pub(crate) mod audio;
+pub(crate) mod client;
+pub(crate) mod documents;
 pub(crate) mod fs;
+pub(crate) mod protocol;
+mod worker;
 
 /// Park the synthesis worker's WASM stack until a browser operation completes.
 /// Calls must originate at a JSPI export, with one active job per worker.

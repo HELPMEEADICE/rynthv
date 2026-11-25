@@ -3,6 +3,8 @@ mod decode;
 
 use super::{audio::RenderedAudio, rendered::Waveform};
 use crate::model::Project;
+#[cfg(not(target_arch = "wasm32"))]
+use std::thread;
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
@@ -11,7 +13,6 @@ use std::{
         atomic::{AtomicBool, Ordering},
         mpsc,
     },
-    thread,
 };
 
 pub struct AudioAsset {
@@ -33,6 +34,8 @@ enum Entry {
     Loading {
         rx: mpsc::Receiver<Result<Arc<AudioAsset>, String>>,
         cancel: Arc<AtomicBool>,
+        #[cfg(target_arch = "wasm32")]
+        web: crate::platform::web::client::Pending<()>,
     },
     Ready(Arc<AudioAsset>),
     Failed(String),
@@ -42,6 +45,10 @@ impl Drop for Entry {
     fn drop(&mut self) {
         if let Self::Loading { cancel, .. } = self {
             cancel.store(true, Ordering::Relaxed);
+        }
+        #[cfg(target_arch = "wasm32")]
+        if let Self::Loading { web, .. } = self {
+            web.cancel();
         }
     }
 }
@@ -86,7 +93,17 @@ impl AudioLibrary {
             let result = match rx.try_recv() {
                 Ok(result) => result,
                 Err(mpsc::TryRecvError::Empty) => continue,
-                Err(mpsc::TryRecvError::Disconnected) => Err("音频加载线程意外停止".into()),
+                Err(mpsc::TryRecvError::Disconnected) => {
+                    #[cfg(target_arch = "wasm32")]
+                    if let Entry::Loading { web, .. } = entry
+                        && let Some(Err(error)) = web.poll()
+                    {
+                        *entry = Entry::Failed(error);
+                        self.generation = self.generation.wrapping_add(1);
+                        continue;
+                    }
+                    Err("音频加载任务意外停止".into())
+                }
             };
             *entry = match result {
                 Ok(asset) => Entry::Ready(asset),
@@ -125,6 +142,7 @@ impl AudioLibrary {
         let worker_cancel = Arc::clone(&cancel);
         let file = path.clone();
         let ctx = ctx.clone();
+        #[cfg(not(target_arch = "wasm32"))]
         let result = thread::Builder::new()
             .name("audio-import".into())
             .spawn(move || {
@@ -136,10 +154,54 @@ impl AudioLibrary {
                     ctx.wake();
                 }
             });
+        #[cfg(target_arch = "wasm32")]
+        let result: Result<crate::platform::web::client::Pending<()>, std::io::Error> = {
+            use crate::platform::web::{
+                client,
+                protocol::{Event, Request},
+            };
+            use crate::synthesis::audio::ChannelLayout;
+            let pending = client::submit::<()>(
+                Request::Audio { path: file },
+                ctx.clone(),
+                move |event, samples| {
+                    if let (Event::Audio { channels, rate }, Some(samples)) = (event, samples) {
+                        let layout = if channels == 1 {
+                            ChannelLayout::Mono
+                        } else {
+                            ChannelLayout::Stereo
+                        };
+                        let asset = RenderedAudio::new(rate, 0.0, layout, samples.to_vec())
+                            .map(|audio| {
+                                let waveforms = (0..channels)
+                                    .map(|channel| Waveform::new_channel(&audio, channel))
+                                    .collect();
+                                Arc::new(AudioAsset {
+                                    audio: Arc::new(audio),
+                                    waveforms,
+                                })
+                            })
+                            .map_err(|error| error.to_string());
+                        if !worker_cancel.load(Ordering::Relaxed) {
+                            let _ = tx.send(asset);
+                            ctx.wake();
+                        }
+                    }
+                },
+            );
+            // The data event precedes successful completion. Forward a worker
+            // failure separately because it has no data packet.
+            Ok(pending)
+        };
         self.entries.insert(
             path,
             match result {
-                Ok(_) => Entry::Loading { rx, cancel },
+                Ok(_task) => Entry::Loading {
+                    rx,
+                    cancel,
+                    #[cfg(target_arch = "wasm32")]
+                    web: _task,
+                },
                 Err(error) => Entry::Failed(format!("无法加载音频：{error}")),
             },
         );

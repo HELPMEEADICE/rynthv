@@ -6,7 +6,7 @@ mod prepare;
 pub use crate::model::SourcePhone;
 
 /// One source phoneme on the acoustic clock, including its unedited model values.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct RenderedPhoneme {
     pub source: SourcePhone,
     pub token: String,
@@ -26,7 +26,7 @@ pub struct RenderedPhoneme {
 }
 
 /// The complete owner result is shared before any PCM block is requested.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct RenderedPhonemeTrack {
     pub phones: Arc<[RenderedPhoneme]>,
 }

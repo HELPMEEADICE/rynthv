@@ -13,7 +13,7 @@ use crate::synthesis::voice::{
     },
 };
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, serde::Deserialize)]
 pub struct FlatCatalogEntry {
     pub dependencies: Vec<FlatDependency>,
     pub styles: Vec<String>,

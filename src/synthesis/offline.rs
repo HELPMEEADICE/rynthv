@@ -49,6 +49,8 @@ pub struct Options {
     pub adapter: Option<AdapterId>,
     /// Drop acoustic cache at this soft limit between requests.
     pub cache_bytes: usize,
+    #[cfg(target_arch = "wasm32")]
+    pub preview_seconds: Option<f64>,
 }
 
 pub enum Progress {
@@ -59,6 +61,11 @@ pub enum Progress {
     Stage {
         group: String,
         stage: RenderStage,
+    },
+    #[cfg(target_arch = "wasm32")]
+    Pcm {
+        group: String,
+        audio: RenderedAudio,
     },
 }
 
@@ -250,15 +257,19 @@ impl Offline {
                             "VOICE_NOT_FOUND: {} / {}: {error}",
                             track.name, reference.uuid
                         )
-                    })?
-                    .ok_or_else(|| {
-                        format!(
-                            "VOICE_NOT_ASSIGNED: {} / {} has {} notes. Assign a voice first.",
-                            track.name,
-                            reference.uuid,
-                            request.input.notes.len()
-                        )
                     })?;
+                #[cfg(target_arch = "wasm32")]
+                if options.preview_seconds.is_some() && key.is_none() {
+                    continue;
+                }
+                let key = key.ok_or_else(|| {
+                    format!(
+                        "VOICE_NOT_ASSIGNED: {} / {} has {} notes. Assign a voice first.",
+                        track.name,
+                        reference.uuid,
+                        request.input.notes.len()
+                    )
+                })?;
                 routes.entry(key).or_default().push(owner);
             }
         }

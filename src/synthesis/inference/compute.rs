@@ -43,7 +43,7 @@ struct Inner {
     timestamps: AtomicBool,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Status {
     pub requested: Backend,
     pub device: Option<AdapterInfo>,

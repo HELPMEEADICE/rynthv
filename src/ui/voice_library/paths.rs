@@ -18,8 +18,7 @@ pub fn settings(app: &mut App, ui: &mut Ui) {
         }
         if ui
             .add_enabled(
-                !app.synthesis.library.is_scanning()
-                    && app.synthesis.library.settings.has_databases(),
+                !app.synthesis.library.is_scanning() && app.synthesis.library.has_databases(),
                 Button::new("重新扫描"),
             )
             .clicked()

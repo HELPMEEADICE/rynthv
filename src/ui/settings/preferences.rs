@@ -1,5 +1,6 @@
 use eframe::egui::Context;
 use serde::{Deserialize, Serialize};
+#[cfg(not(target_arch = "wasm32"))]
 use std::path::Path;
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
@@ -21,6 +22,7 @@ impl Default for Preferences {
 }
 
 impl Preferences {
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn load(path: &Path) -> Result<Self, String> {
         let bytes = match std::fs::read(path) {
             Ok(bytes) => bytes,
@@ -31,10 +33,14 @@ impl Preferences {
         };
         let value: Self =
             serde_json::from_slice(&bytes).map_err(|e| format!("无法读取界面设置：{e}"))?;
-        if !value.zoom.is_finite() || !(0.75..=2.0).contains(&value.zoom) {
+        if !value.valid() {
             return Err("界面缩放必须为 75% 至 200%".into());
         }
         Ok(value)
+    }
+
+    pub fn valid(&self) -> bool {
+        self.zoom.is_finite() && (0.75..=2.0).contains(&self.zoom)
     }
 
     pub fn apply(&self, ctx: &Context) {

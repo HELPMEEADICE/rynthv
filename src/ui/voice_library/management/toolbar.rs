@@ -187,7 +187,7 @@ fn refresh(app: &mut App, ui: &mut Ui) {
         .add_enabled(
             !app.synthesis.library.is_scanning()
                 && !app.synthesis.library.resource_busy()
-                && app.synthesis.library.settings.has_databases(),
+                && app.synthesis.library.has_databases(),
             Button::new("刷新").min_size(vec2(52.0, 36.0)),
         )
         .clicked()

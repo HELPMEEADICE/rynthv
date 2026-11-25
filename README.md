@@ -4,7 +4,7 @@
   <img src="assets/branding/app-icon.png" alt="RynthV 图标" width="96" height="96">
 </p>
 
-使用 Rust 开发的原生歌声合成工作站，提供 Windows、Linux 和 Android 的 egui 编辑器，以及桌面端可脚本化的 Headless CLI。
+使用 Rust 开发的歌声合成工作站，提供 Windows、Linux、Android 和浏览器的 egui 编辑器，以及桌面端可脚本化的 Headless CLI。
 
 ```sh
 rynthv song.svp
@@ -52,15 +52,21 @@ AppImage 在 Ubuntu 24.04 上构建。运行依赖系统的 glibc 和 `libgcc_s.
 从 [GitHub Releases](https://github.com/HELPMEEADICE/rynthv/releases) 或 [Android 工作流](https://github.com/HELPMEEADICE/rynthv/actions/workflows/android.yml) 获取对应架构的 APK。
 工程导入、触控编辑、声库、CPU 和 Vulkan 推理、签名与设备验证见 [Android 指南](docs/android.md)。
 
+### Web
+
+从 [GitHub Releases](https://github.com/HELPMEEADICE/rynthv/releases) 或 [WebAssembly 工作流](https://github.com/HELPMEEADICE/rynthv/actions/workflows/web.yml) 获取 `rynthv-web.zip`。解压到 HTTPS 静态站点即可使用，声库、工程和推理均留在浏览器本地。
+
+需要支持 WASM SIMD128、JSPI 和 OPFS 的现代浏览器。WebGPU 推理还需要浏览器在 Dedicated Worker 中提供可用的 WebGPU 设备。构建、导入、部署和实机验证见 [Web 指南](docs/web.md)。
+
 ## 声库与配置
 
 在 **管理歌声** 或 **设置 → 歌声资源** 中，选择 **导入声库…** 可打开原生 SV1 AI 的 `.svpk` 或 Flat 的 `.sfpk`、`.sfpks`。在 **发音词典目录（clf-data）** 下选择 **导入词典压缩包…**，可直接导入 `clf-data.zip` 或 `clf-data.7z` 并启用词典。已有资源目录也可在设置中选择，或用 `rynthv -cli config set` 配置。
 声库、词典和用户模型上下文由用户提供。
 
-| 声库类型 | Windows | Linux | Android |
-| --- | --- | --- | --- |
-| 一代声库 | 支持 | 支持 | 复用同一引擎，待真机验证 |
-| 二代声库 | 需要导入模型上下文 | 需要导入模型上下文 | 导入便携上下文文件或手动输入，待真机验证 |
+| 声库类型 | Windows | Linux | Android | Web |
+| --- | --- | --- | --- | --- |
+| 一代声库 | 支持 | 支持 | 复用同一引擎，待真机验证 | `.svpk`、`.sfpk`、`.sfpks` 导入，待浏览器验证 |
+| 二代声库 | 需要导入模型上下文 | 需要导入模型上下文 | 导入便携上下文文件或手动输入，待真机验证 | 导入资源目录与便携模型上下文，待浏览器验证 |
 
 Windows ARM64 和 Linux 可通过上下文文件或手动输入导入二代声库所需的模型上下文。直接从原编辑器的本机会话文件或在线进程导入需要 Windows x64 的 CPUID 身份格式。
 

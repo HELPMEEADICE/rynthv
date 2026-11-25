@@ -4,7 +4,7 @@ use crate::{editor::Editor, midi::MidiFile, model::beats, ui};
 use eframe::egui::Context;
 use std::{
     path::PathBuf,
-    sync::mpsc::{self, Receiver, TryRecvError},
+    sync::mpsc::{Receiver, TryRecvError},
 };
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -40,19 +40,39 @@ impl App {
         );
     }
 
-    fn load_midi_import(&mut self, path: PathBuf, mode: MidiImportMode, ctx: &Context) {
-        let (tx, rx) = mpsc::channel();
-        let source = path.clone();
-        let repaint = ctx.clone();
-        let worker = std::thread::Builder::new()
-            .name("midi-import".into())
-            .spawn(move || {
-                let _ = tx.send(crate::midi::load(&source));
-                repaint.request_repaint();
-            });
-        let phase = match worker {
-            Ok(_) => MidiImportPhase::Loading(rx),
-            Err(error) => MidiImportPhase::Failed(format!("无法启动 MIDI 读取线程：{error}")),
+    pub(super) fn load_midi_import(&mut self, path: PathBuf, mode: MidiImportMode, ctx: &Context) {
+        #[cfg(not(target_arch = "wasm32"))]
+        let phase = {
+            use std::sync::mpsc;
+            let (tx, rx) = mpsc::channel();
+            let source = path.clone();
+            let repaint = ctx.clone();
+            let worker = std::thread::Builder::new()
+                .name("midi-import".into())
+                .spawn(move || {
+                    let _ = tx.send(crate::midi::load(&source));
+                    repaint.request_repaint();
+                });
+            match worker {
+                Ok(_) => MidiImportPhase::Loading(rx),
+                Err(error) => MidiImportPhase::Failed(format!("无法启动 MIDI 读取线程：{error}")),
+            }
+        };
+        #[cfg(target_arch = "wasm32")]
+        let phase = {
+            use crate::{
+                platform::web::{client, protocol::Request},
+                synthesis::notify::Notify,
+            };
+            let repaint = ctx.clone();
+            MidiImportPhase::Loading(
+                client::submit(
+                    Request::Midi { path: path.clone() },
+                    Notify::new(move || repaint.request_repaint()),
+                    |_, _| {},
+                )
+                .into_receiver(),
+            )
         };
         self.midi_import = Some(MidiImport {
             path,

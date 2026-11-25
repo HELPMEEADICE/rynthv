@@ -12,6 +12,19 @@ const HELD: u64 = 0x80;
 const SERIAL_MASK: u64 = !0xff;
 const VOICES: usize = 4;
 
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn audition_pcm(note: u8) -> Vec<f32> {
+    let control = PianoControl::default();
+    let mut synth = PianoSynth::new(48_000, control.clone());
+    control.set_note(Some(note));
+    synth.begin_buffer();
+    let mut samples: Vec<_> = (0..4_800).map(|_| synth.sample()).collect();
+    control.set_note(None);
+    synth.begin_buffer();
+    samples.extend((0..7_200).map(|_| synth.sample()));
+    samples
+}
+
 /// Piano audition belongs to the output device, independently of project PCM
 /// and transport controls. Releasing retains the last strike, so even a click
 /// shorter than a device callback produces an audible attack.
