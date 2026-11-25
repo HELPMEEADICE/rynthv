@@ -59,7 +59,7 @@ pub(crate) fn with_activity<T>(
         vm.attach_current_thread(|env| {
             // The AndroidApp owns this global reference for the duration of the call.
             let activity = unsafe { env.as_cast_raw::<Global<JObject>>(&activity)? };
-            f(env, activity)
+            f(env, &activity)
         })
         .map_err(|error: jni::errors::Error| error.to_string())
     })

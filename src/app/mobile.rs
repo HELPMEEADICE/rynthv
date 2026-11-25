@@ -82,13 +82,13 @@ impl App {
             self.fill_lyrics = None;
             self.rename = None;
             self.time_edit = None;
-        } else if ctx.wants_keyboard_input() {
+        } else if ctx.egui_wants_keyboard_input() {
             ctx.memory_mut(|memory| {
                 if let Some(id) = memory.focused() {
                     memory.surrender_focus(id);
                 }
             });
-        } else {
+        } else if !ui::mobile::back_to_editor(ctx) {
             self.request_file(FileAction::Close, ctx);
         }
     }
