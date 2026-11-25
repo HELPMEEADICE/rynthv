@@ -1,14 +1,15 @@
 """Build the static RynthV site using the locked Rust and wasm-bindgen versions."""
 
 import argparse
+from contextlib import contextmanager
 import hashlib
 import os
 from pathlib import Path
 import shutil
 import subprocess
-import tempfile
 import tomllib
 import urllib.request
+from uuid import uuid4
 import zipfile
 
 
@@ -97,6 +98,17 @@ def publish_site(site, destination, bundle_path):
     (site / "index.html").replace(destination / "index.html")
 
 
+@contextmanager
+def staging_directory(dist):
+    # Renamed files retain their Windows ACLs, so inherit permissions from dist.
+    staging = dist / f"site-{uuid4().hex}"
+    staging.mkdir()
+    try:
+        yield staging
+    finally:
+        shutil.rmtree(staging)
+
+
 def package_site(bindgen, wasm, debug):
     cache = ROOT / "target" / "web-fonts"
     cache.mkdir(parents=True, exist_ok=True)
@@ -107,8 +119,7 @@ def package_site(bindgen, wasm, debug):
         raise SystemExit(f"Expected the generated output directory at {dist}")
     dist.mkdir(exist_ok=True)
 
-    with tempfile.TemporaryDirectory(prefix="site-", dir=dist) as staging:
-        staging = Path(staging)
+    with staging_directory(dist) as staging:
         bundle = staging / "bundle"
         flags = () if debug else ("--remove-name-section", "--remove-producers-section")
         run(bindgen, "--target", "web", "--no-typescript", "--out-dir", bundle, *flags, wasm)
