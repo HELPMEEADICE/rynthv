@@ -221,18 +221,26 @@ impl<'a> Batch<'a> {
         self.activity.readback_count += 1;
         self.activity.readback_bytes += mapped_bytes;
         let slice = staging.slice(..mapped_bytes);
-        let mapped = map_read(self.device, &slice, submission)?;
-        checkpoint(self.device)?;
-        mapped.map_err(|e| MatrixError::Compute(format!("WebGPU readback: {e}")))?;
-        {
+        map_read(self.device, &slice, submission)?
+            .map_err(|e| MatrixError::Compute(format!("WebGPU readback: {e}")))?;
+        let read = (|| {
+            checkpoint(self.device)?;
             let data = slice
                 .get_mapped_range()
                 .map_err(|e| MatrixError::Compute(format!("WebGPU mapped range: {e}")))?;
             let values: &[f32] = bytemuck::cast_slice(&data[..bytes as usize]);
-            if values.iter().any(|value| !value.is_finite()) {
-                return Err(MatrixError::Compute(
-                    "WebGPU inference produced a nonfinite value".into(),
-                ));
+            if let Some((index, value)) = values.iter().enumerate().find(|(_, v)| !v.is_finite()) {
+                let kernels = self
+                    .activity
+                    .gpu_dispatches
+                    .keys()
+                    .copied()
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                return Err(MatrixError::Compute(format!(
+                    "WebGPU inference produced a nonfinite value ({value}) at output element {} in batch [{kernels}]",
+                    first + index,
+                )));
             }
             output.copy_from_slice(values);
             if timestamp_bytes != 0 {
@@ -242,8 +250,10 @@ impl<'a> Batch<'a> {
                     &mut self.activity,
                 );
             }
-        }
+            Ok(())
+        })();
         staging.unmap();
+        read?;
         self.activity.completed_gpu_submissions += 1;
         self.activity.readback_ms += started.elapsed().as_secs_f64() * 1000.0;
         let mut cache = self.device.cache.lock().unwrap();

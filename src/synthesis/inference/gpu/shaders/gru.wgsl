@@ -7,7 +7,8 @@
 var<workgroup> state: array<f32, 2048>;
 
 fn sigmoid(x: f32) -> f32 {
-    return 1.0 / (1.0 + exp(-x));
+    let tail = exp(-abs(x));
+    return select(tail, 1.0, x >= 0.0) / (1.0 + tail);
 }
 
 fn frame_index(step: u32) -> u32 {
@@ -68,7 +69,9 @@ fn gru_recurrent(@builtin(local_invocation_index) lane: u32) {
             let recurrent_terms = recurrent(channel, bank, vec3<f32>(input[base], input[base + hidden], 0.0));
             let reset = sigmoid(recurrent_terms.x);
             let update = sigmoid(recurrent_terms.y);
-            let candidate = tanh(input[base + hidden * 2u] + reset * recurrent_terms.z);
+            let candidate_input = input[base + hidden * 2u] + reset * recurrent_terms.z;
+            // Beyond +/-10 tanh rounds to +/-1 in f32. Avoid overflow in its lowering.
+            let candidate = tanh(clamp(candidate_input, -10.0, 10.0));
             let value = state[bank + channel] * update + candidate * (1.0 - update);
             state[hidden - bank + channel] = value;
             output[frame * width + offset + channel] = value;

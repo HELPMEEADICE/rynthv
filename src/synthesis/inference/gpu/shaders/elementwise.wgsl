@@ -9,7 +9,15 @@ fn index(wg: vec3<u32>, lane: u32) -> u32 {
 }
 
 fn sigmoid(x: f32) -> f32 {
-    return 1.0 / (1.0 + exp(-x));
+    // Keep exp finite even for large negative logits.
+    let tail = exp(-abs(x));
+    return select(tail, 1.0, x >= 0.0) / (1.0 + tail);
+}
+
+fn saturated_tanh(x: f32) -> f32 {
+    // tanh has already rounded to +/-1 in f32 at +/-10. Bound its input
+    // so implementations that lower tanh to exponentials cannot overflow.
+    return tanh(clamp(x, -10.0, 10.0));
 }
 
 @compute @workgroup_size(64)
@@ -21,7 +29,7 @@ fn activation(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_in
     let x = input[i];
     switch params[0].z {
         case 1u: { output[i] = select(0.0, x, x > 0.0); }
-        case 2u: { output[i] = tanh(x); }
+        case 2u: { output[i] = saturated_tanh(x); }
         case 3u: { output[i] = sigmoid(x); }
         case 4u: { output[i] = x * sigmoid(x); }
         case 5u: { output[i] = select(bitcast<f32>(params[0].w), 1.0, x > 0.0) * x; }
@@ -107,7 +115,7 @@ fn gated_activation(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocat
         signal += a[row];
         gate += a[row + channels];
     }
-    output[i] = tanh(signal) * sigmoid(gate);
+    output[i] = saturated_tanh(signal) * sigmoid(gate);
 }
 
 @compute @workgroup_size(64)
