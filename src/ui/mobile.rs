@@ -15,7 +15,7 @@ enum Page {
     Mixer,
 }
 
-const PAGES: [(Page, &'static str); 6] = [
+const PAGES: [(Page, &str); 6] = [
     (Page::Editor, "卷帘"),
     (Page::Panel(Column::Note), "音符"),
     (Page::Panel(Column::Voice), "歌声"),
