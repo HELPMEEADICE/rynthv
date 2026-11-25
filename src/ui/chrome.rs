@@ -36,6 +36,10 @@ pub fn menus(app: &mut App, ui: &mut Ui) {
             if item(ui, "打开…", "Ctrl+O", true) {
                 app.request_file(FileAction::Open, &ctx);
             }
+            #[cfg(target_os = "android")]
+            if item(ui, "本机工程…", "", true) {
+                app.request_file(FileAction::OpenLocal, &ctx);
+            }
             ui.separator();
             if item(ui, "保存", "Ctrl+S", true) {
                 app.save_project(false, &ctx);

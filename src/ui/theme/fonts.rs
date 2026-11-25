@@ -25,8 +25,10 @@ pub fn install(ctx: &Context) -> Result<(), String> {
 }
 
 fn load(fonts: &mut FontDefinitions) -> Result<(), String> {
-    let regular = system_font(false)?;
-    fonts.font_data.insert("Chinese".into(), regular.into());
+    let regular = std::sync::Arc::new(system_font(false)?);
+    #[cfg(target_os = "android")]
+    let bold = regular.clone();
+    fonts.font_data.insert("Chinese".into(), regular);
     fonts
         .families
         .entry(FontFamily::Proportional)
@@ -37,8 +39,9 @@ fn load(fonts: &mut FontDefinitions) -> Result<(), String> {
         .entry(FontFamily::Monospace)
         .or_default()
         .push("Chinese".into());
-    let bold = system_font(true)?;
-    fonts.font_data.insert("ChineseBold".into(), bold.into());
+    #[cfg(not(target_os = "android"))]
+    let bold = std::sync::Arc::new(system_font(true)?);
+    fonts.font_data.insert("ChineseBold".into(), bold);
     Ok(())
 }
 
@@ -68,8 +71,7 @@ fn system_font(bold: bool) -> Result<FontData, String> {
 }
 
 #[cfg(target_os = "android")]
-fn system_font(bold: bool) -> Result<FontData, String> {
-    let _ = bold;
+fn system_font(_bold: bool) -> Result<FontData, String> {
     read_font(Path::new("/system/fonts/NotoSansCJK-Regular.ttc"), 2)
 }
 

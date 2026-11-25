@@ -1,4 +1,4 @@
-use super::{App, FileAction};
+use super::App;
 use crate::{platform::android::lifecycle, ui};
 use eframe::egui::{Context, Popup};
 
@@ -74,6 +74,8 @@ impl App {
             self.settings = false;
         } else if self.voice_manager {
             self.voice_manager = false;
+        } else if self.local_projects.is_some() {
+            self.local_projects = None;
         } else if self.about {
             self.about = false;
         } else if self.midi_import.is_some() {
@@ -89,7 +91,11 @@ impl App {
                 }
             });
         } else if !ui::mobile::back_to_editor(ctx) {
-            self.request_file(FileAction::Close, ctx);
+            self.persist_layout();
+            self.update_recovery(ctx);
+            if let Err(error) = crate::platform::android::move_to_background() {
+                self.error = Some(error);
+            }
         }
     }
 }

@@ -259,7 +259,7 @@ fn start_export(app: &mut App) {
     #[cfg(not(target_os = "android"))]
     let request = ExportRequest::from_project(&app.editor.project);
     #[cfg(target_os = "android")]
-    let request = crate::platform::config_directory().and_then(|root| {
+    let request = crate::platform::android::cache_directory().and_then(|root| {
         ExportRequest::with_directory(
             &app.editor.project,
             Some(root.join("renders").join(uuid::Uuid::new_v4().to_string())),

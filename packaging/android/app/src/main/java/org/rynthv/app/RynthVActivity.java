@@ -67,6 +67,7 @@ public final class RynthVActivity extends NativeActivity {
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         super.onCreate(state);
         editorInput = new EditorInput(this, () -> nativeEvent(6));
+        files.execute(documents::pruneTransientFiles);
         audioManager.registerAudioDeviceCallback(routes, new Handler(Looper.getMainLooper()));
         setVolumeControlStream(AudioManager.STREAM_MUSIC);
         if (Build.VERSION.SDK_INT >= 33) {
@@ -135,14 +136,18 @@ public final class RynthVActivity extends NativeActivity {
         return getFilesDir().getAbsolutePath();
     }
 
+    String rynthvCacheDirectory() {
+        return getCacheDir().getAbsolutePath();
+    }
+
     long rynthvTotalMemory() {
         ActivityManager.MemoryInfo info = new ActivityManager.MemoryInfo();
         getSystemService(ActivityManager.class).getMemoryInfo(info);
         return info.totalMem;
     }
 
-    void rynthvFinish() {
-        runOnUiThread(this::finish);
+    void rynthvMoveToBackground() {
+        runOnUiThread(() -> moveTaskToBack(true));
     }
 
     void rynthvShowFatalError(String message) {

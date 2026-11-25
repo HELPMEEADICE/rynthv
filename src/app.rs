@@ -25,7 +25,10 @@ use std::{
 pub enum FileAction {
     New,
     Open,
+    #[cfg(target_os = "android")]
+    OpenLocal,
     ImportMidi,
+    #[cfg(not(target_os = "android"))]
     Close,
 }
 pub struct App {
@@ -72,6 +75,9 @@ pub struct App {
     recovered_dirty: bool,
     #[cfg(target_os = "android")]
     audio_wanted: bool,
+    #[cfg(target_os = "android")]
+    local_projects: Option<Vec<PathBuf>>,
+    #[cfg(not(target_os = "android"))]
     pub allow_close: bool,
     pub status: String,
     settings_path: Option<PathBuf>,
@@ -178,6 +184,9 @@ impl App {
             recovered_dirty: false,
             #[cfg(target_os = "android")]
             audio_wanted: false,
+            #[cfg(target_os = "android")]
+            local_projects: None,
+            #[cfg(not(target_os = "android"))]
             allow_close: false,
             status: String::new(),
             settings_path,
@@ -257,17 +266,14 @@ impl App {
                     .filter("Synthesizer V 工程", &["svp"]),
                 |app, _, path| app.open_path(path),
             ),
+            #[cfg(target_os = "android")]
+            FileAction::OpenLocal => self.list_local_projects(),
             FileAction::ImportMidi => self.begin_midi_import(MidiImportMode::NewProject, ctx),
+            #[cfg(not(target_os = "android"))]
             FileAction::Close => {
                 self.allow_close = true;
                 self.persist_layout();
-                #[cfg(not(target_os = "android"))]
                 ctx.send_viewport_cmd(ViewportCommand::Close);
-                #[cfg(target_os = "android")]
-                if let Err(error) = crate::platform::android::finish() {
-                    self.error = Some(error);
-                    self.allow_close = false;
-                }
             }
         }
     }
@@ -360,6 +366,8 @@ impl App {
         }
     }
     fn dialogs(&mut self, ctx: &Context) {
+        #[cfg(target_os = "android")]
+        self.local_project_dialog(ctx);
         if let Some(action) = self.pending {
             Modal::new(Id::new("unsaved")).show(ctx, |ui| {
                 ui.heading("保存工程更改？");
@@ -404,6 +412,15 @@ impl App {
             ui::settings::show(self, ctx);
         }
         ui::voice_library::dialogs(self, ctx);
+        #[cfg(target_os = "android")]
+        if self.picker.is_some() {
+            Modal::new(Id::new("android-file-operation")).show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                    ui.label("正在处理文件…");
+                });
+            });
+        }
     }
 }
 impl eframe::App for App {
@@ -426,6 +443,7 @@ impl eframe::App for App {
         self.synthesis.poll();
         self.poll_audio_import();
         self.poll_midi_import();
+        #[cfg(not(target_os = "android"))]
         if ctx.input(|i| i.viewport().close_requested()) && !self.allow_close {
             ctx.send_viewport_cmd(ViewportCommand::CancelClose);
             self.request_file(FileAction::Close, &ctx);

@@ -4,6 +4,78 @@ use eframe::egui::Context;
 use std::path::PathBuf;
 
 impl App {
+    #[cfg(target_os = "android")]
+    pub(super) fn list_local_projects(&mut self) {
+        let result = (|| {
+            let root = crate::platform::config_directory()?.join("projects");
+            std::fs::create_dir_all(&root).map_err(|error| error.to_string())?;
+            let mut files = Vec::new();
+            for directory in root
+                .read_dir()
+                .map_err(|error| error.to_string())?
+                .flatten()
+            {
+                if let Ok(entries) = directory.path().read_dir() {
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if path.is_file()
+                            && path
+                                .extension()
+                                .is_some_and(|ext| ext.eq_ignore_ascii_case("svp"))
+                        {
+                            let modified = entry.metadata().and_then(|meta| meta.modified()).ok();
+                            files.push((modified, path));
+                        }
+                    }
+                }
+            }
+            files.sort_by(|a, b| b.cmp(a));
+            Ok(files.into_iter().map(|(_, path)| path).collect())
+        })();
+        match result {
+            Ok(files) => self.local_projects = Some(files),
+            Err(error) => self.error = Some(error),
+        }
+    }
+
+    #[cfg(target_os = "android")]
+    pub(super) fn local_project_dialog(&mut self, ctx: &Context) {
+        use eframe::egui::{Button, Id, Modal, ScrollArea, vec2};
+        let Some(files) = &self.local_projects else {
+            return;
+        };
+        let mut selected = None;
+        let mut close = false;
+        let modal = Modal::new(Id::new("local-projects")).show(ctx, |ui| {
+            ui.set_width((ctx.content_rect().width() - 30.0).clamp(220.0, 440.0));
+            ui.heading("本机工程");
+            if files.is_empty() {
+                ui.weak("保存的手机工程会显示在这里。");
+            }
+            ScrollArea::vertical()
+                .max_height(ctx.content_rect().height() * 0.55)
+                .show(ui, |ui| {
+                    for (index, file) in files.iter().enumerate() {
+                        let name = file.file_stem().unwrap_or_default().to_string_lossy();
+                        if ui
+                            .add_sized(vec2(ui.available_width(), 44.0), Button::new(name))
+                            .clicked()
+                        {
+                            selected = Some(index);
+                        }
+                    }
+                });
+            close = ui.button("关闭").clicked();
+        });
+        if let Some(index) = selected {
+            let path = files[index].clone();
+            self.local_projects = None;
+            self.open_path(path);
+        } else if close || modal.should_close() {
+            self.local_projects = None;
+        }
+    }
+
     pub fn open_path(&mut self, path: PathBuf) {
         ui::phonemes::phoneme_deactivate(self);
         ui::piano::cancel_audition(self);

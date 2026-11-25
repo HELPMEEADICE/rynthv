@@ -20,6 +20,7 @@ thread_local! {
 }
 static REPAINT: Mutex<Option<Context>> = Mutex::new(None);
 static FILES_DIRECTORY: OnceLock<Result<PathBuf, String>> = OnceLock::new();
+static CACHE_DIRECTORY: OnceLock<Result<PathBuf, String>> = OnceLock::new();
 static TOTAL_MEMORY: OnceLock<u64> = OnceLock::new();
 
 pub(crate) fn install_activity(app: AndroidApp) {
@@ -28,6 +29,11 @@ pub(crate) fn install_activity(app: AndroidApp) {
         string_method(jni::jni_str!("rynthvFilesDirectory"))?
             .map(PathBuf::from)
             .ok_or_else(|| "Android 无法定位应用私有目录".into())
+    });
+    CACHE_DIRECTORY.get_or_init(|| {
+        string_method(jni::jni_str!("rynthvCacheDirectory"))?
+            .map(PathBuf::from)
+            .ok_or_else(|| "Android 无法定位应用缓存目录".into())
     });
     TOTAL_MEMORY.get_or_init(|| {
         with_activity(|env, activity| {
@@ -109,11 +115,18 @@ pub(crate) fn files_directory() -> Result<PathBuf, String> {
         .unwrap_or_else(|| Err("Android 应用目录未初始化".into()))
 }
 
-pub(crate) fn finish() -> Result<(), String> {
+pub(crate) fn cache_directory() -> Result<PathBuf, String> {
+    CACHE_DIRECTORY
+        .get()
+        .cloned()
+        .unwrap_or_else(|| Err("Android 缓存目录未初始化".into()))
+}
+
+pub(crate) fn move_to_background() -> Result<(), String> {
     with_activity(|env, activity| {
         env.call_method(
             activity,
-            jni::jni_str!("rynthvFinish"),
+            jni::jni_str!("rynthvMoveToBackground"),
             jni::jni_sig!("()V"),
             &[],
         )?;

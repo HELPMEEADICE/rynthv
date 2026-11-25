@@ -8,6 +8,7 @@ import android.os.ParcelFileDescriptor;
 import android.os.StatFs;
 import android.provider.DocumentsContract;
 import android.provider.DocumentsContract.Document;
+import android.util.Log;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -33,11 +34,13 @@ final class DocumentStore {
     private final ContentResolver resolver;
     private final File root;
     private final File shares;
+    private final File renders;
 
     DocumentStore(Context context) {
         resolver = context.getContentResolver();
         root = new File(context.getFilesDir(), "RynthV/imports");
         shares = new File(context.getCacheDir(), "shares");
+        renders = new File(context.getCacheDir(), "renders");
     }
 
     File importFile(Uri uri, String extensions) throws IOException {
@@ -47,8 +50,12 @@ final class DocumentStore {
             if (!extensions.isEmpty() && !hasExtension(name, extensions)) {
                 throw new IOException("不支持此文件类型：" + name);
             }
-            File parent = new File(new File(root, "files"), hash(uri.toString()));
-            return copyDocument(uri, parent, name, rows.getLong(1), rows.getLong(2));
+            long bytes = rows.getLong(1);
+            long modified = rows.getLong(2);
+            String revision = bytes > 0 && modified > 0
+                ? hash(uri + "\n" + bytes + "\n" + modified) : UUID.randomUUID().toString();
+            File parent = new File(new File(root, "files"), revision);
+            return copyDocument(uri, parent, name, bytes, modified);
         }
     }
 
@@ -136,6 +143,29 @@ final class DocumentStore {
         requireSpace(directory, source.length());
         Files.copy(source.toPath(), destination.toPath());
         return destination;
+    }
+
+    void pruneTransientFiles() {
+        long cutoff = System.currentTimeMillis() - 3L * 24 * 60 * 60 * 1000;
+        pruneTransientFiles(shares, cutoff);
+        pruneTransientFiles(renders, cutoff);
+    }
+
+    private static void pruneTransientFiles(File root, long cutoff) {
+        File[] folders = root.listFiles(path -> path.isDirectory() && path.lastModified() < cutoff);
+        if (folders == null) return;
+        for (File folder : folders) {
+            File[] files = folder.listFiles();
+            if (files == null) continue;
+            try {
+                for (File file : files) {
+                    if (file.isFile()) Files.deleteIfExists(file.toPath());
+                }
+                Files.deleteIfExists(folder.toPath());
+            } catch (IOException error) {
+                Log.w("RynthV", "Could not prune temporary exports", error);
+            }
+        }
     }
 
     private static void copy(FileInputStream input, FileOutputStream output, File volume)
