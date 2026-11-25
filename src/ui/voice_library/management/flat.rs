@@ -1,6 +1,7 @@
 use super::super::{error_label, text, weak};
 use crate::{
     app::App,
+    app::picker::{Picker, Selection},
     synthesis::voice::{VoiceCatalogEntry, flat::ModelRole},
 };
 use eframe::egui::*;
@@ -13,11 +14,13 @@ pub(super) fn import_button(app: &mut App, ui: &mut Ui) {
             Button::new("导入 Flat…").min_size(vec2(98.0, 36.0)),
         )
         .clicked()
-        && let Some(paths) = rfd::FileDialog::new()
-            .add_filter("SynthV Flat", &["sfpk", "sfpks"])
-            .pick_files()
     {
-        app.synthesis.import_flat_voices(paths);
+        app.pick(
+            ui.ctx(),
+            Picker::new(Selection::Files, "导入 Flat 声库")
+                .filter("SynthV Flat", &["sfpk", "sfpks"]),
+            |app, _, paths| app.synthesis.import_flat_voices(paths),
+        );
     }
 }
 

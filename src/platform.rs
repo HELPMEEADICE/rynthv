@@ -2,6 +2,9 @@
 
 use std::path::PathBuf;
 
+#[cfg(all(target_os = "android", feature = "gui"))]
+pub(crate) mod android;
+
 #[cfg(windows)]
 mod windows;
 
@@ -50,7 +53,16 @@ fn config_root() -> Result<PathBuf, String> {
         .ok_or_else(|| "XDG_CONFIG_HOME 和 HOME 未设置为绝对路径，无法定位用户配置目录。".into())
 }
 
-#[cfg(not(any(windows, target_os = "linux")))]
+#[cfg(all(target_os = "android", feature = "gui"))]
+fn config_root() -> Result<PathBuf, String> {
+    android::files_directory()
+}
+
+#[cfg(not(any(
+    windows,
+    target_os = "linux",
+    all(target_os = "android", feature = "gui")
+)))]
 fn config_root() -> Result<PathBuf, String> {
     Err("当前平台尚未支持用户配置目录。".into())
 }

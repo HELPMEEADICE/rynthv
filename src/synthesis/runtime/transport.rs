@@ -1,6 +1,17 @@
 use super::{Runtime, worker};
 
 impl Runtime {
+    #[cfg(target_os = "android")]
+    pub(crate) fn reset_android_audio(&mut self, seconds: f64, active: bool) {
+        self.desired_seconds = seconds;
+        self.playback.reset_device();
+        if active {
+            self.refresh_playback();
+        } else {
+            self.desired_playing = false;
+        }
+    }
+
     pub fn set_loop_range(&mut self, range: Option<(f64, f64)>) {
         if range == self.loop_range {
             return;

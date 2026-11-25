@@ -8,6 +8,7 @@ use std::{
 
 /// Content fingerprint used for optimistic writes across processes.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[cfg_attr(target_os = "android", derive(serde::Serialize, serde::Deserialize))]
 pub struct Revision([u8; 32]);
 
 impl Revision {
@@ -49,6 +50,14 @@ impl Revision {
 pub struct ProjectFile {
     path: PathBuf,
     _lock: File,
+}
+
+impl Drop for ProjectFile {
+    fn drop(&mut self) {
+        // Release the lock even if a concurrent spawn briefly inherited the
+        // open file description before exec closes its copy.
+        let _ = self._lock.unlock();
+    }
 }
 
 impl ProjectFile {

@@ -1,0 +1,183 @@
+name: Android
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+    secrets:
+      ANDROID_KEYSTORE_BASE64:
+        required: false
+      ANDROID_KEYSTORE_PASSWORD:
+        required: false
+      ANDROID_KEY_ALIAS:
+        required: false
+      ANDROID_KEY_PASSWORD:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    name: Package Android ${{ matrix.abi }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - abi: arm64-v8a
+            target: aarch64-linux-android
+            clang: aarch64-linux-android26-clang
+          - abi: x86_64
+            target: x86_64-linux-android
+            clang: x86_64-linux-android26-clang
+    env:
+      ANDROID_ABI: ${{ matrix.abi }}
+      ANDROID_NDK_VERSION: 28.2.13676358
+      ANDROID_BUILD_TOOLS: 36.0.0
+      CARGO_PROFILE_RELEASE_OPT_LEVEL: z
+      CARGO_PROFILE_RELEASE_LTO: fat
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
+      CARGO_PROFILE_RELEASE_PANIC: abort
+      CARGO_PROFILE_RELEASE_STRIP: debuginfo
+      CARGO_PROFILE_RELEASE_DEBUG: "false"
+      CARGO_PROFILE_RELEASE_INCREMENTAL: "false"
+      CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS: "false"
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: ${{ matrix.target }}
+          cache: false
+      - name: Cache Rust builds
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: android-${{ matrix.abi }}-ndk-r28c-full-lto
+          cache-on-failure: true
+      - name: Install JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.6.0'
+      - name: Install Android command-line tools
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '12266719'
+          packages: ''
+          log-accepted-android-sdk-licenses: false
+      - name: Install Android SDK packages and configure the linker
+        env:
+          RUST_TARGET: ${{ matrix.target }}
+          CLANG_NAME: ${{ matrix.clang }}
+        run: |
+          set -euo pipefail
+          sdkmanager --install "platforms;android-36" "build-tools;$ANDROID_BUILD_TOOLS" "ndk;$ANDROID_NDK_VERSION"
+          ndk_bin="$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          cargo_target="${RUST_TARGET^^}"
+          cargo_target="${cargo_target//-/_}"
+          c_target="${RUST_TARGET//-/_}"
+          {
+            printf 'CARGO_TARGET_%s_LINKER=%s/%s\n' "$cargo_target" "$ndk_bin" "$CLANG_NAME"
+            printf 'CC_%s=%s/%s\n' "$c_target" "$ndk_bin" "$CLANG_NAME"
+            printf 'AR_%s=%s/llvm-ar\n' "$c_target" "$ndk_bin"
+            printf 'ANDROID_NDK_BIN=%s\n' "$ndk_bin"
+          } >> "$GITHUB_ENV"
+      - name: Check dependency isolation and lint Android
+        env:
+          RUST_TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          cargo tree --locked -p rynthv-android --target "$RUST_TARGET" -e normal --prefix none > android-dependencies.txt
+          if grep -E '^(rfd|rustyline|clap|ctrlc|shell-words) ' android-dependencies.txt; then
+            exit 1
+          fi
+          cargo check --locked -p rynthv-android --target "$RUST_TARGET"
+          cargo clippy --locked -p rynthv-android --target "$RUST_TARGET" -- -D warnings
+          cargo clippy --locked -p rynthv --no-default-features --features gui --lib --target "$RUST_TARGET" -- -D warnings
+      - name: Link Android shared library
+        env:
+          RUST_TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          cargo build --locked --release -p rynthv-android --target "$RUST_TARGET"
+          install -Dm755 "target/$RUST_TARGET/release/librynthv_android.so" \
+            "packaging/android/app/src/main/jniLibs/$ANDROID_ABI/librynthv_android.so"
+      - name: Prepare the APK version and signing identity
+        env:
+          SIGNING_BASE64: ${{ github.event_name == 'release' && secrets.ANDROID_KEYSTORE_BASE64 || '' }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keystore="$RUNNER_TEMP/rynthv-signing.p12"
+          if [[ -n "$SIGNING_BASE64" ]]; then
+            : "${SIGNING_STORE_PASSWORD:?Missing ANDROID_KEYSTORE_PASSWORD}"
+            : "${SIGNING_KEY_ALIAS:?Missing ANDROID_KEY_ALIAS}"
+            : "${SIGNING_KEY_PASSWORD:?Missing ANDROID_KEY_PASSWORD}"
+            printf '%s' "$SIGNING_BASE64" | base64 --decode > "$keystore"
+            mode=release
+          else
+            mode=test
+            SIGNING_STORE_PASSWORD="$(openssl rand -hex 24)"
+            echo "::add-mask::$SIGNING_STORE_PASSWORD"
+            SIGNING_KEY_ALIAS=rynthv-ci-test
+            SIGNING_KEY_PASSWORD="$SIGNING_STORE_PASSWORD"
+            export SIGNING_STORE_PASSWORD
+            keytool -genkeypair -storetype PKCS12 -keystore "$keystore" \
+              -alias "$SIGNING_KEY_ALIAS" -storepass:env SIGNING_STORE_PASSWORD \
+              -keyalg RSA -keysize 3072 -validity 30 -dname 'CN=RynthV CI Test APK'
+          fi
+          version="$(cargo metadata --locked --no-deps --format-version 1 | jq -er '.packages[] | select(.name == "rynthv") | .version')"
+          code="$(git show -s --format=%ct HEAD)"
+          {
+            printf 'ANDROID_VERSION_NAME=%s\nANDROID_VERSION_CODE=%s\n' "$version" "$code"
+            printf 'ANDROID_SIGNING_MODE=%s\nANDROID_SIGNING_FILE=%s\n' "$mode" "$keystore"
+            printf 'ANDROID_KEYSTORE_PASSWORD=%s\n' "$SIGNING_STORE_PASSWORD"
+            printf 'ANDROID_KEY_ALIAS=%s\n' "$SIGNING_KEY_ALIAS"
+            printf 'ANDROID_KEY_PASSWORD=%s\n' "$SIGNING_KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+          if [[ "$mode" == test ]]; then
+            echo "Test-signed APK. This temporary certificate only supports a fresh install." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Assemble signed APK
+        run: gradle -p packaging/android --no-daemon :app:assembleRelease
+      - name: Verify manifest, signature, ABI, and 16 KiB alignment
+        run: |
+          set -euo pipefail
+          apk="dist/rynthv-android-$ANDROID_ABI.apk"
+          install -Dm644 packaging/android/app/build/outputs/apk/release/app-release.apk "$apk"
+          tools="$ANDROID_HOME/build-tools/$ANDROID_BUILD_TOOLS"
+          "$tools/apksigner" verify --verbose --print-certs "$apk"
+          "$tools/zipalign" -c -P 16 -v 4 "$apk"
+          manifest="$("$tools/aapt" dump badging "$apk")"
+          printf '%s\n' "$manifest"
+          application=org.rynthv.app
+          if [[ "$ANDROID_SIGNING_MODE" == test ]]; then application+=.test; fi
+          grep -F "package: name='$application' versionCode='$ANDROID_VERSION_CODE' versionName='$ANDROID_VERSION_NAME'" <<< "$manifest"
+          grep -Fx "sdkVersion:'26'" <<< "$manifest"
+          grep -Fx "targetSdkVersion:'36'" <<< "$manifest"
+          grep -F "launchable-activity: name='org.rynthv.app.RynthVActivity'" <<< "$manifest"
+          grep -Fx "native-code: '$ANDROID_ABI'" <<< "$manifest"
+          if grep -F 'android.permission.MANAGE_EXTERNAL_STORAGE' <<< "$manifest"; then exit 1; fi
+          python3 packaging/android/verify_apk.py "$apk" "$ANDROID_ABI" \
+            "$ANDROID_NDK_BIN/llvm-readelf" "$ANDROID_NDK_BIN/llvm-nm"
+      - name: Upload standalone APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: rynthv-android-${{ matrix.abi }}
+          path: dist/rynthv-android-${{ matrix.abi }}.apk
+          if-no-files-found: error
+          compression-level: 0
+      - name: Remove signing material
+        if: always()
+        run: rm -f -- "$RUNNER_TEMP/rynthv-signing.p12"

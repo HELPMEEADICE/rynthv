@@ -31,6 +31,13 @@ impl ExportRequest {
     }
 
     pub fn from_project(project: &Project) -> Result<Self, String> {
+        Self::with_directory(project, None)
+    }
+
+    pub(crate) fn with_directory(
+        project: &Project,
+        directory: Option<PathBuf>,
+    ) -> Result<Self, String> {
         let config = &project.render_config;
         crate::synthesis::mixing_options::validate_export_bypass(config)?;
         crate::synthesis::mixing_options::validate_project_mixer(
@@ -52,7 +59,7 @@ impl ExportRequest {
                 .and_then(serde_json::Value::as_u64)
                 .unwrap_or(0)
         };
-        let directory = PathBuf::from(text("destination"));
+        let directory = directory.unwrap_or_else(|| PathBuf::from(text("destination")));
         if directory.as_os_str().is_empty() || (directory.exists() && !directory.is_dir()) {
             return Err("请选择有效的目标文件夹".into());
         }
@@ -222,12 +229,14 @@ impl Runtime {
         let repaint = self.repaint.clone();
         let (tx, rx) = mpsc::sync_channel(1);
         self.export_result = None;
+        #[cfg(target_os = "android")]
+        let cancellation = crate::platform::android::lifecycle::export_cancellation();
         match thread::Builder::new()
             .name("audio-export".into())
             .spawn(move || {
                 let _wake = WakeOnExit(repaint);
                 let sender = tx;
-                let result = (|| {
+                let export = || {
                     // Validate all selected sources before writing the first file.
                     let recordings_for = |stem| {
                         if stem == VocalStem::Aspiration {
@@ -280,7 +289,18 @@ impl Runtime {
                         written.push(output.path.clone());
                     }
                     Ok(written)
-                })();
+                };
+                #[cfg(not(target_os = "android"))]
+                let result = export();
+                #[cfg(target_os = "android")]
+                let result = crate::synthesis::execution::scope(cancellation.clone(), export)
+                    .map_err(|error| {
+                        if cancellation.is_cancelled() {
+                            "应用已进入后台，WAV 渲染已中止。".to_owned()
+                        } else {
+                            error
+                        }
+                    });
                 let _ = sender.send(result);
             }) {
             Ok(_) => self.export = Some(rx),

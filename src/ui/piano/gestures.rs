@@ -48,9 +48,15 @@ pub(super) fn start_gesture(
         if !app.editor.selected.contains(&note.id) {
             app.editor.selected = BTreeSet::from([note.id]);
         }
-        let kind = if origin.x > r.right() - 6.0 {
+        let touch = cfg!(target_os = "android") && ui.input(|input| input.any_touches());
+        let edge = if touch {
+            (r.width() * 0.25).clamp(2.0, 12.0)
+        } else {
+            6.0
+        };
+        let kind = if origin.x > r.right() - edge {
             NoteDrag::Right
-        } else if origin.x < r.left() + 6.0 {
+        } else if origin.x < r.left() + edge {
             NoteDrag::Left
         } else {
             NoteDrag::Move

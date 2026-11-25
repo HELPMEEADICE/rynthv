@@ -51,6 +51,13 @@ pub(super) fn settings(app: &mut App, ui: &mut Ui) {
         row(ui, "当前显卡", |ui| {
             ui.add(Label::new(device.id.to_string()).truncate());
         });
+        #[cfg(target_os = "android")]
+        ui.weak(format!(
+            "{} {} · {:.0} MiB / 存储缓冲区",
+            device.driver,
+            device.driver_info,
+            device.max_storage_binding_bytes as f64 / (1024.0 * 1024.0),
+        ));
     }
     let initialization = match (status.requested, &status.device, &status.error) {
         (_, Some(_), None) => "已就绪 · 支持计算",

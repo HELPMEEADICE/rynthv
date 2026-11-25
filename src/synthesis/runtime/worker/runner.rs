@@ -35,6 +35,10 @@ pub(super) fn run(
     if !alive.load(Ordering::Acquire) {
         return;
     }
+    #[cfg(target_os = "android")]
+    let Some(loading_permit) = super::mobile::Permit::acquire(&alive) else {
+        return;
+    };
     let loading_checkpoint = || {
         if alive.load(Ordering::Acquire) {
             Ok(())
@@ -123,6 +127,8 @@ pub(super) fn run(
             return;
         }
     };
+    #[cfg(target_os = "android")]
+    drop(loading_permit);
     let _ = events.send(Event::Ready);
     let mut state = WorkState::new();
     while alive.load(Ordering::Acquire) {
@@ -136,6 +142,10 @@ pub(super) fn run(
                 Err(mpsc::RecvTimeoutError::Disconnected) => break,
             }
             continue;
+        };
+        #[cfg(target_os = "android")]
+        let Some(_permit) = super::mobile::Permit::acquire(&alive) else {
+            break;
         };
         if !state.sessions.contains_key(&owner) {
             if let Some(job) = state.cache.take_owner(owner) {

@@ -102,7 +102,7 @@ impl Default for ViewState {
             panel_width: 234.0,
             arrangement_first: true,
             arrangement_height: 264.0,
-            arrangement_collapsed: false,
+            arrangement_collapsed: cfg!(target_os = "android"),
             piano: Viewport {
                 start: 0.0,
                 beat_width: 160.0,

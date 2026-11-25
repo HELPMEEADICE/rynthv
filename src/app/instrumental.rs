@@ -1,4 +1,5 @@
 use super::App;
+use super::picker::{Picker, Selection};
 use crate::model::{AudioClip, EntityId};
 use eframe::egui::Context;
 use std::path::PathBuf;
@@ -21,26 +22,26 @@ impl App {
 
     fn select_audio(&mut self, target: Option<EntityId>, relink: bool, ctx: &Context) {
         crate::ui::phonemes::phoneme_deactivate(self);
-        let Some(path) = rfd::FileDialog::new()
-            .set_title(if relink {
+        let picker = Picker::new(
+            Selection::File,
+            if relink {
                 "重新链接音频"
             } else {
                 "导入伴奏"
-            })
-            .add_filter(
-                "音频文件",
-                &[
-                    "wav", "mp3", "flac", "ogg", "aif", "aiff", "aac", "m4a", "mp4",
-                ],
-            )
-            .pick_file()
-        else {
-            return;
-        };
-        self.commit_lyric();
-        self.editor.finish();
-        let track = target.unwrap_or_else(|| self.editor.add_instrumental_track());
-        self.begin_audio_import(track, path, relink, ctx);
+            },
+        )
+        .filter(
+            "音频文件",
+            &[
+                "wav", "mp3", "flac", "ogg", "aif", "aiff", "aac", "m4a", "mp4",
+            ],
+        );
+        self.pick_one(ctx, picker, move |app, ctx, path| {
+            app.commit_lyric();
+            app.editor.finish();
+            let track = target.unwrap_or_else(|| app.editor.add_instrumental_track());
+            app.begin_audio_import(track, path, relink, ctx);
+        });
     }
 
     pub fn reload_audio(&mut self, track: EntityId, ctx: &Context) {
@@ -133,7 +134,7 @@ impl App {
     }
 }
 
-fn notify(ctx: &eframe::egui::Context) -> rynthv::synthesis::notify::Notify {
+fn notify(ctx: &eframe::egui::Context) -> crate::synthesis::notify::Notify {
     let ctx = ctx.clone();
-    rynthv::synthesis::notify::Notify::new(move || ctx.request_repaint())
+    crate::synthesis::notify::Notify::new(move || ctx.request_repaint())
 }

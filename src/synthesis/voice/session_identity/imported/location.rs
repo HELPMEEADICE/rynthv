@@ -26,7 +26,7 @@ pub(super) fn create_temporary(path: &Path) -> io::Result<File> {
 }
 
 fn options() -> OpenOptions {
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     {
         use std::os::unix::fs::OpenOptionsExt;
 
@@ -37,7 +37,7 @@ fn options() -> OpenOptions {
         options.custom_flags(O_NOFOLLOW).mode(0o600);
         options
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(not(any(target_os = "linux", target_os = "android")))]
     {
         OpenOptions::new()
     }
@@ -89,7 +89,7 @@ fn normalize(path: &str) -> String {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub(super) fn verify(file: &File, expected: &Path) -> Result<()> {
     use std::os::{fd::AsRawFd, unix::fs::MetadataExt};
 
@@ -116,7 +116,7 @@ pub(super) fn verify(file: &File, expected: &Path) -> Result<()> {
     Ok(())
 }
 
-#[cfg(not(any(windows, target_os = "linux")))]
+#[cfg(not(any(windows, target_os = "linux", target_os = "android")))]
 pub(super) fn verify(_file: &File, _expected: &Path) -> Result<()> {
     Err(VoiceError::new(
         "模型上下文导入当前仅支持 Windows 和 Linux。",

@@ -1,7 +1,7 @@
 use super::clipboard::ParameterClipboard;
 use super::{active_lane, editable_bounds, reconcile};
 use crate::{app::App, model::QUARTER};
-use eframe::egui::{Context, ViewportCommand};
+use eframe::egui::Context;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub fn parameter_active(app: &App) -> bool {
@@ -106,9 +106,16 @@ pub fn parameter_delete(app: &mut App) {
     }
 }
 
-pub fn parameter_paste(app: &mut App, ctx: &Context) {
+pub fn parameter_paste(app: &mut App, _ctx: &Context) {
     if ready(app) && parameter_can_paste(app) {
-        ctx.send_viewport_cmd(ViewportCommand::RequestPaste);
+        #[cfg(not(target_os = "android"))]
+        _ctx.send_viewport_cmd(eframe::egui::ViewportCommand::RequestPaste);
+        #[cfg(target_os = "android")]
+        match crate::platform::android::input::clipboard() {
+            Ok(Some(text)) => parameter_paste_text(app, &text),
+            Ok(None) => {}
+            Err(error) => app.error = Some(error),
+        }
     }
 }
 

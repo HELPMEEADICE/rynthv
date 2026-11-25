@@ -11,6 +11,8 @@ mod retakes;
 mod scale_guide;
 mod scene;
 mod toolbar;
+#[cfg(target_os = "android")]
+mod touch;
 use crate::model::*;
 pub use canvas::show;
 use eframe::egui::Pos2;

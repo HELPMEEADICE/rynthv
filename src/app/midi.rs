@@ -1,4 +1,5 @@
 use super::App;
+use super::picker::{Picker, Selection};
 use crate::{editor::Editor, midi::MidiFile, model::beats, ui};
 use eframe::egui::Context;
 use std::{
@@ -32,13 +33,14 @@ impl App {
         ui::tempo_input::finish(self);
         self.commit_lyric();
         self.editor.finish();
-        let Some(path) = rfd::FileDialog::new()
-            .set_title("导入 MIDI")
-            .add_filter("MIDI 文件", &["mid", "midi"])
-            .pick_file()
-        else {
-            return;
-        };
+        self.pick_one(
+            ctx,
+            Picker::new(Selection::File, "导入 MIDI").filter("MIDI 文件", &["mid", "midi"]),
+            move |app, ctx, path| app.load_midi_import(path, mode, ctx),
+        );
+    }
+
+    fn load_midi_import(&mut self, path: PathBuf, mode: MidiImportMode, ctx: &Context) {
         let (tx, rx) = mpsc::channel();
         let source = path.clone();
         let repaint = ctx.clone();
@@ -102,6 +104,11 @@ impl App {
                 // Construct and validate before retiring the current project.
                 let (editor, summary) = Editor::from_midi(file, &indices)?;
                 self.synthesis.reset_project();
+                #[cfg(target_os = "android")]
+                {
+                    self.recovery.invalidate();
+                    self.recovered_dirty = true;
+                }
                 self.editor = editor;
                 self.path = None;
                 self.audio_import = None;

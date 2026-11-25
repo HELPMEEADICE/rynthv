@@ -24,7 +24,8 @@ pub(in super::super) fn attention(
     };
     let rows = query_frames * heads;
     let score_len = rows.saturating_mul(key_frames);
-    if !attention_within_budget(relative, query_frames, key_frames, score_len, options) {
+    let tile = query_tile(query_frames, heads, key_frames);
+    if tile == 0 || !positions_fit(relative, query_frames, key_frames, options) {
         compute::record_cpu(name, "attention window or score matrix exceeds GPU budget");
         return Ok(false);
     }
@@ -43,7 +44,7 @@ pub(in super::super) fn attention(
         1_048_576,
         &[
             input_len,
-            score_len,
+            tile * heads * key_frames,
             output.len(),
             relative.map_or(0, |r| r.key.len()),
             relative.map_or(0, |r| r.value.len()),
@@ -86,7 +87,8 @@ pub(in super::super) fn projected_attention(
     let score_len = query_frames
         .saturating_mul(heads)
         .saturating_mul(key_frames);
-    if !attention_within_budget(relative, query_frames, key_frames, score_len, options) {
+    let tile = query_tile(query_frames, heads, key_frames);
+    if tile == 0 || !positions_fit(relative, query_frames, key_frames, options) {
         return Ok(None);
     }
     let mask = options.key_padding_mask.unwrap_or_default();
@@ -120,7 +122,7 @@ pub(in super::super) fn projected_attention(
             k_len,
             v_len,
             qkv_mask_len,
-            score_len,
+            tile * heads * key_frames,
             context_len,
             output_len,
             query_op.matrix().values().len(),
@@ -166,19 +168,40 @@ pub(in super::super) fn projected_attention(
     Ok(projected)
 }
 
-fn attention_within_budget(
+fn query_tile(queries: usize, heads: usize, keys: usize) -> usize {
+    let scores_per_query = heads.saturating_mul(keys);
+    if scores_per_query == 0 {
+        return 0;
+    }
+    #[cfg(target_os = "android")]
+    {
+        #[cfg(feature = "gui")]
+        let desired = (crate::platform::android::memory_bytes() / 256).clamp(2 << 20, 16 << 20);
+        #[cfg(not(feature = "gui"))]
+        let desired = 8 << 20;
+        let bytes = compute::gpu_storage_budget().map_or(desired, |limit| desired.min(limit));
+        queries.min(bytes as usize / 4 / scores_per_query)
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        if queries.saturating_mul(scores_per_query) <= 16 * 1024 * 1024 {
+            queries
+        } else {
+            0
+        }
+    }
+}
+
+fn positions_fit(
     relative: Option<&RelativePositions>,
     query_frames: usize,
     key_frames: usize,
-    score_len: usize,
     options: AttentionOptions<'_>,
 ) -> bool {
     let entries = relative.map_or(0, |positions| positions.entries);
     let max_distance = i64::from(options.position_offset) + query_frames as i64 - 1;
     let min_distance = i64::from(options.position_offset) - key_frames as i64 + 1;
-    min_distance > i64::from(i32::MIN)
-        && max_distance + (entries / 2) as i64 <= i64::from(i32::MAX)
-        && score_len <= 16 * 1024 * 1024
+    min_distance > i64::from(i32::MIN) && max_distance + (entries / 2) as i64 <= i64::from(i32::MAX)
 }
 
 fn encode_attention_passes(
@@ -192,16 +215,14 @@ fn encode_attention_passes(
 ) -> Result<(), MatrixError> {
     let entries = relative.map_or(0, |positions| positions.entries);
     let window = options.window.unwrap_or(0).min(i32::MAX as usize);
-    let rows = query_frames * heads;
-    let score_len = rows * key_frames;
-    let output_len = query_frames * heads * values;
-    let scores = batch.output(score_len);
+    let tile = query_tile(query_frames, heads, key_frames);
+    let scores = batch.output(tile * heads * key_frames);
     let relative_key = relative.map(|r| batch.weight(&r.key));
     let relative_value = relative.map(|r| batch.weight(&r.value));
     let empty = batch.input(&[]);
     let mut params = [0; 16];
     params[..13].copy_from_slice(&[
-        query_frames as u32,
+        0,
         key_frames as u32,
         heads as u32,
         keys as u32,
@@ -215,7 +236,37 @@ fn encode_attention_passes(
         options.position_offset as u32,
         window as u32,
     ]);
-    let grid = batch.grid((score_len as u32).div_ceil(64))?;
+    for offset in (0..query_frames).step_by(tile) {
+        let queries = tile.min(query_frames - offset);
+        params[0] = queries as u32;
+        params[13] = offset as u32;
+        dispatch_tile(
+            batch,
+            [
+                input,
+                relative_key.as_ref().unwrap_or(&empty),
+                relative_value.as_ref().unwrap_or(&empty),
+                result,
+                &scores,
+            ],
+            params,
+            queries * heads,
+            key_frames,
+            values,
+        )?;
+    }
+    Ok(())
+}
+
+fn dispatch_tile(
+    batch: &mut Batch<'_>,
+    [input, relative_key, relative_value, result, scores]: [&Buffer; 5],
+    mut params: [u32; 16],
+    rows: usize,
+    keys: usize,
+    values: usize,
+) -> Result<(), MatrixError> {
+    let grid = batch.grid(((rows * keys) as u32).div_ceil(64))?;
     params[7] = grid[0];
     batch.dispatch(
         Kernel {
@@ -224,13 +275,7 @@ fn encode_attention_passes(
         },
         grid,
         params,
-        [
-            Some(input),
-            Some(relative_key.as_ref().unwrap_or(&empty)),
-            None,
-            Some(&scores),
-            None,
-        ],
+        [Some(input), Some(relative_key), None, Some(scores), None],
     )?;
     let grid = batch.grid(rows as u32)?;
     params[7] = grid[0];
@@ -241,9 +286,9 @@ fn encode_attention_passes(
         },
         grid,
         params,
-        [None, None, None, Some(&scores), None],
+        [None, None, None, Some(scores), None],
     )?;
-    let grid = batch.grid((output_len as u32).div_ceil(64))?;
+    let grid = batch.grid(((rows * values) as u32).div_ceil(64))?;
     params[7] = grid[0];
     batch.dispatch(
         Kernel {
@@ -255,9 +300,9 @@ fn encode_attention_passes(
         [
             Some(input),
             None,
-            Some(relative_value.as_ref().unwrap_or(&empty)),
+            Some(relative_value),
             Some(result),
-            Some(&scores),
+            Some(scores),
         ],
     )
 }

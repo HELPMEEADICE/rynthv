@@ -1,17 +1,28 @@
 use super::{text, weak};
+use crate::app::picker::{Picker, Selection};
 use crate::synthesis::runtime::{ContextImportDialog, ContextImportPhase, ContextImportSource};
 use eframe::egui::*;
 
-pub(super) fn show(ui: &mut Ui, dialog: &mut ContextImportDialog) -> bool {
+pub(super) fn show(
+    ui: &mut Ui,
+    dialog: &mut ContextImportDialog,
+    picker: &mut Option<Picker>,
+) -> bool {
     match dialog.source {
-        ContextImportSource::SessionFile => session_file(ui, dialog),
-        ContextImportSource::File => file(ui, dialog),
+        ContextImportSource::SessionFile => {
+            *picker = session_file(ui, dialog);
+            false
+        }
+        ContextImportSource::File => {
+            *picker = file(ui, dialog);
+            false
+        }
         ContextImportSource::Manual => manual(ui, dialog),
         ContextImportSource::Online => online(ui, dialog),
     }
 }
 
-fn session_file(ui: &mut Ui, dialog: &mut ContextImportDialog) -> bool {
+fn session_file(ui: &mut Ui, dialog: &ContextImportDialog) -> Option<Picker> {
     text(
         ui,
         "选择本机 Synthesizer V Studio 2 的 session 登录会话文件，无需启动原编辑器。",
@@ -25,41 +36,24 @@ fn session_file(ui: &mut Ui, dialog: &mut ContextImportDialog) -> bool {
     } else {
         weak(ui, "尚未选择会话文件");
     }
-    if !ui.button("选择会话文件…").clicked() {
-        return false;
-    }
-    let mut picker = rfd::FileDialog::new().set_title("选择 Synthesizer V Studio 2 的会话文件");
-    if let Some(parent) = dialog.session_path.as_ref().and_then(|path| path.parent()) {
-        picker = picker.set_directory(parent);
-    }
-    if let Some(path) = picker.pick_file() {
-        dialog.session_path = Some(path);
-        return true;
-    }
-    false
+    ui.button("选择会话文件…").clicked().then(|| {
+        Picker::new(Selection::File, "选择 Synthesizer V Studio 2 的会话文件")
+            .starting_at(dialog.session_path.as_ref().and_then(|path| path.parent()))
+    })
 }
 
-fn file(ui: &mut Ui, dialog: &mut ContextImportDialog) -> bool {
+fn file(ui: &mut Ui, dialog: &ContextImportDialog) -> Option<Picker> {
     text(ui, "选择包含此声库及对应模型代际的上下文 JSON 文件。");
     if let Some(path) = &dialog.file_path {
         ui.add(Label::new(path.display().to_string()).wrap());
     } else {
         weak(ui, "尚未选择文件");
     }
-    if !ui.button("选择上下文文件…").clicked() {
-        return false;
-    }
-    let mut picker = rfd::FileDialog::new()
-        .set_title("选择模型上下文文件")
-        .add_filter("模型上下文 JSON", &["json"]);
-    if let Some(parent) = dialog.file_path.as_ref().and_then(|path| path.parent()) {
-        picker = picker.set_directory(parent);
-    }
-    if let Some(path) = picker.pick_file() {
-        dialog.file_path = Some(path);
-        return true;
-    }
-    false
+    ui.button("选择上下文文件…").clicked().then(|| {
+        Picker::new(Selection::File, "选择模型上下文文件")
+            .filter("模型上下文 JSON", &["json"])
+            .starting_at(dialog.file_path.as_ref().and_then(|path| path.parent()))
+    })
 }
 
 fn manual(ui: &mut Ui, dialog: &mut ContextImportDialog) -> bool {

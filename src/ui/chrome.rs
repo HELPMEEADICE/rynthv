@@ -23,7 +23,11 @@ fn item(ui: &mut Ui, text: &str, shortcut: &str, enabled: bool) -> bool {
 pub fn menus(app: &mut App, ui: &mut Ui) {
     let ctx = ui.ctx().clone();
     MenuBar::new().ui(ui, |ui| {
-        ui.spacing_mut().button_padding = vec2(11.0, 4.0);
+        ui.spacing_mut().button_padding = if cfg!(target_os = "android") {
+            vec2(9.0, 10.0)
+        } else {
+            vec2(11.0, 4.0)
+        };
         ui.spacing_mut().item_spacing.x = 0.0;
         ui.menu_button("文件", |ui| {
             if item(ui, "新建", "Ctrl+N", true) {
@@ -32,12 +36,20 @@ pub fn menus(app: &mut App, ui: &mut Ui) {
             if item(ui, "打开…", "Ctrl+O", true) {
                 app.request_file(FileAction::Open, &ctx);
             }
+            #[cfg(target_os = "android")]
+            if item(ui, "本机工程…", "", true) {
+                app.request_file(FileAction::OpenLocal, &ctx);
+            }
             ui.separator();
             if item(ui, "保存", "Ctrl+S", true) {
-                app.save_project(false);
+                app.save_project(false, &ctx);
             }
             if item(ui, "另存为…", "Ctrl+Shift+S", true) {
-                app.save_project(true);
+                app.save_project(true, &ctx);
+            }
+            #[cfg(target_os = "android")]
+            if item(ui, "分享工程…", "", true) {
+                app.share_project(&ctx);
             }
             ui.separator();
             if item(ui, "导入…", "Ctrl+Shift+I", true) {
@@ -51,7 +63,12 @@ pub fn menus(app: &mut App, ui: &mut Ui) {
                 app.commit_lyric();
                 app.import_audio(None, &ctx);
             }
+            #[cfg(not(target_os = "android"))]
             item(ui, "导出音频", "", false);
+            #[cfg(target_os = "android")]
+            if item(ui, "导出音频…", "", true) {
+                super::mobile::open_render(app, &ctx);
+            }
         });
         ui.menu_button("编辑", |ui| {
             let idle = !app.editor.is_editing();
@@ -270,9 +287,9 @@ pub fn shortcuts(app: &mut App, ctx: &Context) {
         return;
     }
     if command(Key::S, shift) {
-        app.save_project(true);
+        app.save_project(true, ctx);
     } else if command(Key::S, ctrl) {
-        app.save_project(false);
+        app.save_project(false, ctx);
     }
     if command(Key::I, shift) {
         app.request_file(FileAction::ImportMidi, ctx);

@@ -73,7 +73,7 @@ pub(super) fn primary(
         } else if current && loaded {
             app.unload_voice();
         } else if missing_dictionary {
-            paths::choose_dictionaries(app);
+            paths::choose_dictionaries(app, ui.ctx());
         } else if current {
             app.reload_voice();
         } else {

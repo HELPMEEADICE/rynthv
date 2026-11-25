@@ -1,5 +1,11 @@
 mod instrumental;
 mod midi;
+#[cfg(target_os = "android")]
+mod mobile;
+pub(crate) mod picker;
+mod project;
+#[cfg(target_os = "android")]
+mod recovery;
 mod voice;
 pub use midi::{MidiImport, MidiImportMode, MidiImportPhase};
 
@@ -19,7 +25,10 @@ use std::{
 pub enum FileAction {
     New,
     Open,
+    #[cfg(target_os = "android")]
+    OpenLocal,
     ImportMidi,
+    #[cfg(not(target_os = "android"))]
     Close,
 }
 pub struct App {
@@ -58,11 +67,23 @@ pub struct App {
     pub phoneme_draft: ui::panels::PhonemeDraft,
     pub fill_lyrics: Option<ui::fill_lyrics::FillLyrics>,
     pub pending: Option<FileAction>,
+    #[cfg(target_os = "android")]
+    picker: Option<picker::Completion>,
+    #[cfg(target_os = "android")]
+    recovery: recovery::Recovery,
+    #[cfg(target_os = "android")]
+    recovered_dirty: bool,
+    #[cfg(target_os = "android")]
+    audio_wanted: bool,
+    #[cfg(target_os = "android")]
+    local_projects: Option<Vec<PathBuf>>,
+    #[cfg(not(target_os = "android"))]
     pub allow_close: bool,
     pub status: String,
     settings_path: Option<PathBuf>,
     last_layout: String,
     last_preferences: String,
+    #[cfg(not(target_os = "android"))]
     last_title: String,
     last_persist: Instant,
 }
@@ -71,7 +92,7 @@ impl App {
         ui::theme::install(&cc.egui_ctx);
         egui_extras::install_image_loaders(&cc.egui_ctx);
         let mut error = ui::theme::fonts(&cc.egui_ctx).err();
-        let settings_path = match rynthv::platform::config_directory() {
+        let settings_path = match crate::platform::config_directory() {
             Ok(directory) => Some(directory.join("workspace.json")),
             Err(message) => {
                 error = Some(message);
@@ -155,121 +176,50 @@ impl App {
             phoneme_draft: ui::panels::PhonemeDraft::default(),
             fill_lyrics: None,
             pending: None,
+            #[cfg(target_os = "android")]
+            picker: None,
+            #[cfg(target_os = "android")]
+            recovery: recovery::Recovery::default(),
+            #[cfg(target_os = "android")]
+            recovered_dirty: false,
+            #[cfg(target_os = "android")]
+            audio_wanted: false,
+            #[cfg(target_os = "android")]
+            local_projects: None,
+            #[cfg(not(target_os = "android"))]
             allow_close: false,
             status: String::new(),
             settings_path,
             last_layout,
             last_preferences,
+            #[cfg(not(target_os = "android"))]
             last_title: String::new(),
             last_persist: Instant::now(),
         };
         if let Some(path) = path {
             app.open_path(path);
         }
-        app
-    }
-    pub fn open_path(&mut self, path: PathBuf) {
-        ui::phonemes::phoneme_deactivate(self);
-        ui::piano::cancel_audition(self);
-        self.midi_import = None;
-        match storage::load(&path) {
-            Ok(storage::LoadedProject {
-                project,
-                imported,
-                revision,
-            }) => {
-                self.editor = Editor::new(project);
-                self.synthesis.reset_project();
-                self.path = (!imported).then_some(path);
-                self.project_revision = (!imported).then_some(revision);
-                self.status = if imported {
-                    "已导入 Synthesizer V Studio 1 工程，请另存为新文件".into()
-                } else {
-                    String::new()
-                };
-                self.gesture = None;
-                self.piano_anchor = ui::piano::AnchorSelection::default();
-                self.parameter_lane = ui::lanes::ParameterSelection::default();
-                self.phoneme_editing = ui::phonemes::PhonemeEditing::default();
-                self.group_gesture = None;
-                self.audio_drag = None;
-                self.mixer_drag = None;
-                self.audio_import = None;
-                self.view_pan = ui::view_pan::ViewPan::default();
-                self.rename = None;
-                self.time_edit = None;
-                self.bpm_edit = None;
-                self.lyric = None;
-                self.phoneme_draft = ui::panels::PhonemeDraft::default();
-                self.fill_lyrics = None;
-                let reference = self.editor.active_ref();
-                let first = reference.and_then(|r| {
-                    self.editor.notes().iter().find_map(|n| {
-                        r.note_range(n)
-                            .map(|(start, _)| (start, n.pitch + r.pitch_offset))
-                    })
-                });
-                self.view.piano.start = beats(first.map_or_else(
-                    || reference.map_or(0, |r| r.blick_absolute_begin),
-                    |(start, _)| start,
-                ))
-                .floor()
-                .max(0.0);
-                if let Some((_, pitch)) = first {
-                    self.view.top_pitch = (pitch + 9).clamp(12, 127) as f32;
+        #[cfg(target_os = "android")]
+        match recovery::Recovery::init(&cc.egui_ctx) {
+            Ok((recovery, snapshot)) => {
+                app.recovery = recovery;
+                if let Some(snapshot) = snapshot
+                    && let Err(error) = app.restore_snapshot(snapshot)
+                {
+                    app.error = Some(error);
                 }
             }
-            Err(e) => self.error = Some(e),
+            Err(error) => app.error = Some(error),
         }
+        app
     }
-    pub fn save_project(&mut self, save_as: bool) -> bool {
-        ui::phonemes::phoneme_deactivate(self);
-        ui::piano::cancel_audition(self);
-        ui::tempo_input::finish(self);
-        self.commit_lyric();
-        self.editor.finish();
-        let path = if save_as || self.path.is_none() {
-            let name = self
-                .path
-                .as_ref()
-                .and_then(|p| p.file_name())
-                .and_then(|n| n.to_str())
-                .unwrap_or("未命名.svp");
-            rfd::FileDialog::new()
-                .add_filter("Synthesizer V 工程", &["svp"])
-                .set_file_name(name)
-                .save_file()
-        } else {
-            self.path.clone()
-        };
-        let Some(mut path) = path else {
-            return false;
-        };
-        if path.extension().is_none() {
-            path.set_extension("svp");
+
+    fn has_unsaved_changes(&self) -> bool {
+        #[cfg(target_os = "android")]
+        if self.recovered_dirty {
+            return true;
         }
-        let result = (|| {
-            let file = storage::ProjectFile::lock(&path)?;
-            let revision = if self.path.as_ref() == Some(&path) {
-                self.project_revision
-            } else {
-                storage::Revision::read(&path)?
-            };
-            file.save_if(&self.editor.project, revision)
-        })();
-        match result {
-            Ok(revision) => {
-                self.editor.mark_saved();
-                self.path = Some(path);
-                self.project_revision = Some(revision);
-                self.status = "工程已保存".into();
-                true
-            }
-            Err(e) => {
-                self.error = Some(e);
-                false
-            }
-        }
+        self.editor.dirty()
     }
     pub fn request_file(&mut self, action: FileAction, ctx: &Context) {
         ui::phonemes::phoneme_deactivate(self);
@@ -279,7 +229,7 @@ impl App {
         self.commit_lyric();
         self.fill_lyrics = None;
         self.editor.finish();
-        if self.editor.dirty() {
+        if self.has_unsaved_changes() {
             self.pending = Some(action);
         } else {
             self.perform_file(action, ctx);
@@ -306,19 +256,20 @@ impl App {
         self.bpm_edit = None;
         match action {
             FileAction::New => {
-                self.editor = Editor::new(Project::default());
-                self.synthesis.reset_project();
+                self.install_project(Project::default());
                 self.path = None;
+                self.project_revision = None;
             }
-            FileAction::Open => {
-                if let Some(path) = rfd::FileDialog::new()
-                    .add_filter("Synthesizer V 工程", &["svp"])
-                    .pick_file()
-                {
-                    self.open_path(path);
-                }
-            }
+            FileAction::Open => self.pick_one(
+                ctx,
+                picker::Picker::new(picker::Selection::File, "打开工程")
+                    .filter("Synthesizer V 工程", &["svp"]),
+                |app, _, path| app.open_path(path),
+            ),
+            #[cfg(target_os = "android")]
+            FileAction::OpenLocal => self.list_local_projects(),
             FileAction::ImportMidi => self.begin_midi_import(MidiImportMode::NewProject, ctx),
+            #[cfg(not(target_os = "android"))]
             FileAction::Close => {
                 self.allow_close = true;
                 self.persist_layout();
@@ -368,6 +319,23 @@ impl App {
             }
         }
     }
+    #[cfg(not(target_os = "android"))]
+    fn update_title(&mut self, ctx: &Context) {
+        let title = format!(
+            "RynthV - {}{}",
+            self.path
+                .as_ref()
+                .and_then(|p| p.file_stem())
+                .and_then(|p| p.to_str())
+                .unwrap_or("未命名"),
+            if self.has_unsaved_changes() { " *" } else { "" }
+        );
+        if title != self.last_title {
+            self.last_title = title.clone();
+            ctx.send_viewport_cmd(ViewportCommand::Title(title));
+        }
+    }
+
     fn persist_layout(&mut self) {
         self.last_persist = Instant::now();
         let Some(settings_path) = self.settings_path.as_ref() else {
@@ -398,12 +366,14 @@ impl App {
         }
     }
     fn dialogs(&mut self, ctx: &Context) {
+        #[cfg(target_os = "android")]
+        self.local_project_dialog(ctx);
         if let Some(action) = self.pending {
             Modal::new(Id::new("unsaved")).show(ctx, |ui| {
                 ui.heading("保存工程更改？");
                 ui.label("当前工程包含尚未保存的编辑。");
                 ui.horizontal(|ui| {
-                    if ui.button("保存").clicked() && self.save_project(false) {
+                    if ui.button("保存").clicked() && self.save_project(false, ctx) {
                         self.pending = None;
                         self.perform_file(action, ctx);
                     }
@@ -432,7 +402,7 @@ impl App {
                 ui.heading(format!("RynthV {}", env!("CARGO_PKG_VERSION")));
                 ui.label("Rust + egui 歌声合成引擎");
                 ui.label("多音轨编辑、歌词与音高调整、MIDI 导入和 WAV 导出。");
-                ui.label("支持 Windows 和 Linux。");
+                ui.label("支持 Windows、Linux 和 Android。");
                 if ui.button("关闭").clicked() {
                     self.about = false;
                 }
@@ -442,15 +412,38 @@ impl App {
             ui::settings::show(self, ctx);
         }
         ui::voice_library::dialogs(self, ctx);
+        #[cfg(target_os = "android")]
+        if self.picker.is_some() {
+            Modal::new(Id::new("android-file-operation")).show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                    ui.label("正在处理文件…");
+                });
+            });
+        }
     }
 }
 impl eframe::App for App {
+    #[cfg(target_os = "android")]
+    fn raw_input_hook(&mut self, ctx: &Context, raw: &mut RawInput) {
+        crate::platform::android::input::read(ctx, raw);
+    }
+
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        #[cfg(target_os = "android")]
+        {
+            self.handle_mobile_events(&ctx);
+            self.poll_picker(&ctx);
+            if !crate::platform::android::lifecycle::foreground() {
+                return;
+            }
+        }
         ui::piano::begin_keyboard_frame(self, &ctx);
         self.synthesis.poll();
         self.poll_audio_import();
         self.poll_midi_import();
+        #[cfg(not(target_os = "android"))]
         if ctx.input(|i| i.viewport().close_requested()) && !self.allow_close {
             ctx.send_viewport_cmd(ViewportCommand::CancelClose);
             self.request_file(FileAction::Close, &ctx);
@@ -480,36 +473,67 @@ impl eframe::App for App {
         {
             ui::chrome::shortcuts(self, &ctx);
         }
-        let title = format!(
-            "RynthV - {}{}",
-            self.path
-                .as_ref()
-                .and_then(|p| p.file_stem())
-                .and_then(|p| p.to_str())
-                .unwrap_or("未命名"),
-            if self.editor.dirty() { " *" } else { "" }
-        );
-        if title != self.last_title {
-            self.last_title = title.clone();
-            ctx.send_viewport_cmd(ViewportCommand::Title(title));
-        }
+        #[cfg(not(target_os = "android"))]
+        self.update_title(&ctx);
         let rect = ui.max_rect();
         ui.painter().rect_filled(rect, 0, ui::theme::BACKGROUND);
-        let menu = Rect::from_min_max(rect.min, pos2(rect.right(), rect.top() + 27.0));
+        #[cfg(target_os = "android")]
+        let (menu_height, transport_height) =
+            (ui::mobile::MENU_HEIGHT, ui::mobile::TRANSPORT_HEIGHT);
+        #[cfg(not(target_os = "android"))]
+        let (menu_height, transport_height) = (27.0, 44.0);
+        let mobile = cfg!(target_os = "android");
+        let menu = Rect::from_min_max(rect.min, pos2(rect.right(), rect.top() + menu_height));
+        #[cfg(not(target_os = "android"))]
         ui::chrome::menus(self, &mut ui::child(ui, menu, "menu"));
-        let transport = Rect::from_min_max(
-            pos2(rect.left(), menu.bottom()),
-            pos2(rect.right(), menu.bottom() + 44.0),
+        #[cfg(target_os = "android")]
+        ScrollArea::horizontal()
+            .auto_shrink([false, false])
+            .scroll_bar_visibility(scroll_area::ScrollBarVisibility::AlwaysHidden)
+            .show(&mut ui::child(ui, menu, "menu"), |ui| {
+                ui::chrome::menus(self, ui)
+            });
+        let transport_top = if mobile {
+            rect.bottom() - transport_height
+        } else {
+            menu.bottom()
+        };
+        let transport = Rect::from_min_size(
+            pos2(rect.left(), transport_top),
+            vec2(rect.width(), transport_height),
         );
-        ui::transport::show(self, &mut ui::child(ui, transport, "transport"));
+        let mut transport_ui = ui::child(ui, transport, "transport");
+        #[cfg(target_os = "android")]
+        if rect.width() < 760.0 {
+            ui::mobile::transport(self, &mut transport_ui);
+        } else {
+            ui::transport::show(self, &mut transport_ui);
+        }
+        #[cfg(not(target_os = "android"))]
+        ui::transport::show(self, &mut transport_ui);
         let status_height = if self.preferences.show_status_bar {
             23.0
         } else {
             0.0
         };
-        let status = Rect::from_min_max(pos2(rect.left(), rect.bottom() - status_height), rect.max);
+        let status_bottom = if mobile {
+            transport.top()
+        } else {
+            rect.bottom()
+        };
+        let status = Rect::from_min_size(
+            pos2(rect.left(), status_bottom - status_height),
+            vec2(rect.width(), status_height),
+        );
         let work = Rect::from_min_max(
-            pos2(rect.left() + 5.0, transport.bottom()),
+            pos2(
+                rect.left() + 5.0,
+                if mobile {
+                    menu.bottom()
+                } else {
+                    transport.bottom()
+                },
+            ),
             pos2(rect.right() - 5.0, status.top() - 4.0),
         );
         ui::workspace::show(self, &mut ui::child(ui, work, "workspace"));
@@ -518,7 +542,9 @@ impl eframe::App for App {
         if self.preferences.show_status_bar {
             let mut status_ui = ui::child(ui, status.shrink2(vec2(8.0, 1.0)), "status");
             status_ui.horizontal(|ui| {
-                let hint = if self.status.is_empty() && self.piano_tool == ui::piano::Tool::PitchAnchor {
+                let hint = if mobile && self.status.is_empty() {
+                    "双指缩放或平移 · 长按打开菜单"
+                } else if self.status.is_empty() && self.piano_tool == ui::piano::Tool::PitchAnchor {
                     "双击创建控制点 · 拖动框选 / 移动 · 四边手柄缩放 · Delete 删除 · Esc 取消 · Ctrl+Z 撤销"
                 } else if self.status.is_empty() && self.piano_tool == ui::piano::Tool::PitchDraw {
                     "左键拖动绘制音高 · 右键拖动擦除 · Esc 取消本次绘制 · Ctrl+Z 撤销 · 中键拖动视野"
@@ -546,6 +572,8 @@ impl eframe::App for App {
         }
         self.view_pan.end_frame(&ctx);
         ui::piano::end_keyboard_frame(self, &ctx);
+        #[cfg(target_os = "android")]
+        self.sync_android_audio();
         ui::piano::end_gesture_frame(self, &ctx);
         ui::piano::end_pitch_frame(self, &ctx);
         ui::piano::end_anchor_frame(self, &ctx);
@@ -579,6 +607,11 @@ impl eframe::App for App {
         );
         if self.last_persist.elapsed() > Duration::from_secs(3) {
             self.persist_layout();
+        }
+        #[cfg(target_os = "android")]
+        {
+            self.update_recovery(&ctx);
+            crate::platform::android::input::publish(&ctx);
         }
     }
     fn on_exit(&mut self) {

@@ -43,16 +43,24 @@ pub fn show(app: &mut App, ui: &mut Ui) {
     if canvas.height() < 8.0 {
         return;
     }
+    #[cfg(target_os = "android")]
+    let touch_transforming = super::touch::transform(app, ui, canvas);
+    #[cfg(not(target_os = "android"))]
+    let touch_transforming = false;
     let pan = app.view_pan.drag(
         ui,
         crate::ui::view_pan::Target::Piano,
         Rect::from_min_max(all.min, canvas.max - vec2(6.0, 0.0)),
-        app.gesture.is_none() && app.group_gesture.is_none() && !phoneme_dragging,
+        app.gesture.is_none()
+            && app.group_gesture.is_none()
+            && !phoneme_dragging
+            && !touch_transforming,
     );
     app.view.piano.start =
         (app.view.piano.start - pan.x as f64 / app.view.piano.beat_width as f64).max(0.0);
     let response = ui.interact(canvas, Id::new("piano-canvas"), Sense::click_and_drag());
-    let vertical = if phoneme_dragging
+    let vertical = if touch_transforming
+        || phoneme_dragging
         || matches!(app.gesture, Some(Gesture::Pitch(_) | Gesture::Anchor(_)))
     {
         0.0
@@ -72,7 +80,8 @@ pub fn show(app: &mut App, ui: &mut Ui) {
             && app.group_gesture.is_none()
             && app.audio_drag.is_none()
             && !phoneme_dragging
-            && !app.view_pan.is_active(),
+            && !app.view_pan.is_active()
+            && !touch_transforming,
     );
     super::background::draw(app, ui, canvas);
     super::keyboard::show(app, ui, all, canvas);
@@ -93,7 +102,8 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         loop_region::RulerOptions {
             marker_step: app.view.snap.then_some(app.view.step()),
             seek_step: app.view.snap.then_some(app.view.step()),
-            enabled: !app.view_pan.is_active()
+            enabled: !touch_transforming
+                && !app.view_pan.is_active()
                 && app.gesture.is_none()
                 && app.group_gesture.is_none()
                 && app.audio_drag.is_none()
@@ -109,7 +119,8 @@ pub fn show(app: &mut App, ui: &mut Ui) {
     );
     let groups = scene::snapshot(app, canvas);
     let mut changed_scene = false;
-    if !app.editor.current_track().is_instrumental()
+    if !touch_transforming
+        && !app.editor.current_track().is_instrumental()
         && app.group_gesture.is_none()
         && !app.view_pan.is_active()
         && !phoneme_dragging
@@ -211,7 +222,7 @@ fn interaction(
         && let Some(p) = response.interact_pointer_pos()
     {
         app.commit_lyric();
-        if let Some((reference, note)) = hit {
+        if let Some((reference, note)) = hit.as_ref() {
             app.editor.select_reference(app.editor.track, reference.id);
             app.editor.selected = BTreeSet::from([note.id]);
             app.edit_lyric();
@@ -231,7 +242,7 @@ fn interaction(
         && let Some(p) = response.interact_pointer_pos()
     {
         app.commit_lyric();
-        if let Some((reference, note)) = hit {
+        if let Some((reference, note)) = hit.as_ref() {
             app.editor.select_reference(app.editor.track, reference.id);
             if ui.input(|i| i.modifiers.ctrl || i.modifiers.shift) {
                 if !app.editor.selected.remove(&note.id) {
@@ -240,6 +251,13 @@ fn interaction(
             } else {
                 app.editor.selected = BTreeSet::from([note.id]);
             }
+        } else if cfg!(target_os = "android") && app.piano_tool == super::Tool::NoteDraw {
+            app.editor.begin("创建音符");
+            let at = ticks(app.view.snap_beat(beat_at(canvas, &app.view.piano, p.x))).max(0);
+            let duration = ticks(app.view.step());
+            app.editor
+                .add_note(at, duration, pitch_at(app, canvas, p.y));
+            app.editor.finish();
         } else {
             let at = ticks(beat_at(canvas, &app.view.piano, p.x));
             if let Some(id) = app.editor.group_at(at) {
@@ -256,12 +274,42 @@ fn interaction(
     {
         app.commit_lyric();
         app.editor.select_reference(app.editor.track, reference.id);
-        if !app.editor.selected.contains(&note.id) {
+        if !app.editor.selected.contains(&note.id) && !response.long_touched() {
             app.editor.selected = BTreeSet::from([note.id]);
+        } else if app.editor.selected.is_empty() {
+            app.editor.selected.insert(note.id);
         }
+        #[cfg(target_os = "android")]
+        ui.ctx()
+            .data_mut(|data| data.insert_temp(response.id.with("note-context"), note.id));
     }
     response.context_menu(|ui| {
         let selected = !app.editor.selected.is_empty();
+        #[cfg(target_os = "android")]
+        if let Some(note) = ui
+            .ctx()
+            .data(|data| data.get_temp::<EntityId>(response.id.with("note-context")))
+        {
+            let was_selected = app.editor.selected.contains(&note);
+            let label = if was_selected {
+                "移出选择"
+            } else {
+                "加入选择"
+            };
+            if ui.button(label).clicked() {
+                if was_selected {
+                    app.editor.selected.remove(&note);
+                } else {
+                    app.editor.selected.insert(note);
+                }
+                ui.close();
+            }
+        }
+        #[cfg(target_os = "android")]
+        if ui.add_enabled(selected, Button::new("编辑歌词")).clicked() {
+            app.edit_lyric();
+            ui.close();
+        }
         if ui
             .add_enabled(selected, Button::new("填入歌词…").shortcut_text("Ctrl+L"))
             .clicked()

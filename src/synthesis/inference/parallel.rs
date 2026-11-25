@@ -3,8 +3,6 @@
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use std::sync::OnceLock;
 
-const MAX_THREADS: usize = 8;
-
 static POOL: OnceLock<Result<ThreadPool, String>> = OnceLock::new();
 
 pub(super) fn pool() -> Result<&'static ThreadPool, String> {
@@ -18,7 +16,7 @@ pub(super) fn pool() -> Result<&'static ThreadPool, String> {
                 .ok()
                 .filter(|threads| (1..=256).contains(threads))
                 .ok_or("RYNTHV_THREADS must be an integer between 1 and 256")?,
-            Err(std::env::VarError::NotPresent) => available.min(MAX_THREADS),
+            Err(std::env::VarError::NotPresent) => default_threads(available),
             Err(error) => return Err(error.to_string()),
         };
         ThreadPoolBuilder::new()
@@ -29,4 +27,18 @@ pub(super) fn pool() -> Result<&'static ThreadPool, String> {
     })
     .as_ref()
     .map_err(Clone::clone)
+}
+
+fn default_threads(available: usize) -> usize {
+    #[cfg(all(target_os = "android", feature = "gui"))]
+    {
+        let low_memory = crate::platform::android::memory_bytes() < 4 * (1 << 30);
+        available
+            .saturating_sub(1)
+            .clamp(1, if low_memory { 2 } else { 4 })
+    }
+    #[cfg(not(all(target_os = "android", feature = "gui")))]
+    {
+        available.min(8)
+    }
 }
