@@ -36,6 +36,7 @@ def verify(apk, abi, readelf, nm):
                 for symbol in (
                     "ANativeActivity_onCreate",
                     "Java_org_rynthv_app_RynthVActivity_nativeWake",
+                    "Java_org_rynthv_app_RynthVActivity_nativeEvent",
                 ):
                     assert re.search(rf"\b{symbol}$", symbols, re.MULTILINE), symbol
             print(f"Verified {item.filename}: {expected_machine}, {len(loads)} aligned LOAD segments")

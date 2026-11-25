@@ -31,6 +31,12 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 public final class RynthVActivity extends NativeActivity {
+    static {
+        // Register the library with ART for the Java-to-native callbacks.
+        // NativeActivity opens it separately to resolve the Activity entry point.
+        System.loadLibrary("rynthv_android");
+    }
+
     private static final int PICK_DOCUMENT = 100;
     private static final int MULTIPLE = 1, TREE = 2, PUBLISH = 3;
     private final ExecutorService files = Executors.newSingleThreadExecutor();

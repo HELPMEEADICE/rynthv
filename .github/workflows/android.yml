@@ -151,7 +151,7 @@ jobs:
           fi
       - name: Assemble signed APK
         run: gradle -p packaging/android --no-daemon :app:assembleRelease
-      - name: Verify manifest, signature, ABI, and 16 KiB alignment
+      - name: Verify startup linkage, manifest, signature, ABI, and 16 KiB alignment
         run: |
           set -euo pipefail
           apk="dist/rynthv-android-$ANDROID_ABI.apk"
@@ -169,6 +169,9 @@ jobs:
           grep -F "launchable-activity: name='org.rynthv.app.RynthVActivity'" <<< "$manifest"
           grep -Fx "native-code: '$ANDROID_ABI'" <<< "$manifest"
           if grep -F 'android.permission.MANAGE_EXTERNAL_STORAGE' <<< "$manifest"; then exit 1; fi
+          initializer="$(apkanalyzer dex code --class org.rynthv.app.RynthVActivity --method '<clinit>()V' "$apk")"
+          grep -F '"rynthv_android"' <<< "$initializer"
+          grep -F 'Ljava/lang/System;->loadLibrary(Ljava/lang/String;)V' <<< "$initializer"
           python3 packaging/android/verify_apk.py "$apk" "$ANDROID_ABI" \
             "$ANDROID_NDK_BIN/llvm-readelf" "$ANDROID_NDK_BIN/llvm-nm"
       - name: Upload standalone APK
