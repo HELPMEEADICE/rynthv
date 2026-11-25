@@ -15,8 +15,8 @@ async function start() {
         WebAssembly.compileStreaming(fetch(new URL("./rynthv_bg.wasm", import.meta.url))),
         import("./rynthv.js"),
     ]);
-    set_wasm_module(module);
     await init({ module_or_path: module });
+    set_wasm_module(module);
     const editor = new BrowserEditor();
     await editor.start(canvas);
     status.remove();

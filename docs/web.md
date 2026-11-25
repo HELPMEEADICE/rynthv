@@ -23,7 +23,9 @@ python -m http.server 8080 --bind 127.0.0.1 --directory dist/web
 
 `--check` 执行 WASM 编译检查和严格 Clippy。`--debug` 生成开发包。默认使用 release、Thin LTO 和 Rust 的性能优化级别，保留推理内核的速度。脚本固定字体版本与 SHA-256，构建时缓存字体与许可证，运行时字体从同站点加载。
 
-上传 `dist/web/` 全部内容，或解压 `dist/rynthv-web.zip` 到 GitHub Pages、Cloudflare Pages 或 Nginx。`index.html`、Worker、AudioWorklet、WASM 和字体使用相对路径，支持站点子目录。确保服务器为 `.wasm` 返回 `application/wasm`，为 `.js` 返回 JavaScript MIME 类型。访问发布目录的带尾部斜线地址。使用内容安全策略时允许同源模块脚本和 Worker，并为 WebAssembly 编译配置 `wasm-unsafe-eval`。发布包包含字体及其许可证。
+上传 `dist/web/` 全部内容，或解压 `dist/rynthv-web.zip` 到 GitHub Pages、Cloudflare Pages 或 Nginx。入口 `index.html` 引用同一个 `assets/<内容哈希>/` 目录，主页面模块、Worker、AudioWorklet、WASM 和字体都使用该目录内的相对路径，支持站点子目录。发布时先上传本次资源目录，再切换 `index.html`。可配置 HTTP 缓存时，为入口 HTML 设置 `Cache-Control: no-cache`，为内容哈希目录设置 `Cache-Control: public, max-age=31536000, immutable`。从旧的平铺包更新时，清除部署缓存中的旧入口和旧资源 URL。
+
+确保服务器为 `.wasm` 返回 `application/wasm`，为 `.js` 返回 JavaScript MIME 类型。访问发布目录的带尾部斜线地址。使用内容安全策略时允许同源模块脚本和 Worker，并为 WebAssembly 编译配置 `wasm-unsafe-eval`。发布包包含字体及其许可证。
 
 WebAssembly 工作流在 PR、main 提交和手动触发时生成部署 ZIP，在 Release 发布时把相同名称的文件上传到对应 Release。[WebAssembly 工作流](https://github.com/HELPMEEADICE/rynthv/actions/workflows/web.yml)
 

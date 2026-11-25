@@ -28,7 +28,7 @@ ASSETS = {
     ),
 }
 STATIC = (
-    "index.html", "style.css", "main.js", "browser.js", "documents.js",
+    "style.css", "main.js", "browser.js", "documents.js",
     "worker.js", "worker-bridge.js", "opfs.js", "audio.js", "pcm-worklet.js",
 )
 
@@ -63,6 +63,86 @@ def bindgen_path():
     return executable
 
 
+def bundle_digest(bundle):
+    digest = hashlib.sha256()
+    names = sorted(path.relative_to(bundle).as_posix() for path in bundle.rglob("*") if path.is_file())
+    for name in names:
+        digest.update(name.encode("utf-8") + b"\0")
+        with (bundle / name).open("rb") as asset:
+            digest.update(hashlib.file_digest(asset, "sha256").digest())
+    return digest.hexdigest()
+
+
+def prune_output(directory, keep):
+    for entry in directory.iterdir():
+        if entry.name in keep:
+            continue
+        if entry.resolve() != entry:
+            raise SystemExit(f"Expected a generated output at {entry}")
+        if entry.is_dir():
+            shutil.rmtree(entry)
+        else:
+            entry.unlink()
+
+
+def publish_site(site, destination, bundle_path):
+    bundle_output = destination / bundle_path
+    if bundle_output.resolve() != bundle_output:
+        raise SystemExit(f"Expected the generated asset directory at {bundle_output}")
+    bundle_output.parent.mkdir(parents=True, exist_ok=True)
+    if bundle_output.exists() and bundle_digest(bundle_output) != bundle_path.name:
+        shutil.rmtree(bundle_output)
+    if not bundle_output.exists():
+        (site / bundle_path).rename(bundle_output)
+    (site / "index.html").replace(destination / "index.html")
+
+
+def package_site(bindgen, wasm, debug):
+    cache = ROOT / "target" / "web-fonts"
+    cache.mkdir(parents=True, exist_ok=True)
+    dist = ROOT / "dist"
+    site_output = dist / "web"
+    archive_output = dist / "rynthv-web.zip"
+    if dist.resolve() != dist:
+        raise SystemExit(f"Expected the generated output directory at {dist}")
+    dist.mkdir(exist_ok=True)
+
+    with tempfile.TemporaryDirectory(prefix="site-", dir=dist) as staging:
+        staging = Path(staging)
+        bundle = staging / "bundle"
+        flags = () if debug else ("--remove-name-section", "--remove-producers-section")
+        run(bindgen, "--target", "web", "--no-typescript", "--out-dir", bundle, *flags, wasm)
+        for name in STATIC:
+            shutil.copyfile(WEB / name, bundle / name)
+        for name, (source, digest) in ASSETS.items():
+            shutil.copyfile(asset_path(cache, name, source, digest), bundle / name)
+        shutil.copyfile(ROOT / "assets" / "branding" / "app-icon.png", bundle / "app-icon.png")
+
+        # Relative imports keep the page, Worker and AudioWorklet in the same release.
+        site = staging / "web"
+        bundle_path = Path("assets") / bundle_digest(bundle)
+        assets = site / bundle_path
+        assets.parent.mkdir(parents=True)
+        bundle.rename(assets)
+        index = (WEB / "index.html").read_text(encoding="utf-8")
+        (site / "index.html").write_text(
+            index.replace("__WEB_ASSETS__", bundle_path.as_posix()), encoding="utf-8", newline="\n",
+        )
+
+        archive_path = staging / archive_output.name
+        with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+            for path in sorted(site.rglob("*")):
+                if path.is_file():
+                    archive.write(path, path.relative_to(site).as_posix())
+
+        publish_site(site, site_output, bundle_path)
+        archive_path.replace(archive_output)
+        prune_output(site_output, {"assets", "index.html"})
+        prune_output(site_output / bundle_path.parent, {bundle_path.name})
+    print(f"Static site: {site_output}")
+    print(f"Deployment archive: {archive_output}")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="Run compile and strict Clippy checks only")
@@ -89,26 +169,7 @@ def main():
         env["CARGO_PROFILE_RELEASE_STRIP"] = "debuginfo"
     run(cargo, "build", *FEATURES, *(() if args.debug else ("--release",)), env=env)
     wasm = target_dir / TARGET / ("debug" if args.debug else "release") / "rynthv.wasm"
-    cache = ROOT / "target" / "web-fonts"
-    cache.mkdir(parents=True, exist_ok=True)
-    dist = ROOT / "dist"
-    dist.mkdir(exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="site-", dir=target_dir) as staging:
-        site = Path(staging)
-        flags = () if args.debug else ("--remove-name-section", "--remove-producers-section")
-        run(bindgen, "--target", "web", "--no-typescript", "--out-dir", site, *flags, wasm)
-        for name in STATIC:
-            shutil.copyfile(WEB / name, site / name)
-        for name, (source, digest) in ASSETS.items():
-            shutil.copyfile(asset_path(cache, name, source, digest), site / name)
-        shutil.copyfile(ROOT / "assets" / "branding" / "app-icon.png", site / "app-icon.png")
-        shutil.copytree(site, dist / "web", dirs_exist_ok=True)
-        with zipfile.ZipFile(dist / "rynthv-web.zip", "w", zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
-            for path in sorted(site.rglob("*")):
-                if path.is_file():
-                    archive.write(path, path.relative_to(site).as_posix())
-    print(f"Static site: {dist / 'web'}")
-    print(f"Deployment archive: {dist / 'rynthv-web.zip'}")
+    package_site(bindgen, wasm, args.debug)
 
 
 if __name__ == "__main__":
