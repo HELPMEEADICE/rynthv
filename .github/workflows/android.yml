@@ -67,6 +67,11 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.6.0'
+      - name: Install Android command-line tools
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '12266719'
+          packages: ''
       - name: Install Android SDK packages and configure the linker
         env:
           RUST_TARGET: ${{ matrix.target }}
