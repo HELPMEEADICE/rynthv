@@ -4,7 +4,7 @@
   <img src="assets/branding/app-icon.png" alt="RynthV 图标" width="96" height="96">
 </p>
 
-使用 Rust 开发的原生歌声合成工作站，提供 egui 编辑器和可脚本化的 Headless CLI。
+使用 Rust 开发的原生歌声合成工作站，提供 Windows、Linux 和 Android 的 egui 编辑器，以及桌面端可脚本化的 Headless CLI。
 
 ```sh
 rynthv song.svp
@@ -46,15 +46,21 @@ cargo build --release --locked --bins
 
 AppImage 在 Ubuntu 24.04 上构建。运行依赖系统的 glibc 和 `libgcc_s.so.1`。编辑器还需要图形驱动、`libasound.so.2`（Ubuntu 上为 `libasound2t64`）、ALSA 音频设备和桌面对应的 XDG 门户后端（KDE 使用 `xdg-desktop-portal-kde`）。可用 `--appimage-extract` 解包，CLI 位于解包目录中的 `usr/bin/rynthv-synth`。
 
+### Android
+
+需要 Android 8.0 或更新版本。ARM64 手机和平板下载 `arm64-v8a` APK，x86-64 设备下载 `x86_64` APK。
+从 [GitHub Releases](https://github.com/HELPMEEADICE/rynthv/releases) 或 [Android 工作流](https://github.com/HELPMEEADICE/rynthv/actions/workflows/android.yml) 获取对应架构的 APK。
+工程导入、触控编辑、声库、CPU 和 Vulkan 推理、签名与设备验证见 [Android 指南](docs/android.md)。
+
 ## 声库与配置
 
 首次使用可在设置中选择声库和发音词典目录，或者执行 `rynthv -cli config set`。
 声库、词典和用户模型上下文由用户提供。
 
-| 声库类型 | Windows | Linux |
-| --- | --- | --- |
-| 一代声库 | 支持 | 支持 |
-| 二代声库 | 需要导入模型上下文 | 需要导入模型上下文 |
+| 声库类型 | Windows | Linux | Android |
+| --- | --- | --- | --- |
+| 一代声库 | 支持 | 支持 | 复用同一引擎，待真机验证 |
+| 二代声库 | 需要导入模型上下文 | 需要导入模型上下文 | 导入便携上下文文件或手动输入，待真机验证 |
 
 Windows ARM64 和 Linux 可通过上下文文件或手动输入导入二代声库所需的模型上下文。直接从原编辑器的本机会话文件或在线进程导入需要 Windows x64 的 CPUID 身份格式。
 
