@@ -1,14 +1,18 @@
 use super::{
+    Batch,
     batch::Kernel,
+    chain::Chain,
     convolution::encode_convolution,
     elementwise::{self, Element},
 };
 use crate::synthesis::{
-    inference::{Sequence, compute, convolution::Convolution},
+    inference::{Sequence, compute, convolution::Convolution, matrix::MatrixError},
     voice::{PreparedModule, PreparedTree, Result, VoiceError},
 };
 use std::ops::Range;
 use wgpu::Buffer;
+
+const MAX_SCRATCH_FLOATS: usize = 8 * 1024 * 1024;
 
 struct Layer<'a> {
     main: &'a Convolution,
@@ -114,10 +118,11 @@ impl<'a> ConditionalGraph<'a> {
         input: &Sequence,
         condition: Option<&Sequence>,
         output_rows: Range<usize>,
-    ) -> Result<Option<Sequence>> {
+        projection: Option<(&PreparedTree, usize)>,
+    ) -> Result<Option<(Sequence, bool)>> {
         let frames = input.frames;
         if output_rows.is_empty() {
-            return Ok(Some(Sequence::zeros(0, self.channels)?));
+            return Ok(Some((Sequence::zeros(0, self.channels)?, false)));
         }
         let mut work = 0usize;
         let mut lengths = vec![input.values.len(), condition.map_or(0, |s| s.values.len())];
@@ -137,22 +142,38 @@ impl<'a> ConditionalGraph<'a> {
                     .saturating_mul(config.kernel),
             );
         }
-        if capacity > 8 * 1024 * 1024 {
+        if capacity > MAX_SCRATCH_FLOATS {
             return Ok(None);
         }
         lengths.push(capacity);
         let full_output_len = frames * self.channels;
-        let mut output = Sequence::zeros(output_rows.len(), self.channels)?;
+        let stable = output_rows.start * self.channels..output_rows.end * self.channels;
+        let projection = match projection {
+            Some((tree, index)) => {
+                Chain::projection(tree, index, output_rows.len(), self.channels)?
+                    .filter(|chain| chain.capacity <= MAX_SCRATCH_FLOATS)
+            }
+            None => None,
+        };
+        let channels = projection
+            .as_ref()
+            .map_or(self.channels, |chain| chain.channels);
+        let mut output = Sequence::zeros(output_rows.len(), channels)?;
         let ran = compute::accelerate(None, work, 1_048_576, &lengths, |batch| {
             let source = batch.input(&input.values);
             let cond = condition.map(|s| batch.input(&s.values));
-            let [projected, residual, aux_or_skip, gated, state] =
-                std::array::from_fn(|_| batch.output(capacity));
+            let chain_capacity = projection
+                .as_ref()
+                .map_or(capacity, |chain| capacity.max(chain.capacity));
+            let [projected, residual] = std::array::from_fn(|_| batch.output(chain_capacity));
+            let [aux_or_skip, gated, state] = std::array::from_fn(|_| batch.output(capacity));
             let outputs = [batch.output(full_output_len), batch.output(full_output_len)];
-            let project =
-                |batch: &mut super::Batch<'_>, op: &Convolution, from: &Buffer, to: &Buffer| {
-                    encode_convolution(batch, op, from, to, frames, frames, op.config().padding)
-                };
+            let projection = projection
+                .as_ref()
+                .map(|chain| (chain, batch.validation_index()));
+            let project = |batch: &mut Batch<'_>, op: &Convolution, from: &Buffer, to: &Buffer| {
+                encode_convolution(batch, op, from, to, frames, frames, op.config().padding)
+            };
             if let Some(op) = self.direct {
                 project(batch, op, cond.as_ref().unwrap(), &outputs[0])?;
             }
@@ -179,44 +200,85 @@ impl<'a> ConditionalGraph<'a> {
                     auxiliary,
                 )?;
                 project(batch, layer.skip, &gated, &aux_or_skip)?;
-                let add = |batch: &mut super::Batch<'_>,
-                           a: &Buffer,
-                           b: &Buffer,
-                           to: &Buffer,
-                           length: usize,
-                           both| {
-                    let grid = batch.grid((length as u32).div_ceil(64))?;
-                    let mut params = [0; 16];
-                    params[..3].copy_from_slice(&[length as u32, grid[0], u32::from(both)]);
-                    batch.dispatch(
-                        Kernel {
-                            entry: "conditional_sum",
-                            source: include_str!("shaders/conditional.wgsl"),
-                        },
-                        grid,
-                        params,
-                        [Some(a), Some(b), None, Some(to), None],
-                    )
+                add(
+                    batch,
+                    &gated,
+                    &residual,
+                    &state,
+                    0..frames * width,
+                    true,
+                    None,
+                )?;
+                // Only published rows enter the pointwise projection. The final
+                // skip sum also checks the boundary that used to be read on the CPU.
+                let validation = projection
+                    .as_ref()
+                    .filter(|_| index + 1 == self.layers.len())
+                    .map(|(_, validation)| validation);
+                let values = if validation.is_some() {
+                    stable.clone()
+                } else {
+                    0..full_output_len
                 };
-                add(batch, &gated, &residual, &state, frames * width, true)?;
                 add(
                     batch,
                     &outputs[index % 2],
                     &aux_or_skip,
                     &outputs[(index + 1) % 2],
-                    full_output_len,
+                    values,
                     index != 0 || self.direct.is_some(),
+                    validation,
                 )?;
             }
-            batch.read_from(
-                &outputs[self.layers.len() % 2],
-                output_rows.start * self.channels,
-                &mut output.values,
-            )
+            let result = &outputs[self.layers.len() % 2];
+            if let Some((projection, validation)) = projection {
+                let result = projection.encode(batch, result, [&projected, &residual])?;
+                batch.read_checked(result, &mut output.values, &validation)
+            } else {
+                batch.read_from(result, stable.start, &mut output.values)
+            }
         })
         .map_err(|e| VoiceError::new(e.to_string()))?;
-        Ok(ran.then_some(output))
+        Ok(ran.then_some((output, projection.is_some())))
     }
+}
+
+fn add(
+    batch: &mut Batch<'_>,
+    left: &Buffer,
+    right: &Buffer,
+    output: &Buffer,
+    values: Range<usize>,
+    both: bool,
+    validation_index: Option<&Buffer>,
+) -> std::result::Result<(), MatrixError> {
+    let grid = batch.grid((values.len() as u32).div_ceil(64))?;
+    let mut params = [0; 16];
+    params[..4].copy_from_slice(&[
+        values.len() as u32,
+        grid[0],
+        u32::from(both),
+        values.start as u32,
+    ]);
+    batch.dispatch(
+        Kernel {
+            entry: if validation_index.is_some() {
+                "conditional_sum_projected"
+            } else {
+                "conditional_sum"
+            },
+            source: include_str!("shaders/conditional.wgsl"),
+        },
+        grid,
+        params,
+        [
+            Some(left),
+            Some(right),
+            None,
+            Some(output),
+            validation_index,
+        ],
+    )
 }
 
 fn advance(radii: [Option<usize>; 2], op: &Convolution) -> [Option<usize>; 2] {

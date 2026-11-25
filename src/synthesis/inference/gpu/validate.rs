@@ -31,7 +31,7 @@ pub(in super::super) fn validate(device: &Device) -> Result<Vec<&'static str>, S
         ),
         (
             include_str!("shaders/conditional.wgsl"),
-            &["conditional_sum"],
+            &["conditional_sum", "conditional_sum_projected"],
         ),
     ] {
         for &entry in entries {

@@ -212,7 +212,7 @@ impl<'a> ModelRuntime<'a> {
             }
             PreparedModule::Conditional(_)
             | PreparedModule::Gated(_)
-            | PreparedModule::SamplerNetwork => self.composite(index, input, None, flush)?,
+            | PreparedModule::SamplerNetwork => self.composite(index, input, None, None, flush)?,
             PreparedModule::RangeNormalizer(_) => {
                 return Err(VoiceError::new(
                     "Range normalization needs an explicit normalize or denormalize direction",
@@ -283,12 +283,25 @@ impl<'a> ModelRuntime<'a> {
             PreparedModule::Conditional(_)
             | PreparedModule::Gated(_)
             | PreparedModule::SamplerNetwork => {
-                self.composite(index, input, Some(condition), flush)
+                self.composite(index, input, Some(condition), None, flush)
             }
             _ => Err(VoiceError::new(
                 "This operator does not accept a conditioning stream",
             )),
         }
+    }
+
+    /// Execute a conditioned network and its following projection in stream order.
+    pub(crate) fn execute_conditioned_projected(
+        &mut self,
+        index: usize,
+        projection: usize,
+        input: &Sequence,
+        condition: &Sequence,
+        flush: bool,
+    ) -> Result<Sequence> {
+        crate::synthesis::execution::checkpoint()?;
+        self.composite(index, input, Some(condition), Some(projection), flush)
     }
 }
 

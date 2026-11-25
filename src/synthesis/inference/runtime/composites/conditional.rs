@@ -6,6 +6,7 @@ use crate::synthesis::{
     voice::{PreparedModule, PreparedTree, Result, VoiceError},
 };
 use history::History;
+use std::ops::Range;
 
 #[derive(Clone, Default)]
 struct LayerState {
@@ -70,6 +71,7 @@ impl ConditionalState {
         children: &[usize],
         input: &Sequence,
         condition: Option<&Sequence>,
+        pending_projection: &mut Option<usize>,
         flush: bool,
     ) -> Result<Sequence> {
         #[cfg(feature = "synth-profile")]
@@ -83,8 +85,21 @@ impl ConditionalState {
                 self.config.output_channels,
             )?
         {
+            let mut render = |input: &Sequence,
+                              condition: Option<&Sequence>,
+                              rows: Range<usize>|
+             -> Result<Option<Sequence>> {
+                let suffix = pending_projection.map(|index| (tree, index));
+                let result = graph.execute(input, condition, rows, suffix)?;
+                Ok(result.map(|(output, projected)| {
+                    if projected {
+                        *pending_projection = None;
+                    }
+                    output
+                }))
+            };
             if flush && self.history.is_none() {
-                if let Some(output) = graph.execute(input, condition, 0..input.frames)? {
+                if let Some(output) = render(input, condition, 0..input.frames)? {
                     return Ok(output);
                 }
             } else {
@@ -96,7 +111,7 @@ impl ConditionalState {
                     graph.radii(),
                     self.config.output_channels,
                     |input, condition, rows| {
-                        if let Some(output) = graph.execute(input, condition, rows.clone())? {
+                        if let Some(output) = render(input, condition, rows.clone())? {
                             return Ok(output);
                         }
                         // Replaying a bounded context is also valid on the CPU.

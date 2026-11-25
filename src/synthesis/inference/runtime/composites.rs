@@ -64,6 +64,7 @@ impl ModelRuntime<'_> {
         index: usize,
         input: &Sequence,
         condition: Option<&Sequence>,
+        mut projection: Option<usize>,
         flush: bool,
     ) -> Result<Sequence> {
         if self.closed.contains(&index) {
@@ -138,9 +139,14 @@ impl ModelRuntime<'_> {
                 Program::Gated(program) => {
                     program.process(self, &node.children, input, condition, flush)
                 }
-                Program::Conditional(program) => {
-                    program.process(self, &node.children, input, condition, flush)
-                }
+                Program::Conditional(program) => program.process(
+                    self,
+                    &node.children,
+                    input,
+                    condition,
+                    &mut projection,
+                    flush,
+                ),
                 Program::Sampler(program) => program.process(
                     self,
                     &node.children,
@@ -154,7 +160,12 @@ impl ModelRuntime<'_> {
         if output.is_ok() && flush {
             self.closed.insert(index);
         }
-        output
+        let output = output?;
+        if let Some(projection) = projection {
+            self.execute(projection, &output, flush)
+        } else {
+            Ok(output)
+        }
     }
 }
 

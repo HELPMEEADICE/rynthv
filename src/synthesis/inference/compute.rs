@@ -177,6 +177,17 @@ impl Session {
         super::gpu::validate(device)
     }
 
+    fn meets_gpu_threshold(&self, work: usize, minimum: usize, follows_gpu: bool) -> bool {
+        work >= minimum
+            || match self.0.requested {
+                Backend::Auto => false,
+                Backend::WebGpu if cfg!(target_arch = "wasm32") => {
+                    !follows_gpu && self.0.activity.lock().unwrap().completed_gpu_submissions == 0
+                }
+                _ => true,
+            }
+    }
+
     fn record_cpu(&self, operator: &'static str, reason: &'static str) {
         *self
             .0
@@ -228,12 +239,7 @@ pub(super) fn accelerate(
         }
         return Ok(false);
     }
-    let use_threshold = session.0.requested == Backend::Auto
-        || (cfg!(target_arch = "wasm32")
-            && session.0.requested == Backend::WebGpu
-            && work < min_auto_work
-            && session.0.activity.lock().unwrap().completed_gpu_submissions > 0);
-    if use_threshold && work < min_auto_work {
+    if !session.meets_gpu_threshold(work, min_auto_work, false) {
         if let Some(operator) = operator {
             session.record_cpu(operator, "below GPU scheduling threshold");
         }
@@ -249,6 +255,19 @@ pub(super) fn accelerate(
     let result = run(&mut batch);
     session.0.activity.lock().unwrap().merge(batch.activity());
     result.map(|()| true)
+}
+
+/// Decide whether the next operator would use GPU after this batch succeeds.
+pub(super) fn can_append_gpu(work: usize, min_work: usize, lengths: &[usize]) -> bool {
+    let Some(session) = current() else {
+        return false;
+    };
+    session.meets_gpu_threshold(work, min_work, true)
+        && session
+            .0
+            .device
+            .as_ref()
+            .is_some_and(|device| device.is_available() && device.fits(lengths))
 }
 
 pub fn current() -> Option<Session> {

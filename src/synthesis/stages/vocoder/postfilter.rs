@@ -227,15 +227,17 @@ impl Postfilter {
                 .drain(..frames * CONDITION_CHANNELS)
                 .collect(),
         )?;
-        let hidden = {
-            #[cfg(feature = "synth-profile")]
-            let _profile = crate::synthesis::profiling::span("vocoder.postfilter.network");
-            runtime.execute_conditioned(self.network, &input, &condition, end)?
-        };
         let mut projected = {
             #[cfg(feature = "synth-profile")]
-            let _profile = crate::synthesis::profiling::span("vocoder.postfilter.projection");
-            runtime.execute(self.projection, &hidden, end)?
+            let _profile =
+                crate::synthesis::profiling::span("vocoder.postfilter.network_and_projection");
+            runtime.execute_conditioned_projected(
+                self.network,
+                self.projection,
+                &input,
+                &condition,
+                end,
+            )?
         };
         projected.validate()?;
         if projected.channels != BANDS || projected.values.iter().any(|value| !value.is_finite()) {

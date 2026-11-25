@@ -105,6 +105,13 @@ impl<'a> Batch<'a> {
         )
     }
 
+    pub(super) fn validation_index(&mut self) -> Buffer {
+        self.upload(
+            bytemuck::bytes_of(&u32::MAX),
+            BufferUsages::STORAGE | BufferUsages::COPY_SRC,
+        )
+    }
+
     pub(super) fn weight(&mut self, source: &Arc<[f32]>) -> Buffer {
         self.device
             .cache
@@ -227,14 +234,34 @@ impl<'a> Batch<'a> {
         first: usize,
         output: &mut [f32],
     ) -> Result<(), MatrixError> {
+        self.read_output(source, first, output, None)
+    }
+
+    pub(super) fn read_checked(
+        &mut self,
+        source: &Buffer,
+        output: &mut [f32],
+        validation_index: &Buffer,
+    ) -> Result<(), MatrixError> {
+        self.read_output(source, 0, output, Some(validation_index))
+    }
+
+    fn read_output(
+        &mut self,
+        source: &Buffer,
+        first: usize,
+        output: &mut [f32],
+        validation_index: Option<&Buffer>,
+    ) -> Result<(), MatrixError> {
         checkpoint(self.device)?;
         self.flush_dispatches();
         let bytes = output.len() as u64 * 4;
         let mut encoder = self.encoder.take().unwrap();
-        let offset = bytes.next_multiple_of(8);
+        let output_bytes = bytes + if validation_index.is_some() { 4 } else { 0 };
+        let offset = output_bytes.next_multiple_of(8);
         let timestamp_bytes = self.timestamps.as_ref().map_or(0, Timestamps::bytes);
         let mapped_bytes = if timestamp_bytes == 0 {
-            bytes
+            output_bytes
         } else {
             offset + timestamp_bytes
         };
@@ -243,6 +270,9 @@ impl<'a> Batch<'a> {
             BufferUsages::MAP_READ | BufferUsages::COPY_DST,
         );
         encoder.copy_buffer_to_buffer(source, first as u64 * 4, &staging, 0, Some(bytes));
+        if let Some(validation_index) = validation_index {
+            encoder.copy_buffer_to_buffer(validation_index, 0, &staging, bytes, Some(4));
+        }
         if timestamp_bytes != 0 {
             let resolved = self.buffer(
                 timestamp_bytes,
@@ -269,6 +299,18 @@ impl<'a> Batch<'a> {
             let data = slice
                 .get_mapped_range()
                 .map_err(|e| MatrixError::Compute(format!("WebGPU mapped range: {e}")))?;
+            if validation_index.is_some() {
+                let invalid = u32::from_le_bytes(
+                    data[bytes as usize..output_bytes as usize]
+                        .try_into()
+                        .unwrap(),
+                );
+                if invalid != u32::MAX {
+                    return Err(MatrixError::Compute(format!(
+                        "WebGPU inference produced a nonfinite value at element {invalid} before the conditional output projection"
+                    )));
+                }
+            }
             let values: &[f32] = bytemuck::cast_slice(&data[..bytes as usize]);
             if let Some((index, value)) = values.iter().enumerate().find(|(_, v)| !v.is_finite()) {
                 let kernels = self
