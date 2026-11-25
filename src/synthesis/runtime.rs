@@ -15,6 +15,9 @@ mod visuals;
 mod voices;
 mod worker;
 
+#[cfg(target_os = "android")]
+pub(crate) use playback::stop_android_stream;
+
 use super::{
     plan::{OwnerId, Planner},
     render_cache::{CacheStats, PublishedOwner},

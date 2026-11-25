@@ -229,12 +229,14 @@ impl Runtime {
         let repaint = self.repaint.clone();
         let (tx, rx) = mpsc::sync_channel(1);
         self.export_result = None;
+        #[cfg(target_os = "android")]
+        let cancellation = crate::platform::android::lifecycle::export_cancellation();
         match thread::Builder::new()
             .name("audio-export".into())
             .spawn(move || {
                 let _wake = WakeOnExit(repaint);
                 let sender = tx;
-                let result = (|| {
+                let export = || {
                     // Validate all selected sources before writing the first file.
                     let recordings_for = |stem| {
                         if stem == VocalStem::Aspiration {
@@ -287,7 +289,18 @@ impl Runtime {
                         written.push(output.path.clone());
                     }
                     Ok(written)
-                })();
+                };
+                #[cfg(not(target_os = "android"))]
+                let result = export();
+                #[cfg(target_os = "android")]
+                let result = crate::synthesis::execution::scope(cancellation.clone(), export)
+                    .map_err(|error| {
+                        if cancellation.is_cancelled() {
+                            "应用已进入后台，WAV 渲染已中止。".to_owned()
+                        } else {
+                            error
+                        }
+                    });
                 let _ = sender.send(result);
             }) {
             Ok(_) => self.export = Some(rx),

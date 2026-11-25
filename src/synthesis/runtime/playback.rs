@@ -30,6 +30,18 @@ enum Command {
     Quit,
 }
 
+#[cfg(target_os = "android")]
+static ACTIVE_PLAYER: Mutex<Option<Sender<Command>>> = Mutex::new(None);
+
+#[cfg(target_os = "android")]
+pub(crate) fn stop_android_stream() {
+    if let Ok(active) = ACTIVE_PLAYER.lock()
+        && let Some(player) = active.as_ref()
+    {
+        let _ = player.send(Command::ResetDevice);
+    }
+}
+
 enum Transport {
     Load(Arc<PlaybackSource>, f64, bool),
     Control { playing: bool, seek: Option<f64> },
@@ -49,6 +61,10 @@ pub(super) struct Playback {
 impl Playback {
     pub fn new(repaint: crate::synthesis::notify::Notify) -> Self {
         let (tx, rx) = mpsc::channel();
+        #[cfg(target_os = "android")]
+        if let Ok(mut active) = ACTIVE_PLAYER.lock() {
+            *active = Some(tx.clone());
+        }
         let state = Arc::new(Mutex::new(Snapshot::default()));
         let latest = Arc::new(AtomicU64::new(0));
         let piano = PianoControl::default();
@@ -202,6 +218,10 @@ impl Playback {
 
 impl Drop for Playback {
     fn drop(&mut self) {
+        #[cfg(target_os = "android")]
+        if let Ok(mut active) = ACTIVE_PLAYER.lock() {
+            *active = None;
+        }
         self.piano.set_note(None);
         self.latest.fetch_add(1, Ordering::AcqRel);
         if let Ok(state) = self.state.lock()
