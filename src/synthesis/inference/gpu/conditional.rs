@@ -2,7 +2,7 @@ use super::{
     Batch,
     batch::Kernel,
     chain::Chain,
-    convolution::encode_convolution,
+    convolution::{Prefix, encode_convolution},
     elementwise::{self, Element},
 };
 use crate::synthesis::{
@@ -65,12 +65,9 @@ impl<'a> ConditionalGraph<'a> {
             // The streaming program pairs outputs by row and allows general rate
             // changes. This resident graph requires every projection to preserve
             // the complete input length and both branches to have the same extent.
-            if config.stride != 1
-                || config.padding * 2
-                    != config
-                        .receptive_frames()
-                        .map_err(|e| VoiceError::new(e.to_string()))?
-                        - 1
+            if !config
+                .preserves_frames()
+                .map_err(|e| VoiceError::new(e.to_string()))?
                 || u32::try_from(config.dilation).is_err()
             {
                 return Ok(None);
@@ -172,7 +169,15 @@ impl<'a> ConditionalGraph<'a> {
                 .as_ref()
                 .map(|chain| (chain, batch.validation_index()));
             let project = |batch: &mut Batch<'_>, op: &Convolution, from: &Buffer, to: &Buffer| {
-                encode_convolution(batch, op, from, to, frames, frames, op.config().padding)
+                encode_convolution(
+                    batch,
+                    op,
+                    from,
+                    to,
+                    frames,
+                    frames,
+                    Prefix::Zeros(op.config().padding),
+                )
             };
             if let Some(op) = self.direct {
                 project(batch, op, cond.as_ref().unwrap(), &outputs[0])?;

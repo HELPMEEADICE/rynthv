@@ -4,6 +4,11 @@ use wgpu::Buffer;
 
 const SOURCE: &str = include_str!("shaders/convolution.wgsl");
 
+pub(super) enum Prefix<'a> {
+    Zeros(usize),
+    History { buffer: &'a Buffer, frames: usize },
+}
+
 pub(in super::super) fn convolution(
     op: &Convolution,
     input: &[f32],
@@ -31,7 +36,7 @@ pub(in super::super) fn convolution(
                 &result,
                 input.len() / op.input_channels(),
                 frames,
-                0,
+                Prefix::Zeros(0),
             )?;
             batch.read(&result, output)
         },
@@ -45,7 +50,7 @@ pub(super) fn encode_convolution(
     result: &Buffer,
     input_frames: usize,
     output_frames: usize,
-    padding: usize,
+    prefix: Prefix<'_>,
 ) -> Result<(), MatrixError> {
     let columns = (op.output_channels() as u32).div_ceil(8);
     let grid = batch.grid((output_frames as u32).div_ceil(8) * columns)?;
@@ -56,8 +61,27 @@ pub(super) fn encode_convolution(
     );
     params[7] = grid[0];
     params[8] = columns;
-    params[11] = padding as u32;
-    encode(batch, "convolution", op, grid, params, source, result, None)
+    let previous = match prefix {
+        Prefix::Zeros(frames) => {
+            params[11] = frames as u32;
+            source
+        }
+        Prefix::History { buffer, frames } => {
+            params[9] = 1;
+            params[11] = frames as u32;
+            buffer
+        }
+    };
+    encode(
+        batch,
+        "convolution",
+        op,
+        grid,
+        params,
+        source,
+        result,
+        previous,
+    )
 }
 
 pub(in super::super) fn transpose(
@@ -110,7 +134,7 @@ pub(in super::super) fn transpose(
                 params,
                 &source,
                 &result,
-                Some(&pending),
+                &pending,
             )?;
             output.resize(output_len, 0.0);
             batch.read(&result, &mut output)
@@ -150,7 +174,7 @@ fn encode(
     params: [u32; 16],
     source: &Buffer,
     result: &Buffer,
-    previous: Option<&Buffer>,
+    previous: &Buffer,
 ) -> Result<(), MatrixError> {
     let weights = batch.weight(op.shared_weights());
     let bias = match op.shared_bias() {
@@ -169,7 +193,7 @@ fn encode(
             Some(&weights),
             Some(&bias),
             Some(result),
-            previous,
+            Some(previous),
         ],
     )
 }

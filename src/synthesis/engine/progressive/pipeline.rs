@@ -77,7 +77,7 @@ impl Input {
     ) -> Result<Output> {
         execution::checkpoint()?;
         let started = Instant::now();
-        let process = || {
+        let mut process = || {
             vocoder.process(
                 &self.physical,
                 self.controls.as_ref(),
@@ -91,10 +91,7 @@ impl Input {
             None => process(),
         }?;
         #[cfg(not(feature = "synth-profile"))]
-        let pcm = {
-            let mut process = process;
-            process()?
-        };
+        let pcm = process()?;
         execution::checkpoint()?;
         Ok(Output {
             #[cfg(not(target_arch = "wasm32"))]

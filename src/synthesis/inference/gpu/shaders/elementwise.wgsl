@@ -3,9 +3,18 @@
 @group(0) @binding(2) var<storage, read> b: array<f32>;
 @group(0) @binding(3) var<storage, read_write> output: array<f32>;
 @group(0) @binding(4) var<uniform> params: array<vec4<u32>, 4>;
+@group(0) @binding(5) var<storage, read_write> invalid_index: atomic<u32>;
 
 fn index(wg: vec3<u32>, lane: u32) -> u32 {
     return (wg.x + wg.y * params[0].y) * 64u + lane;
+}
+
+@compute @workgroup_size(64)
+fn validate_finite(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) lane: u32) {
+    let i = index(wg, lane);
+    if (i < params[0].x && (bitcast<u32>(input[i]) & 0x7f800000u) == 0x7f800000u) {
+        atomicMin(&invalid_index, i);
+    }
 }
 
 fn sigmoid(x: f32) -> f32 {

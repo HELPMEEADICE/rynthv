@@ -94,7 +94,7 @@ impl TransposedConvolutionStream {
             return Err(ConvolutionError::Finished);
         }
         let op = &self.operator.inner;
-        let frames = op.input_frames(input)?;
+        let frames = op.input_frames(input.len())?;
         let count = self
             .input_frames
             .checked_add(frames)

@@ -27,6 +27,7 @@ pub(in super::super) fn validate(device: &Device) -> Result<Vec<&'static str>, S
                 "layer_norm",
                 "gated_activation",
                 "embedding",
+                "validate_finite",
             ],
         ),
         (

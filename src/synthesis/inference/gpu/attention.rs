@@ -143,9 +143,9 @@ pub(in super::super) fn projected_attention(
             encode_affine(batch, key_op, key_frames, &raw_k_buf, &k_buf)?;
             encode_affine(batch, value_op, key_frames, &raw_v_buf, &v_buf)?;
             let qkv_mask = batch.staging_input(qkv_mask_len);
-            batch.copy_floats(&q_buf, &qkv_mask, 0, q_len);
-            batch.copy_floats(&k_buf, &qkv_mask, q_len, k_len);
-            batch.copy_floats(&v_buf, &qkv_mask, q_len + k_len, v_len);
+            batch.copy_floats(&q_buf, 0..q_len, &qkv_mask, 0);
+            batch.copy_floats(&k_buf, 0..k_len, &qkv_mask, q_len);
+            batch.copy_floats(&v_buf, 0..v_len, &qkv_mask, q_len + k_len);
             batch.write_slice(&qkv_mask, q_len + k_len + v_len, mask);
             let context_buf = batch.output(context_len);
             encode_attention_passes(

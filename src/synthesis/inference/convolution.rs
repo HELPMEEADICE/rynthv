@@ -5,6 +5,7 @@ mod packing;
 mod stream;
 mod transpose;
 
+pub(super) use stream::ConvolutionChunk;
 pub use stream::ConvolutionStream;
 pub use transpose::{
     TRANSPOSED_CONVOLUTION_TYPE_ID, TransposedConvolution, TransposedConvolutionStream,
@@ -74,6 +75,10 @@ impl ConvolutionConfig {
             .and_then(|n| n.checked_mul(self.dilation))
             .and_then(|n| n.checked_add(1))
             .ok_or(MatrixError::InvalidShape.into())
+    }
+
+    pub(super) fn preserves_frames(self) -> Result<bool, ConvolutionError> {
+        Ok(self.stride == 1 && self.receptive_frames()? - 1 == self.padding * 2)
     }
 
     fn available_outputs(self, frames: usize) -> Result<usize, ConvolutionError> {
@@ -179,11 +184,11 @@ impl Convolution {
         self.stream()?.process(input, true)
     }
 
-    fn input_frames(&self, input: &[f32]) -> Result<usize, ConvolutionError> {
-        if !input.len().is_multiple_of(self.input_channels()) {
+    fn input_frames(&self, input_len: usize) -> Result<usize, ConvolutionError> {
+        if !input_len.is_multiple_of(self.input_channels()) {
             return Err(ConvolutionError::InvalidConfig("partial input frame"));
         }
-        Ok(input.len() / self.input_channels())
+        Ok(input_len / self.input_channels())
     }
 
     /// Queue already contains the left padding. Missing trailing rows are zero.

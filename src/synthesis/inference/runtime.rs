@@ -256,9 +256,13 @@ impl<'a> ModelRuntime<'a> {
         let mut output = input.clone();
         let mut offset = 0;
         while offset < children.len() {
-            if let Some((count, result)) =
-                super::gpu::sequence(self.tree, &children[offset..], &output)?
-            {
+            if let Some((count, result)) = super::gpu::sequence(
+                self.tree,
+                &children[offset..],
+                &output,
+                &mut self.convolutions,
+                flush,
+            )? {
                 output = result;
                 offset += count;
             } else {

@@ -5,6 +5,26 @@ use wgpu::Buffer;
 
 const SOURCE: &str = include_str!("shaders/elementwise.wgsl");
 
+pub(super) fn validate_finite(
+    batch: &mut Batch<'_>,
+    input: &Buffer,
+    len: usize,
+    invalid_index: &Buffer,
+) -> Result<(), MatrixError> {
+    let grid = batch.grid((len as u32).div_ceil(64))?;
+    let mut params = [0; 16];
+    params[..2].copy_from_slice(&[len as u32, grid[0]]);
+    batch.dispatch(
+        Kernel {
+            entry: "validate_finite",
+            source: SOURCE,
+        },
+        grid,
+        params,
+        [Some(input), None, None, None, Some(invalid_index)],
+    )
+}
+
 #[derive(Clone, Copy)]
 pub(in super::super) enum Element<'a> {
     Unary(UnaryOperator),
