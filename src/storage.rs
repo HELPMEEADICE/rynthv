@@ -1,8 +1,10 @@
 use crate::model::*;
+use crate::platform::fs;
+#[cfg(not(target_arch = "wasm32"))]
+use std::io::Read;
 use std::{
     collections::HashMap,
-    fs,
-    io::{BufWriter, Read, Write},
+    io::{BufWriter, Write},
     path::Path,
 };
 
@@ -10,9 +12,13 @@ mod identity;
 mod project_size;
 mod svp_v153;
 mod transaction;
-pub use transaction::{ProjectFile, Revision};
+#[cfg(not(target_arch = "wasm32"))]
+pub use transaction::ProjectFile;
+pub use transaction::Revision;
 
-use project_size::{MAX_PROJECT_BYTES, ProjectWriter, check_project_size};
+#[cfg(not(target_arch = "wasm32"))]
+use project_size::MAX_PROJECT_BYTES;
+use project_size::{ProjectWriter, check_project_size};
 
 pub struct LoadedProject {
     pub project: Project,
@@ -20,6 +26,7 @@ pub struct LoadedProject {
     pub revision: Revision,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn load(path: &Path) -> Result<LoadedProject, String> {
     let file = fs::File::open(path).map_err(|e| e.to_string())?;
     let metadata = file.metadata().map_err(|e| e.to_string())?;
@@ -101,6 +108,7 @@ fn sort_notes(project: &mut Project) {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn save(path: &Path, project: &Project) -> Result<(), String> {
     ProjectFile::lock(path)?.save(project)
 }
@@ -113,6 +121,7 @@ pub fn validate(project: &Project) -> Result<(), String> {
     validate_content(project)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn save_locked(path: &Path, project: &Project, overwrite: bool) -> Result<(), String> {
     validate(project)?;
     let mut ordered = project.clone();
@@ -223,13 +232,17 @@ pub fn atomic_write_policy(
 #[cfg(windows)]
 use crate::platform::publish_new_file;
 
-#[cfg(not(windows))]
+#[cfg(target_arch = "wasm32")]
+use fs::publish_new_file;
+
+#[cfg(not(any(windows, target_arch = "wasm32")))]
 fn publish_new_file(temp: &Path, path: &Path) -> std::io::Result<()> {
     fs::hard_link(temp, path)?;
     let _ = fs::remove_file(temp);
     Ok(())
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn portable_relative_path(path: &Path) -> Option<std::path::PathBuf> {
     let text = path.to_str()?;
     #[cfg(windows)]

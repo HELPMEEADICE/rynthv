@@ -1,12 +1,13 @@
 //! Read only an explicitly selected session file; never persist its contents.
 
+use crate::platform::fs::File;
 mod smbios;
 
 use blowfish::{
     BlowfishLE,
     cipher::{Block, BlockCipherDecrypt, KeyInit, zeroize::Zeroize},
 };
-use std::{fs::File, io::Read, path::Path};
+use std::{io::Read, path::Path};
 
 use super::super::{Result, VoiceError};
 

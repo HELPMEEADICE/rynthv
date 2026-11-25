@@ -1,6 +1,6 @@
+use crate::platform::fs::File;
 use std::{
     collections::BTreeMap,
-    fs::File,
     io::{BufReader, Cursor, Read, Seek, SeekFrom},
     path::Path,
 };

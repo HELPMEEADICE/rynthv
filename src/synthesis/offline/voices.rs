@@ -1,4 +1,5 @@
 use super::*;
+use crate::platform::fs;
 use crate::synthesis::{
     execution::{self, Cancellation},
     render_cache::{Completion, RenderJob},
@@ -131,7 +132,7 @@ impl Offline {
             let frontend = match &mut resource.frontend {
                 Some(frontend) => frontend,
                 slot => {
-                    let dictionaries = settings.dictionaries.as_deref().filter(|path| path.is_dir())
+                    let dictionaries = settings.dictionaries.as_deref().filter(|path| fs::is_dir(path))
                         .ok_or("DICTIONARY_REQUIRED: Set the clf-data directory with config set --dictionaries")?;
                     slot.insert(
                         LyricFrontend::new(

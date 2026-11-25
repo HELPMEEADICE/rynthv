@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use wgpu::{Adapter, Backends, DeviceType, DownlevelFlags, Limits};
+#[cfg(not(target_arch = "wasm32"))]
+use wgpu::Backends;
+use wgpu::{Adapter, DeviceType, DownlevelFlags, Limits};
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -44,10 +46,12 @@ impl AdapterInfo {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn list_devices() -> Vec<AdapterInfo> {
     adapters().1.into_iter().map(|(_, info)| info).collect()
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub(super) fn adapters() -> (Backends, Vec<(Adapter, AdapterInfo)>) {
     let mut descriptor = wgpu::InstanceDescriptor::new_without_display_handle();
     let supported = if cfg!(windows) {
@@ -83,6 +87,7 @@ pub(super) fn adapters() -> (Backends, Vec<(Adapter, AdapterInfo)>) {
     (backends, entries)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn adapter_priority(adapter: &Adapter) -> (u8, u8) {
     let info = adapter.get_info();
     let device = match info.device_type {
@@ -110,7 +115,7 @@ pub(super) fn limits(supported: Limits) -> Limits {
     .using_alignment(supported)
 }
 
-fn adapter_info(adapter: &Adapter) -> AdapterInfo {
+pub(super) fn adapter_info(adapter: &Adapter) -> AdapterInfo {
     let info = adapter.get_info();
     let supported = adapter.limits();
     let supports_compute = adapter

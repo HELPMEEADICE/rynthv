@@ -1,6 +1,6 @@
+use crate::platform::fs::File;
 use std::{
     collections::HashMap,
-    fs::File,
     io::Read,
     path::Path,
     sync::{Arc, Mutex, OnceLock, Weak},

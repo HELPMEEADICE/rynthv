@@ -3,8 +3,9 @@
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex, MutexGuard},
-    time::{Duration, Instant},
+    time::Duration,
 };
+use web_time::Instant;
 
 use serde::Serialize;
 

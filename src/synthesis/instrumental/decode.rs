@@ -1,10 +1,10 @@
 use super::AudioAsset;
+use crate::platform::fs::File;
 use crate::synthesis::{
     audio::{ChannelLayout, RenderedAudio, conversion},
     rendered::Waveform,
 };
 use std::{
-    fs::File,
     path::Path,
     sync::{
         Arc,
@@ -18,6 +18,16 @@ use symphonia::core::{
 };
 
 const MAX_SAMPLES: usize = 512 * 1024 * 1024;
+
+#[cfg(target_arch = "wasm32")]
+impl symphonia::core::io::MediaSource for File {
+    fn is_seekable(&self) -> bool {
+        true
+    }
+    fn byte_len(&self) -> Option<u64> {
+        self.metadata().ok().map(|metadata| metadata.len())
+    }
+}
 
 pub(super) fn decode(path: &Path, cancelled: &AtomicBool) -> Result<RenderedAudio, String> {
     let file = File::open(path).map_err(|e| format!("无法打开音频文件：{e}"))?;

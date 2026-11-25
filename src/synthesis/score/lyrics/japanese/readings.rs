@@ -1,7 +1,8 @@
 //! Decode kana readings with the installed Japanese character transition model.
 
+use crate::platform::fs;
 use crate::synthesis::voice::{Result, VoiceError};
-use std::{collections::HashMap, fs, path::Path};
+use std::{collections::HashMap, path::Path};
 
 const HEADER: [u8; 10] = [0, 0, 1, 0, 0, 0, 3, 0, 0, 0];
 const BOUNDARY: &str = "#";

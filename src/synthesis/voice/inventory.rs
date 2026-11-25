@@ -1,10 +1,10 @@
+use crate::platform::fs;
 mod flat;
 mod inspect;
 mod nofs;
 
 use std::{
     collections::BTreeMap,
-    fs,
     path::{Path, PathBuf},
     sync::{Arc, OnceLock},
 };
@@ -201,7 +201,7 @@ impl VoiceInventory {
                 let path = entry?.path();
                 Ok::<_, std::io::Error>(
                     found
-                        || (path.is_file()
+                        || (fs::is_file(&path)
                             && path
                                 .extension()
                                 .is_some_and(|extension| extension.eq_ignore_ascii_case("dnni"))),
@@ -219,7 +219,7 @@ impl VoiceInventory {
             .map(|entry| entry.map(|entry| entry.path()))
             .collect::<std::io::Result<Vec<_>>>()?;
         paths.retain(|path| {
-            path.is_file()
+            fs::is_file(path)
                 && path
                     .extension()
                     .is_some_and(|ext| ext.eq_ignore_ascii_case("dnni"))

@@ -1,3 +1,4 @@
+use crate::platform::fs;
 use std::path::Path;
 
 use serde::Serialize;
@@ -75,7 +76,7 @@ fn entry(
     let managed = is_managed_voice(path);
     let icon_path = managed
         .then(|| path.with_extension("png"))
-        .filter(|icon| icon.is_file());
+        .filter(|icon| fs::is_file(icon));
     Ok(VoiceCatalogEntry {
         database_id: manifest.database_id(),
         revision: manifest.revision()?,

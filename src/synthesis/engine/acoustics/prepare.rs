@@ -10,7 +10,7 @@ use crate::synthesis::{
     },
     voice::{PreparedVoice, Result, VoiceError, VoiceFamily},
 };
-use std::time::Instant;
+use web_time::Instant;
 
 /// Prepare whole-phrase contextual features once, independently of the order in
 /// which the caller will request acoustic frames.

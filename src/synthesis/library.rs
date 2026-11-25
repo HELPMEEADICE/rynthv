@@ -2,6 +2,7 @@ use super::{
     settings::SynthesisSettings,
     voice::{Result, VoiceAvailability, VoiceCatalog, flat::FlatModelRegistry, svpk},
 };
+use crate::platform::fs;
 use std::{path::Path, sync::Arc};
 
 pub struct LibraryScan {
@@ -33,7 +34,7 @@ pub fn scan_roots(settings: &SynthesisSettings) -> LibraryScan {
         append(label, root, VoiceCatalog::scan(root));
     }
     if let Ok(root) = svpk::root()
-        && root.is_dir()
+        && fs::is_dir(&root)
     {
         append("SVPK", &root, svpk::scan(&root));
     }

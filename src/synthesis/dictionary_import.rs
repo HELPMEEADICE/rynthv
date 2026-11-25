@@ -2,8 +2,11 @@ mod members;
 
 use std::{io, path::Path};
 
+use crate::platform::{
+    fs,
+    temporary::{self, TempDir},
+};
 use sevenz_rust2::{ArchiveReader, Password};
-use tempfile::TempDir;
 
 use super::{
     resource_archive,
@@ -23,15 +26,13 @@ pub fn prepare(input: &Path, dry_run: bool) -> Result<TempDir> {
         _ => return Err(VoiceError::new("请选择 clf-data 的 ZIP 或 7z 压缩包")),
     };
     let directory = if dry_run {
-        tempfile::tempdir()?
+        temporary::create(None, "import-")?
     } else {
         let root = crate::platform::config_directory()
             .map_err(VoiceError::new)?
             .join("clf-data");
-        std::fs::create_dir_all(&root)?;
-        tempfile::Builder::new()
-            .prefix("import-")
-            .tempdir_in(root)?
+        fs::create_dir_all(&root)?;
+        temporary::create(Some(&root), "import-")?
     };
     extract(input, directory.path())?;
     Ok(directory)

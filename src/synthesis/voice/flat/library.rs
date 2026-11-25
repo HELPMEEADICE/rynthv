@@ -1,6 +1,6 @@
+use crate::platform::fs::{self, File, OpenOptions};
 use std::{
     collections::BTreeSet,
-    fs::{self, File, OpenOptions},
     io::{self, Read, Write},
     path::{Path, PathBuf},
 };
@@ -164,12 +164,15 @@ fn lock(imports: &Path) -> Result<File> {
     if !metadata.is_dir() || metadata.file_type().is_symlink() {
         return Err(VoiceError::new("Invalid managed Flat import directory"));
     }
-    let file = OpenOptions::new()
-        .read(true)
+    let mut options = OpenOptions::new();
+    #[cfg(not(target_arch = "wasm32"))]
+    options.read(true);
+    let file = options
         .write(true)
         .create(true)
         .truncate(false)
         .open(imports.join(".lock"))?;
+    #[cfg(not(target_arch = "wasm32"))]
     file.lock()?;
     Ok(file)
 }

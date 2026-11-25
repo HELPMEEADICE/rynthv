@@ -1,15 +1,13 @@
 //! Lightweight discovery of installed voice revisions, without loading model weights.
 
+use crate::platform::fs;
 mod dnni;
 mod flat;
 mod metadata;
 mod nofs;
 mod resource;
 
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 

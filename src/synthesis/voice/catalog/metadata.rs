@@ -1,4 +1,4 @@
-use std::fs::{self, File};
+use crate::platform::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
@@ -90,7 +90,7 @@ fn read_entry(path: &Path) -> Option<Entry> {
             genres: metadata.genres,
             pitch_range: metadata.pitch_range.filter(|range| !range.is_empty()),
             languages: metadata.languages,
-            icon_path: icon_path.is_file().then_some(icon_path),
+            icon_path: fs::is_file(&icon_path).then_some(icon_path),
         },
     })
 }

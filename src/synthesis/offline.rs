@@ -22,9 +22,9 @@ use std::{
         Arc,
         atomic::{AtomicBool, Ordering},
     },
-    time::Instant,
 };
 use voices::VoiceResources;
+use web_time::Instant;
 
 #[derive(Default)]
 pub struct Offline {

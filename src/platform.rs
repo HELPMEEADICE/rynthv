@@ -2,6 +2,30 @@
 
 use std::path::PathBuf;
 
+#[cfg(all(target_arch = "wasm32", feature = "web"))]
+pub(crate) mod web;
+#[cfg(target_arch = "wasm32")]
+pub(crate) use web::fs;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) mod fs {
+    pub use std::fs::*;
+
+    pub fn is_dir(path: impl AsRef<std::path::Path>) -> bool {
+        path.as_ref().is_dir()
+    }
+
+    pub fn is_file(path: impl AsRef<std::path::Path>) -> bool {
+        path.as_ref().is_file()
+    }
+
+    pub fn try_exists(path: impl AsRef<std::path::Path>) -> std::io::Result<bool> {
+        path.as_ref().try_exists()
+    }
+}
+
+pub(crate) mod temporary;
+
 #[cfg(all(target_os = "android", feature = "gui"))]
 pub(crate) mod android;
 
@@ -58,9 +82,15 @@ fn config_root() -> Result<PathBuf, String> {
     android::files_directory()
 }
 
+#[cfg(target_arch = "wasm32")]
+fn config_root() -> Result<PathBuf, String> {
+    Ok(PathBuf::from("/"))
+}
+
 #[cfg(not(any(
     windows,
     target_os = "linux",
+    target_arch = "wasm32",
     all(target_os = "android", feature = "gui")
 )))]
 fn config_root() -> Result<PathBuf, String> {

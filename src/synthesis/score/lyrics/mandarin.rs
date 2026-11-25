@@ -3,7 +3,8 @@
 //! Use the installed dictionary's first reading when a lyric has multiple
 //! pronunciations. Explicit phonemes and pinyin can specify another reading.
 
-use std::{collections::HashMap, fs, path::Path};
+use crate::platform::fs;
+use std::{collections::HashMap, path::Path};
 
 use crate::synthesis::voice::{Result, VoiceError};
 

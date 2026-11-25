@@ -1,5 +1,6 @@
 //! Compute selection belongs to a render scope, independent of the editor renderer.
 
+use web_time::Instant;
 mod diagnostics;
 
 use super::{
@@ -13,10 +14,11 @@ use std::{
         Arc, Mutex,
         atomic::{AtomicBool, Ordering},
     },
-    time::Instant,
 };
 
-pub use super::gpu::{AdapterId, AdapterInfo, list_devices};
+#[cfg(not(target_arch = "wasm32"))]
+pub use super::gpu::list_devices;
+pub use super::gpu::{AdapterId, AdapterInfo};
 pub use diagnostics::{Activity, Diagnostics};
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]

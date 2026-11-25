@@ -134,6 +134,7 @@ impl PreparedVoice {
         Ok(self.find_model(role)?.tree.as_ref())
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn shared_model(&self, role: &str) -> Result<Arc<PreparedTree>> {
         Ok(Arc::clone(&self.find_model(role)?.tree))
     }

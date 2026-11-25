@@ -1,24 +1,23 @@
 //! Prevent explicit imports from being saved to a packaged host's private copy.
 
-use std::{
-    fs::{File, OpenOptions},
-    io,
-    path::Path,
-};
+use crate::platform::fs::{File, OpenOptions};
+use std::{io, path::Path};
 
+#[cfg(not(target_arch = "wasm32"))]
 use crate::synthesis::voice::{Result, VoiceError};
 
 pub(super) fn open_read(path: &Path) -> io::Result<File> {
+    #[cfg(target_arch = "wasm32")]
+    return File::open(path);
+    #[cfg(not(target_arch = "wasm32"))]
     options().read(true).open(path)
 }
 
 pub(super) fn open_lock(path: &Path) -> io::Result<File> {
-    options()
-        .read(true)
-        .write(true)
-        .create(true)
-        .truncate(false)
-        .open(path)
+    let mut options = options();
+    #[cfg(not(target_arch = "wasm32"))]
+    options.read(true);
+    options.write(true).create(true).truncate(false).open(path)
 }
 
 pub(super) fn create_temporary(path: &Path) -> io::Result<File> {
@@ -116,7 +115,12 @@ pub(super) fn verify(file: &File, expected: &Path) -> Result<()> {
     Ok(())
 }
 
-#[cfg(not(any(windows, target_os = "linux", target_os = "android")))]
+#[cfg(not(any(
+    windows,
+    target_os = "linux",
+    target_os = "android",
+    target_arch = "wasm32"
+)))]
 pub(super) fn verify(_file: &File, _expected: &Path) -> Result<()> {
     Err(VoiceError::new(
         "模型上下文导入当前仅支持 Windows 和 Linux。",

@@ -23,6 +23,7 @@ impl Cancellation {
 
     /// Cancel an execution cursor without cancelling its owner render. The
     /// parent remains observable by kernels running on the cursor's worker.
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn child(parent: Option<Self>) -> Self {
         Self {
             flag: Arc::new(AtomicBool::new(false)),
@@ -38,6 +39,7 @@ impl Cancellation {
                 .is_some_and(|parent| parent.is_cancelled())
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn cancel(&self) {
         self.flag.store(true, Ordering::Release);
     }

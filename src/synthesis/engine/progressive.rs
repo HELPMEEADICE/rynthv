@@ -22,7 +22,8 @@ use crate::synthesis::{
 };
 use network::PreparedFrames;
 use pcm::PcmStore;
-use std::{ops::Range, sync::OnceLock, time::Instant};
+use std::{ops::Range, sync::OnceLock};
+use web_time::Instant;
 
 pub struct PreparedRender {
     acoustic: PreparedRenderAcoustics,

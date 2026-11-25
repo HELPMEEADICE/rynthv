@@ -1,4 +1,6 @@
-use super::adapter::{AdapterId, AdapterInfo, adapters, limits};
+#[cfg(not(target_arch = "wasm32"))]
+use super::adapter::adapters;
+use super::adapter::{AdapterId, AdapterInfo, limits};
 #[cfg(all(target_os = "android", feature = "gui"))]
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -65,6 +67,7 @@ impl Device {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub(in super::super) fn open(
     selected: Option<&AdapterId>,
 ) -> (Vec<AdapterInfo>, Result<Device, String>) {
@@ -73,6 +76,7 @@ pub(in super::super) fn open(
     (devices, open_device(backends, adapters, selected))
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn open_device(
     backends: Backends,
     adapters: Vec<(Adapter, AdapterInfo)>,
@@ -105,6 +109,35 @@ fn open_device(
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+pub(in super::super) fn open(
+    selected: Option<&AdapterId>,
+) -> (Vec<AdapterInfo>, Result<Device, String>) {
+    let adapter = crate::platform::web::wait(async {
+        let mut descriptor = wgpu::InstanceDescriptor::new_without_display_handle();
+        descriptor.backends = Backends::BROWSER_WEBGPU;
+        let instance = wgpu::Instance::new(descriptor);
+        instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::HighPerformance,
+                ..Default::default()
+            })
+            .await
+    })
+    .and_then(|result| result.map_err(|error| format!("Browser WebGPU adapter: {error}")));
+    let adapter = match adapter {
+        Ok(adapter) => adapter,
+        Err(error) => return (Vec::new(), Err(error)),
+    };
+    let info = super::adapter::adapter_info(&adapter);
+    let result = if selected.is_some_and(|id| *id != info.id) {
+        Err("The requested adapter is unavailable in this browser".into())
+    } else {
+        request_device(adapter, info.clone())
+    };
+    (vec![info], result)
+}
+
 fn request_device(adapter: Adapter, info: AdapterInfo) -> Result<Device, String> {
     if let Some(reason) = &info.unavailable_reason {
         return Err(format!("{}: {reason}", info.id));
@@ -116,8 +149,12 @@ fn request_device(adapter: Adapter, info: AdapterInfo) -> Result<Device, String>
         memory_hints: wgpu::MemoryHints::MemoryUsage,
         ..Default::default()
     };
-    let (raw, queue) = pollster::block_on(adapter.request_device(&descriptor))
-        .map_err(|error| format!("{}: {error}", info.id))?;
+    #[cfg(not(target_arch = "wasm32"))]
+    let requested = pollster::block_on(adapter.request_device(&descriptor));
+    #[cfg(target_arch = "wasm32")]
+    let requested =
+        crate::platform::web::wait(async move { adapter.request_device(&descriptor).await })?;
+    let (raw, queue) = requested.map_err(|error| format!("{}: {error}", info.id))?;
     let error = Arc::new(OnceLock::new());
     let fault = Arc::clone(&error);
     raw.on_uncaptured_error(Arc::new(move |e| {

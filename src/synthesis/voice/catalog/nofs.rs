@@ -1,3 +1,4 @@
+use crate::platform::fs;
 use std::path::Path;
 
 use super::{VoiceAvailability, VoiceCatalogEntry};
@@ -7,7 +8,7 @@ pub(super) fn entry(path: &Path) -> Result<VoiceCatalogEntry> {
     let icon_path = path
         .parent()
         .map(|directory| directory.join("profile.png"))
-        .filter(|path| path.is_file());
+        .filter(|path| fs::is_file(path));
     let mut entry = VoiceCatalogEntry {
         flat: None,
         database_id: nofs::database_id(path)?,

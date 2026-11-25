@@ -3,8 +3,8 @@ use crate::synthesis::inference::compute::Activity;
 use std::{
     collections::HashMap,
     sync::{Arc, Weak},
-    time::Instant,
 };
+use web_time::Instant;
 use wgpu::{Buffer, BufferUsages, ComputePipeline, ShaderModule, util::DeviceExt};
 
 #[derive(Default)]
@@ -36,16 +36,19 @@ impl Cache {
                 (memory / 128).clamp(6 << 20, 32 << 20),
             )
         };
-        #[cfg(not(all(target_os = "android", feature = "gui")))]
+        #[cfg(target_arch = "wasm32")]
+        let (weight, buffer) = (96 << 20, 16 << 20);
+        #[cfg(not(any(target_arch = "wasm32", all(target_os = "android", feature = "gui"))))]
         let (weight, buffer) = (384 << 20, 64 << 20);
-        let (weight_budget, buffer_budget) = if cfg!(target_os = "android") {
-            (
-                weight.min(limits.max_buffer_size),
-                buffer.min(limits.max_buffer_size),
-            )
-        } else {
-            (weight, buffer)
-        };
+        let (weight_budget, buffer_budget) =
+            if cfg!(any(target_os = "android", target_arch = "wasm32")) {
+                (
+                    weight.min(limits.max_buffer_size),
+                    buffer.min(limits.max_buffer_size),
+                )
+            } else {
+                (weight, buffer)
+            };
         Self {
             weight_budget,
             buffer_budget,

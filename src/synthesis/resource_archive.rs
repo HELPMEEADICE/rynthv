@@ -1,5 +1,5 @@
+use crate::platform::fs::File;
 use std::{
-    fs::File,
     io::{self, BufReader, Read},
     path::Path,
 };

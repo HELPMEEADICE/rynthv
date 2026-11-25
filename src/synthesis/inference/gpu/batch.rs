@@ -3,10 +3,10 @@ use crate::synthesis::{
     execution,
     inference::{compute::Activity, matrix::MatrixError},
 };
-use std::{
-    sync::{Arc, mpsc},
-    time::{Duration, Instant},
-};
+use std::sync::Arc;
+#[cfg(not(target_arch = "wasm32"))]
+use std::{sync::mpsc, time::Duration};
+use web_time::Instant;
 use wgpu::{Buffer, BufferUsages};
 
 #[derive(Clone, Copy)]
@@ -221,32 +221,7 @@ impl<'a> Batch<'a> {
         self.activity.readback_count += 1;
         self.activity.readback_bytes += mapped_bytes;
         let slice = staging.slice(..mapped_bytes);
-        let (tx, rx) = mpsc::sync_channel(1);
-        slice.map_async(wgpu::MapMode::Read, move |status| {
-            let _ = tx.send(status);
-        });
-        let mapped = loop {
-            checkpoint(self.device)?;
-            match self.device.raw.poll(wgpu::PollType::Wait {
-                submission_index: Some(submission.clone()),
-                timeout: Some(Duration::from_millis(5)),
-            }) {
-                Ok(_) => {}
-                Err(wgpu::PollError::Timeout) => {}
-                Err(error) => return Err(MatrixError::Compute(error.to_string())),
-            }
-            // A concurrent poll can collect the callback and deliver it after
-            // this thread's wait returns.
-            match rx.recv_timeout(Duration::from_millis(5)) {
-                Ok(status) => break status,
-                Err(mpsc::RecvTimeoutError::Timeout) => {}
-                Err(error) => {
-                    return Err(MatrixError::Compute(format!(
-                        "WebGPU readback callback: {error}"
-                    )));
-                }
-            }
-        };
+        let mapped = map_read(self.device, &slice, submission)?;
         checkpoint(self.device)?;
         mapped.map_err(|e| MatrixError::Compute(format!("WebGPU readback: {e}")))?;
         {
@@ -310,4 +285,53 @@ fn checkpoint(device: &Device) -> Result<(), MatrixError> {
     device
         .error()
         .map_or(Ok(()), |error| Err(MatrixError::Compute(error)))
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn map_read(
+    device: &Device,
+    slice: &wgpu::BufferSlice<'_>,
+    submission: wgpu::SubmissionIndex,
+) -> Result<Result<(), wgpu::BufferAsyncError>, MatrixError> {
+    let (tx, rx) = mpsc::sync_channel(1);
+    slice.map_async(wgpu::MapMode::Read, move |status| {
+        let _ = tx.send(status);
+    });
+    loop {
+        checkpoint(device)?;
+        match device.raw.poll(wgpu::PollType::Wait {
+            submission_index: Some(submission.clone()),
+            timeout: Some(Duration::from_millis(5)),
+        }) {
+            Ok(_) => {}
+            Err(wgpu::PollError::Timeout) => {}
+            Err(error) => return Err(MatrixError::Compute(error.to_string())),
+        }
+        // A concurrent poll can collect the callback and deliver it after
+        // this thread's wait returns.
+        match rx.recv_timeout(Duration::from_millis(5)) {
+            Ok(status) => return Ok(status),
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+            Err(error) => {
+                return Err(MatrixError::Compute(format!(
+                    "WebGPU readback callback: {error}"
+                )));
+            }
+        }
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+fn map_read(
+    _: &Device,
+    slice: &wgpu::BufferSlice<'_>,
+    _: wgpu::SubmissionIndex,
+) -> Result<Result<(), wgpu::BufferAsyncError>, MatrixError> {
+    let (sender, receiver) = futures_channel::oneshot::channel();
+    slice.map_async(wgpu::MapMode::Read, move |status| {
+        let _ = sender.send(status);
+    });
+    crate::platform::web::wait(receiver)
+        .map_err(MatrixError::Compute)?
+        .map_err(|error| MatrixError::Compute(format!("WebGPU readback callback: {error}")))
 }
