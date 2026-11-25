@@ -130,17 +130,17 @@ impl Worker {
             });
         }
 
-        for owner in &output.report.owners {
+        for owner in output.report.owners {
             let data = &owner.owner.visuals;
             let origin = owner.owner.audio.start_seconds();
             let mut peaks = Vec::new();
             data.waveform.append_peaks(&mut peaks);
             event(
                 Event::Visuals(Box::new(Visuals {
-                    group: owner.group_ref_id.clone(),
+                    group: owner.group_ref_id,
                     pitch: data.pitch.clone(),
                     phones: data.phonemes.clone(),
-                    note_ids: owner.note_ids.clone(),
+                    note_ids: owner.note_ids.into_iter().collect(),
                     origin,
                     frames: owner.owner.audio.frames(),
                 })),

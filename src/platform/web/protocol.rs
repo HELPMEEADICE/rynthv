@@ -7,7 +7,7 @@ use crate::synthesis::{
     voice::{VoiceCatalog, VoiceConfiguration},
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, path::PathBuf};
+use std::path::PathBuf;
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -77,7 +77,8 @@ pub struct Visuals {
     pub group: String,
     pub pitch: PitchTrack,
     pub phones: RenderedPhonemeTrack,
-    pub note_ids: BTreeMap<u64, String>,
+    // Keep IDs as JSON numbers when Serde buffers the internally tagged event.
+    pub note_ids: Vec<(u64, String)>,
     pub origin: f64,
     pub frames: usize,
 }

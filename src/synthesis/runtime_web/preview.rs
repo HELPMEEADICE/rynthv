@@ -142,8 +142,8 @@ impl Runtime {
             }
             let visuals = std::mem::take(&mut *task.visuals.borrow_mut());
             let result = task.pending.poll();
-            for (visual, pcm) in visuals {
-                self.publish_visuals(visual, pcm);
+            for (visual, peaks) in visuals {
+                self.publish_visuals(visual, peaks);
             }
             if let Some(result) = result {
                 self.preview.task = None;
@@ -228,8 +228,8 @@ impl Runtime {
                         }
                         audio::audio_block(index, pcm);
                     }
-                    (Event::Visuals(visual), Some(pcm)) => {
-                        patches.borrow_mut().push((*visual, pcm));
+                    (Event::Visuals(visual), Some(peaks)) => {
+                        patches.borrow_mut().push((*visual, peaks));
                         repaint.wake();
                     }
                     _ => {}
@@ -338,10 +338,10 @@ impl Runtime {
             .iter()
             .map(|note| (&note.uuid, note.id))
             .collect();
+        let note_ids: BTreeMap<_, _> = visual.note_ids.into_iter().collect();
         let phones = Arc::make_mut(&mut visual.phones.phones);
         for phone in phones {
-            if let Some(id) = visual
-                .note_ids
+            if let Some(id) = note_ids
                 .get(&phone.source.note_id)
                 .and_then(|uuid| ids.get(uuid))
             {
