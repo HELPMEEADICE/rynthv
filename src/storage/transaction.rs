@@ -52,6 +52,14 @@ pub struct ProjectFile {
     _lock: File,
 }
 
+impl Drop for ProjectFile {
+    fn drop(&mut self) {
+        // Release the lock even if a concurrent spawn briefly inherited the
+        // open file description before exec closes its copy.
+        let _ = self._lock.unlock();
+    }
+}
+
 impl ProjectFile {
     pub fn lock(path: &Path) -> Result<Self, String> {
         let absolute = std::path::absolute(path).map_err(|error| error.to_string())?;
