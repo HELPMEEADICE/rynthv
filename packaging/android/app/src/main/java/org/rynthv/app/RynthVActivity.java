@@ -75,6 +75,7 @@ public final class RynthVActivity extends NativeActivity {
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         super.onCreate(state);
         editorInput = new EditorInput(this, () -> nativeEvent(6));
+        EditorWindow.install(this, editorInput);
         files.execute(documents::pruneTransientFiles);
         audioManager.registerAudioDeviceCallback(routes, new Handler(Looper.getMainLooper()));
         setVolumeControlStream(AudioManager.STREAM_MUSIC);

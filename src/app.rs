@@ -475,8 +475,12 @@ impl eframe::App for App {
         }
         #[cfg(not(target_os = "android"))]
         self.update_title(&ctx);
+        ui.painter()
+            .rect_filled(ui.max_rect(), 0, ui::theme::BACKGROUND);
+        #[cfg(target_os = "android")]
+        let rect = ui.max_rect().intersect(ctx.content_rect());
+        #[cfg(not(target_os = "android"))]
         let rect = ui.max_rect();
-        ui.painter().rect_filled(rect, 0, ui::theme::BACKGROUND);
         #[cfg(target_os = "android")]
         let (menu_height, transport_height) =
             (ui::mobile::MENU_HEIGHT, ui::mobile::TRANSPORT_HEIGHT);
