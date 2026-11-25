@@ -102,17 +102,25 @@ impl Default for ViewState {
             panel_width: 234.0,
             arrangement_first: true,
             arrangement_height: 264.0,
-            arrangement_collapsed: cfg!(target_os = "android"),
+            arrangement_collapsed: false,
             piano: Viewport {
                 start: 0.0,
-                beat_width: 160.0,
+                beat_width: if cfg!(target_os = "android") {
+                    96.0
+                } else {
+                    160.0
+                },
             },
             arrangement: Viewport {
                 start: 0.0,
                 beat_width: 20.0,
             },
             top_pitch: 74.0,
-            row_height: 24.0,
+            row_height: if cfg!(target_os = "android") {
+                16.0
+            } else {
+                24.0
+            },
             grid: 16,
             triplet: false,
             snap: true,
@@ -127,6 +135,7 @@ impl Default for ViewState {
     }
 }
 impl ViewState {
+    #[cfg(not(target_os = "android"))]
     pub fn toggle(&mut self, column: Column) {
         if self.columns.contains(&column) {
             self.columns.retain(|c| *c != column);
@@ -189,8 +198,11 @@ impl ViewState {
 }
 #[derive(Clone, Copy)]
 pub enum DragPayload {
+    #[cfg(not(target_os = "android"))]
     Column(Column),
+    #[cfg(not(target_os = "android"))]
     Arrangement,
+    #[cfg(not(target_os = "android"))]
     Piano,
     Lane(u64),
 }

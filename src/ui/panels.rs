@@ -4,11 +4,7 @@ mod note;
 mod render;
 pub(crate) use note::{PhonemeDraft, end_performance_frame};
 
-use super::{
-    child,
-    state::{Column, DragPayload},
-    theme::*,
-};
+use super::{child, state::Column, theme::*};
 use crate::app::App;
 use eframe::egui::*;
 
@@ -19,7 +15,12 @@ pub fn show(app: &mut App, ui: &mut Ui, column: Column) {
         super::phonemes::phoneme_deactivate(app);
     }
     ui.painter().rect_filled(rect, 4, PANEL);
-    let header = Rect::from_min_size(rect.min, vec2(rect.width(), 42.0));
+    let header_height = if cfg!(target_os = "android") {
+        34.0
+    } else {
+        42.0
+    };
+    let header = Rect::from_min_size(rect.min, vec2(rect.width(), header_height));
     let mut header_ui = child(
         ui,
         header.shrink2(vec2(14.0, 2.0)),
@@ -33,7 +34,14 @@ pub fn show(app: &mut App, ui: &mut Ui, column: Column) {
             Rect::from_center_size(icon.center(), Vec2::splat(20.0)),
             MUTED,
         );
-        super::section_title(ui, column.label(), DragPayload::Column(column));
+        #[cfg(not(target_os = "android"))]
+        super::section_title(
+            ui,
+            column.label(),
+            super::state::DragPayload::Column(column),
+        );
+        #[cfg(target_os = "android")]
+        ui.label(RichText::new(column.label()).font(section_title_font()));
     });
     ui.painter()
         .hline(header.x_range(), header.bottom(), Stroke::new(1.0, EDGE));

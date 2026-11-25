@@ -90,7 +90,7 @@ impl App {
                     memory.surrender_focus(id);
                 }
             });
-        } else if !ui::mobile::back_to_editor(ctx) {
+        } else if !ui::mobile::back_to_editor(self, ctx) {
             self.persist_layout();
             self.update_recovery(ctx);
             if let Err(error) = crate::platform::android::move_to_background() {

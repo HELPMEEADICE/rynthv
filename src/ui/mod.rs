@@ -1,6 +1,7 @@
 pub mod arrangement;
 pub mod arrangement_tracks;
 pub mod chrome;
+mod dialog;
 pub mod fill_lyrics;
 pub mod group_edit;
 pub mod group_geometry;
@@ -26,10 +27,12 @@ pub mod theme;
 pub mod time_edit;
 pub mod time_tracks;
 pub mod timeline;
-pub mod tool_rail;
+#[cfg(not(target_os = "android"))]
+mod tool_rail;
 mod track_color;
 pub mod track_header;
-pub mod transport;
+#[cfg(not(target_os = "android"))]
+mod transport;
 pub mod view_pan;
 pub mod voice_library;
 pub mod workspace;
@@ -50,6 +53,7 @@ pub fn label(ui: &Ui, pos: Pos2, text: impl ToString, color: Color32) {
     );
 }
 
+#[cfg(not(target_os = "android"))]
 pub fn section_title(ui: &mut Ui, text: &str, payload: state::DragPayload) -> Response {
     let response = ui.add(
         Label::new(

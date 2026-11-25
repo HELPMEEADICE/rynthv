@@ -1,7 +1,6 @@
 use super::{
     Gesture,
     gestures::{pitch_at, start_gesture, update_gesture},
-    lyrics::lyric,
     scene,
 };
 use crate::{
@@ -32,15 +31,20 @@ pub fn show(app: &mut App, ui: &mut Ui) {
     }
     let phoneme_dragging = crate::ui::phonemes::phoneme_dragging(app);
     ui.painter().rect_filled(all, 0, PANEL);
+    let ruler_height = if cfg!(target_os = "android") {
+        26.0
+    } else {
+        38.0
+    };
     let ruler = Rect::from_min_max(
         pos2(all.left() + GUTTER, all.top()),
-        pos2(all.right(), all.top() + 38.0),
+        pos2(all.right(), all.top() + ruler_height),
     );
     let canvas = Rect::from_min_max(
-        pos2(ruler.left(), ruler.bottom() + 20.0),
+        pos2(ruler.left(), ruler.bottom() + super::GROUP_LABEL_HEIGHT),
         all.max - vec2(0.0, 6.0),
     );
-    if canvas.height() < 8.0 {
+    if canvas.height() < 8.0 || canvas.width() < 18.0 {
         return;
     }
     #[cfg(target_os = "android")]
@@ -176,10 +180,11 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         &app.view.piano,
         app.editor.transport.position,
     );
+    #[cfg(not(target_os = "android"))]
     if !app.piano_tool.is_pitch()
         && let Some(reference) = app.editor.active_ref().cloned()
     {
-        lyric(app, ui, canvas, &reference);
+        super::lyrics::lyric(app, ui, canvas, &reference);
     }
     crate::ui::scrollbars::horizontal(
         ui,

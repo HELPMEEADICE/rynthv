@@ -53,9 +53,15 @@ impl Page {
 pub fn show(app: &mut App, ctx: &Context) {
     let id = Id::new("settings-page");
     let mut page = ctx.data_mut(|data| data.get_temp::<Page>(id).unwrap_or_default());
+    #[cfg(target_os = "android")]
+    let size = (ctx.content_rect().size() - Vec2::splat(12.0)).min(vec2(800.0, 610.0));
+    #[cfg(not(target_os = "android"))]
     let size = (ctx.content_rect().size() - vec2(40.0, 48.0))
         .min(vec2(800.0, 610.0))
         .max(vec2(240.0, 240.0));
+    if size.x < 56.0 || size.y < 34.0 {
+        return;
+    }
     let before = app.preferences.clone();
     let mut close = false;
     let modal = Modal::new(Id::new("settings"))
@@ -68,8 +74,15 @@ pub fn show(app: &mut App, ctx: &Context) {
         )
         .show(ctx, |ui| {
             let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
-            let header = Rect::from_min_size(rect.min, vec2(rect.width(), 50.0));
-            let mut title = child(ui, header.shrink2(vec2(18.0, 10.0)), "settings-title");
+            let short = cfg!(target_os = "android") && size.y < 180.0;
+            let header_height = if short { 34.0 } else { 50.0 };
+            let header = Rect::from_min_size(rect.min, vec2(rect.width(), header_height));
+            let padding = if short {
+                vec2(12.0, 2.0)
+            } else {
+                vec2(18.0, 10.0)
+            };
+            let mut title = child(ui, header.shrink2(padding), "settings-title");
             title.spacing_mut().interact_size.y = 30.0;
             title.horizontal(|ui| {
                 let (icon, _) = ui.allocate_exact_size(Vec2::splat(17.0), Sense::hover());
@@ -90,11 +103,11 @@ pub fn show(app: &mut App, ctx: &Context) {
                 header.bottom(),
                 Stroke::new(1.0, Color32::from_rgb(44, 42, 45)),
             );
-            let compact = cfg!(target_os = "android") && size.x < 540.0;
+            let compact = cfg!(target_os = "android") && (size.x < 540.0 || short);
             let content_rect = if compact {
                 let nav = Rect::from_min_size(
-                    header.left_bottom() + vec2(12.0, 8.0),
-                    vec2(size.x - 24.0, 42.0),
+                    header.left_bottom() + vec2(12.0, if short { 2.0 } else { 8.0 }),
+                    vec2(size.x - 24.0, if short { 30.0 } else { 42.0 }),
                 );
                 ComboBox::from_id_salt("mobile-settings-navigation")
                     .width(nav.width() - 10.0)
@@ -136,6 +149,9 @@ pub fn show(app: &mut App, ctx: &Context) {
                     rect.max - vec2(20.0, 18.0),
                 )
             };
+            if !content_rect.is_positive() {
+                return;
+            }
             let mut content = child(ui, content_rect, ("settings-content", page));
             content.spacing_mut().item_spacing.y = 8.0;
             content.spacing_mut().interact_size.y = 30.0;
@@ -146,12 +162,14 @@ pub fn show(app: &mut App, ctx: &Context) {
                 .id_salt(("settings-page-scroll", page))
                 .show(&mut content, |ui| {
                     ui.set_width(ui.available_width());
-                    ui.label(
-                        RichText::new(page.label())
-                            .font(section_title_font())
-                            .size(15.0),
-                    );
-                    ui.add_space(18.0);
+                    if !compact {
+                        ui.label(
+                            RichText::new(page.label())
+                                .font(section_title_font())
+                                .size(15.0),
+                        );
+                        ui.add_space(18.0);
+                    }
                     match page {
                         Page::General => pages::general(app, ui),
                         Page::Audio => pages::audio(app, ui),

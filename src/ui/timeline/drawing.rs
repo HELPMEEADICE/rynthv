@@ -51,10 +51,12 @@ pub fn draw_ruler(ui: &Ui, rect: Rect, view: &Viewport, time: &TimeAxis, step: f
     let clip = painter.clip_rect();
     // Anchor the ticks to the baseline, independently of the surrounding header height.
     let baseline = rect.bottom();
+    let beat_tick = (rect.height() * 0.5).min(16.0);
+    let number_offset = (rect.height() - 9.0).clamp(9.0, 25.0);
     for beat in visible_steps(rect, view, step) {
         painter.vline(
             x_at(rect, view, beat),
-            baseline - 16.0..=baseline,
+            baseline - beat_tick..=baseline,
             Stroke::new(1.0, BEAT_LINE),
         );
     }
@@ -63,7 +65,11 @@ pub fn draw_ruler(ui: &Ui, rect: Rect, view: &Viewport, time: &TimeAxis, step: f
         visible_end(rect, view) + 1.0,
         |beat, index, _, _| {
             let x = x_at(rect, view, beat);
-            painter.vline(x, baseline - 32.0..=baseline, Stroke::new(1.0, BAR_LINE));
+            painter.vline(
+                x,
+                (baseline - 32.0).max(rect.top())..=baseline,
+                Stroke::new(1.0, BAR_LINE),
+            );
             if x < clip.left() - 96.0 || x > clip.right() {
                 return;
             }
@@ -72,7 +78,7 @@ pub fn draw_ruler(ui: &Ui, rect: Rect, view: &Viewport, time: &TimeAxis, step: f
                 FontId::proportional(12.0),
                 TEXT,
             );
-            let pos = pos2(x + 7.0, baseline - 25.0 - text.size().y / 2.0);
+            let pos = pos2(x + 7.0, baseline - number_offset - text.size().y / 2.0);
             if Rect::from_min_size(pos, text.size()).intersects(clip) {
                 painter.galley(pos, text, TEXT);
             }

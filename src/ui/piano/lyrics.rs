@@ -1,12 +1,13 @@
 use super::LyricEdit;
-use crate::{app::App, model::*, ui::child};
+use crate::{app::App, model::*};
 use eframe::egui::{
     text::{CCursor, CCursorRange},
     *,
 };
 use std::collections::BTreeSet;
+#[cfg(not(target_os = "android"))]
 pub(super) fn lyric(app: &mut App, ui: &mut Ui, rect: Rect, reference: &GroupRef) {
-    let Some(mut edit) = app.lyric.take() else {
+    let Some(edit) = app.lyric.take() else {
         return;
     };
     let Some(note) = app.editor.notes().iter().find(|n| n.id == edit.id) else {
@@ -25,9 +26,35 @@ pub(super) fn lyric(app: &mut App, ui: &mut Ui, rect: Rect, reference: &GroupRef
     };
     let clip = crate::ui::group_geometry::clip_rect(reference, rect, &app.view.piano);
     r.max.x = r.max.x.max(r.min.x + 130.0).min(clip.right());
-    let mut edit_ui = child(ui, r, ("lyric", edit.id));
-    let response = edit_ui.add_sized(
-        r.size(),
+    let mut edit_ui = crate::ui::child(ui, r, ("lyric", edit.id));
+    field(app, &mut edit_ui, r.size(), reference, edit);
+}
+
+#[cfg(target_os = "android")]
+pub(super) fn toolbar(app: &mut App, ui: &mut Ui) {
+    let Some(edit) = app.lyric.take() else {
+        return;
+    };
+    let Some(reference) = app.editor.active_ref().cloned() else {
+        return;
+    };
+    ui.horizontal_centered(|ui| {
+        ui.add_space(5.0);
+        ui.label("歌词");
+        let size = vec2((ui.available_width() - 52.0).max(30.0), 30.0);
+        field(app, ui, size, &reference, edit);
+        if ui
+            .add(Button::new("完成").min_size(vec2(44.0, 30.0)))
+            .clicked()
+        {
+            app.commit_lyric();
+        }
+    });
+}
+
+fn field(app: &mut App, ui: &mut Ui, size: Vec2, reference: &GroupRef, mut edit: LyricEdit) {
+    let response = ui.add_sized(
+        size,
         TextEdit::singleline(&mut edit.text)
             .id(Id::new(("lyric-input", edit.id)))
             .margin(vec2(4.0, 1.0))

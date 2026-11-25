@@ -157,8 +157,11 @@ pub fn headers(app: &mut App, ui: &mut Ui, canvas: Rect, groups: &[SceneGroup]) 
         } else {
             colors.note
         };
-        let header_clip = Rect::from_min_max(pos2(canvas.left(), canvas.top() - 20.0), canvas.max)
-            .intersect(ui.clip_rect());
+        let header_clip = Rect::from_min_max(
+            pos2(canvas.left(), canvas.top() - super::GROUP_LABEL_HEIGHT),
+            canvas.max,
+        )
+        .intersect(ui.clip_rect());
         let painter = ui.painter().with_clip_rect(header_clip);
         if !r.intersects(canvas) {
             continue;

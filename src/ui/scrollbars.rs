@@ -45,12 +45,35 @@ pub fn horizontal(
 
 pub fn vertical(ui: &mut Ui, rect: Rect, top_pitch: &mut f32, row_height: f32) {
     let visible = rect.height() / row_height;
-    let height = (rect.height() * visible / 128.0).clamp(18.0, rect.height());
+    let height =
+        (rect.height() * visible / 128.0).clamp(18.0_f32.min(rect.height()), rect.height());
+    *top_pitch = 127.0
+        - vertical_handle(
+            ui,
+            "pitch-scrollbar",
+            rect,
+            height,
+            127.0 - *top_pitch,
+            115.0,
+        );
+}
+
+#[cfg(target_os = "android")]
+pub(super) fn track_rows(ui: &mut Ui, rect: Rect, total: f32, max: f32, scroll: f32) -> f32 {
+    if max <= 0.0 {
+        return scroll;
+    }
+    let height =
+        (rect.height() * rect.height() / total).clamp(24.0_f32.min(rect.height()), rect.height());
+    vertical_handle(ui, "track-scrollbar", rect, height, scroll, max)
+}
+
+fn vertical_handle(ui: &mut Ui, id: &str, rect: Rect, height: f32, scroll: f32, max: f32) -> f32 {
     let span = (rect.height() - height).max(1.0);
-    let y = rect.top() + (127.0 - *top_pitch) / 115.0 * span;
+    let y = rect.top() + scroll / max * span;
     let handle = Rect::from_min_size(pos2(rect.center().x - 1.5, y), vec2(3.0, height));
     let response = ui
-        .interact(rect, Id::new("pitch-scrollbar"), Sense::click_and_drag())
+        .interact(rect, Id::new(id), Sense::click_and_drag())
         .on_hover_cursor(CursorIcon::ResizeVertical);
     ui.painter().rect_filled(
         handle,
@@ -62,10 +85,12 @@ pub fn vertical(ui: &mut Ui, rect: Rect, top_pitch: &mut f32, row_height: f32) {
         },
     );
     if response.dragged_by(PointerButton::Primary) {
-        *top_pitch = (*top_pitch - response.drag_delta().y / span * 115.0).clamp(12.0, 127.0);
+        (scroll + response.drag_delta().y / span * max).clamp(0.0, max)
     } else if response.clicked()
         && let Some(p) = response.interact_pointer_pos()
     {
-        *top_pitch = (127.0 - (p.y - rect.top() - height / 2.0) / span * 115.0).clamp(12.0, 127.0);
+        ((p.y - rect.top() - height / 2.0) / span * max).clamp(0.0, max)
+    } else {
+        scroll
     }
 }

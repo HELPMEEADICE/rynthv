@@ -6,7 +6,11 @@ use super::{
 use crate::{app::App, model::*};
 use eframe::egui::*;
 
-pub const ROW_HEIGHT: f32 = 28.0;
+pub const ROW_HEIGHT: f32 = if cfg!(target_os = "android") {
+    24.0
+} else {
+    28.0
+};
 
 pub fn show(app: &mut App, ui: &mut Ui, rect: Rect) {
     for row_index in 0..2 {

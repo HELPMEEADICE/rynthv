@@ -4,17 +4,20 @@ use eframe::egui::*;
 #[derive(Clone, Copy)]
 pub enum Icon {
     ChevronDown,
+    #[cfg(not(target_os = "android"))]
     ChevronRight,
     Plus,
     Close,
     Play,
     Pause,
     Stop,
+    #[cfg(not(target_os = "android"))]
     Record,
     Rewind,
     Forward,
     Loop,
     Metronome,
+    #[cfg(not(target_os = "android"))]
     Return,
     Microphone,
     Notes,
@@ -43,6 +46,7 @@ impl Icon {
     pub fn image(self) -> Image<'static> {
         match self {
             Self::ChevronDown => Image::new(include_image!("../../assets/icons/chevron-down.svg")),
+            #[cfg(not(target_os = "android"))]
             Self::ChevronRight => {
                 Image::new(include_image!("../../assets/icons/chevron-right.svg"))
             }
@@ -51,11 +55,13 @@ impl Icon {
             Self::Play => Image::new(include_image!("../../assets/icons/play.svg")),
             Self::Pause => Image::new(include_image!("../../assets/icons/pause.svg")),
             Self::Stop => Image::new(include_image!("../../assets/icons/stop.svg")),
+            #[cfg(not(target_os = "android"))]
             Self::Record => Image::new(include_image!("../../assets/icons/record.svg")),
             Self::Rewind => Image::new(include_image!("../../assets/icons/rewind.svg")),
             Self::Forward => Image::new(include_image!("../../assets/icons/forward.svg")),
             Self::Loop => Image::new(include_image!("../../assets/icons/loop.svg")),
             Self::Metronome => Image::new(include_image!("../../assets/icons/metronome.svg")),
+            #[cfg(not(target_os = "android"))]
             Self::Return => Image::new(include_image!("../../assets/icons/return.svg")),
             Self::Microphone => Image::new(include_image!("../../assets/icons/microphone.svg")),
             Self::Notes => Image::new(include_image!("../../assets/icons/notes.svg")),

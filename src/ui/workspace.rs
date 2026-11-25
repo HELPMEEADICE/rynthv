@@ -1,18 +1,12 @@
-use super::{
-    child,
-    state::{Column, DragPayload},
-    theme::*,
-};
+#[cfg(not(target_os = "android"))]
+use super::state::Column;
+use super::{child, state::DragPayload, theme::*};
 use crate::app::App;
 use eframe::egui::*;
 
+#[cfg(not(target_os = "android"))]
 pub fn show(app: &mut App, ui: &mut Ui) {
     let rect = ui.max_rect();
-    #[cfg(target_os = "android")]
-    if rect.width() < 980.0 {
-        super::mobile::workspace(app, ui);
-        return;
-    }
     let rail = Rect::from_min_max(
         pos2(rect.right() - super::tool_rail::WIDTH, rect.top()),
         rect.max,
@@ -79,14 +73,11 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         app.view.columns.insert(index, source);
     }
 }
-pub(super) fn editor(app: &mut App, ui: &mut Ui) {
+#[cfg(not(target_os = "android"))]
+fn editor(app: &mut App, ui: &mut Ui) {
     let rect = ui.max_rect();
     let available = (rect.height() - 5.0).max(0.0);
-    let arrangement_limit = if cfg!(target_os = "android") {
-        (available * 0.34).max(42.0)
-    } else {
-        (available - 170.0).max(80.0)
-    };
+    let arrangement_limit = (available - 170.0).max(80.0);
     let arrangement_height = if app.view.arrangement_collapsed {
         42.0
     } else if app.piano_collapsed {
@@ -156,10 +147,21 @@ pub(super) fn editor(app: &mut App, ui: &mut Ui) {
         }
     }
 }
-fn piano_stack(app: &mut App, ui: &mut Ui) {
+pub(super) fn piano_stack(app: &mut App, ui: &mut Ui) {
     let rect = ui.max_rect();
-    let toolbar = Rect::from_min_size(rect.min, vec2(rect.width(), super::piano::TOOLBAR_HEIGHT));
-    let tabs = Rect::from_min_max(pos2(rect.left(), rect.bottom() - 28.0), rect.max);
+    let toolbar = Rect::from_min_size(
+        rect.min,
+        vec2(
+            rect.width(),
+            super::piano::TOOLBAR_HEIGHT.min(rect.height()),
+        ),
+    );
+    let lanes_bottom = rect.bottom()
+        - if cfg!(target_os = "android") {
+            0.0
+        } else {
+            28.0
+        };
     ui.painter().rect_filled(rect, 4, PANEL);
     ui.painter()
         .rect_stroke(rect, 4, Stroke::new(1.0, BORDER), StrokeKind::Inside);
@@ -180,13 +182,21 @@ fn piano_stack(app: &mut App, ui: &mut Ui) {
         0.0
     };
     let desired: f32 = lanes.iter().map(|l| l.height + 5.0).sum::<f32>() + phonemes;
-    let available = (tabs.top() - toolbar.bottom() - 125.0).max(0.0);
+    let minimum_piano = if cfg!(target_os = "android") {
+        140.0
+    } else {
+        125.0
+    };
+    let available = (lanes_bottom - toolbar.bottom() - minimum_piano).max(0.0);
     let scale = if desired > available {
         available / desired.max(1.0)
     } else {
         1.0
     };
-    let mut y = tabs.top() - desired * scale;
+    let mut y = lanes_bottom - desired * scale;
+    if y <= toolbar.bottom() {
+        return;
+    }
     super::piano::show(
         app,
         &mut child(
@@ -195,6 +205,10 @@ fn piano_stack(app: &mut App, ui: &mut Ui) {
             "piano",
         ),
     );
+    #[cfg(target_os = "android")]
+    if scale == 0.0 {
+        return;
+    }
     if app.view.phonemes {
         let divider = Rect::from_min_size(pos2(rect.left(), y), vec2(rect.width(), 5.0 * scale));
         let response = ui
@@ -249,6 +263,9 @@ fn piano_stack(app: &mut App, ui: &mut Ui) {
         let at = app.view.lanes.iter().position(|l| l.id == target).unwrap();
         app.view.lanes.insert(at, lane);
     }
-    let mut tab_ui = child(ui, tabs, "lane-tabs");
-    super::lane_tabs::show(app, &mut tab_ui);
+    #[cfg(not(target_os = "android"))]
+    {
+        let tabs = Rect::from_min_max(pos2(rect.left(), lanes_bottom), rect.max);
+        super::lane_tabs::show(app, &mut child(ui, tabs, "lane-tabs"));
+    }
 }

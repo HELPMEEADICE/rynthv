@@ -10,34 +10,29 @@ static READY: AtomicBool = AtomicBool::new(false);
 
 thread_local! {
     static KEYBOARD: Cell<i32> = const { Cell::new(0) };
-    static INSETS: Cell<[i32; 4]> = const { Cell::new([0; 4]) };
+    static INSETS: Cell<WindowInsets> = const { Cell::new(WindowInsets {
+        left: 0, top: 0, right: 0, bottom: 0, window_height: 0,
+    }) };
+}
+
+#[derive(Clone, Copy, Deserialize)]
+struct WindowInsets {
+    left: i32,
+    top: i32,
+    right: i32,
+    bottom: i32,
+    window_height: i32,
 }
 
 #[derive(Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 enum Input {
-    Insets {
-        left: i32,
-        top: i32,
-        right: i32,
-        bottom: i32,
-    },
-    Preedit {
-        text: String,
-    },
-    Commit {
-        text: String,
-    },
-    Delete {
-        before: usize,
-        after: usize,
-    },
-    Text {
-        text: String,
-    },
-    Key {
-        text: String,
-    },
+    Insets(WindowInsets),
+    Preedit { text: String },
+    Commit { text: String },
+    Delete { before: usize, after: usize },
+    Text { text: String },
+    Key { text: String },
 }
 
 pub(super) fn ready() {
@@ -51,12 +46,7 @@ pub(crate) fn read(ctx: &Context, raw: &mut RawInput) {
     {
         for input in events {
             match input {
-                Input::Insets {
-                    left,
-                    top,
-                    right,
-                    bottom,
-                } => INSETS.set([left, top, right, bottom]),
+                Input::Insets(insets) => INSETS.set(insets),
                 Input::Preedit { text } => raw.events.push(Event::Ime(ImeEvent::Preedit {
                     text,
                     active_range_chars: None,
@@ -86,12 +76,16 @@ pub(crate) fn read(ctx: &Context, raw: &mut RawInput) {
         }
     }
     let scale = raw.viewport().native_pixels_per_point.unwrap_or(1.0) * ctx.zoom_factor();
-    let [left, top, right, bottom] = INSETS.get().map(|px| px as f32 / scale);
+    let insets = INSETS.get();
+    // The IME can already have shortened the native surface on some windows.
+    let resized = raw.screen_rect.map_or(0.0, |rect| {
+        (insets.window_height as f32 / scale - rect.height()).max(0.0)
+    });
     raw.safe_area_insets = Some(egui::SafeAreaInsets(egui::epaint::MarginF32 {
-        left,
-        top,
-        right,
-        bottom,
+        left: insets.left as f32 / scale,
+        top: insets.top as f32 / scale,
+        right: insets.right as f32 / scale,
+        bottom: (insets.bottom as f32 / scale - resized).max(0.0),
     }));
 }
 

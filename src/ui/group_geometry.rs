@@ -35,12 +35,13 @@ pub fn visible_note_rect(
 }
 /// A label follows the visible beginning, but never escapes its group's right edge.
 pub fn label_rect(group: Rect, canvas: Rect, width: f32) -> Option<Rect> {
+    let height = super::piano::GROUP_LABEL_HEIGHT;
     let left = group.left().max(canvas.left());
     let right = group.right().min(canvas.right());
     (right > left).then(|| {
         Rect::from_min_size(
-            pos2(left, canvas.top() - 20.0),
-            vec2(width.min(right - left), 20.0),
+            pos2(left, canvas.top() - height),
+            vec2(width.min(right - left), height),
         )
     })
 }

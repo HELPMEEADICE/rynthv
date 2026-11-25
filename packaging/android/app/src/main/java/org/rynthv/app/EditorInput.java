@@ -1,19 +1,17 @@
 package org.rynthv.app;
 
 import android.app.Activity;
-import android.graphics.Insets;
-import android.os.Build;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
-import android.view.WindowInsets;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputConnectionWrapper;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import androidx.core.graphics.Insets;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -36,23 +34,16 @@ final class EditorInput extends EditText {
         setImeOptions(EditorInfo.IME_ACTION_DONE | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
         setVisibility(View.INVISIBLE);
         activity.addContentView(this, new FrameLayout.LayoutParams(1, 1, Gravity.TOP | Gravity.LEFT));
-        if (Build.VERSION.SDK_INT >= 30) {
-            activity.getWindow().setDecorFitsSystemWindows(false);
-            View decor = activity.getWindow().getDecorView();
-            decor.setOnApplyWindowInsetsListener((view, window) -> {
-                Insets insets = window.getInsets(
-                    WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout()
-                        | WindowInsets.Type.ime());
-                JSONObject event = event("insets");
-                put(event, "left", insets.left);
-                put(event, "top", insets.top);
-                put(event, "right", insets.right);
-                put(event, "bottom", insets.bottom);
-                emit(event);
-                return window;
-            });
-            decor.requestApplyInsets();
-        }
+    }
+
+    void updateInsets(Insets insets, int windowHeight) {
+        JSONObject event = event("insets");
+        put(event, "left", insets.left);
+        put(event, "top", insets.top);
+        put(event, "right", insets.right);
+        put(event, "bottom", insets.bottom);
+        put(event, "window_height", windowHeight);
+        emit(event);
     }
 
     void showKeyboard(int purpose, boolean reset) {
