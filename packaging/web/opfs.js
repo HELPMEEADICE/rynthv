@@ -1,7 +1,15 @@
-// Origin-private files are opened only by the synthesis Worker.
+// The synthesis Worker holds the resource lock. Compute Workers may open
+// read-only handles while their parent holds the lock for the render.
 let rootPromise;
 let nextHandle = 1;
+let readOnly = false;
 const handles = new Map();
+
+export function restrictToReads() { readOnly = true; }
+
+function requireWriteAccess() {
+    if (readOnly) throw new DOMException("CPU Worker storage is read-only", "NotAllowedError");
+}
 
 function root() {
     return rootPromise ??= navigator.storage.getDirectory();
@@ -48,6 +56,7 @@ async function absent(handle, name) {
 }
 
 export async function open_handle(path, write, create, exclusive, truncate) {
+    if (write || create || exclusive || truncate) requireWriteAccess();
     const [handle, name] = await parent(path);
     if (exclusive) await absent(handle, name);
     const file = await handle.getFileHandle(name, { create });
@@ -64,7 +73,10 @@ export async function open_handle(path, write, create, exclusive, truncate) {
 }
 
 export function read_handle(id, bytes, at) { return handles.get(id).read(bytes, { at }); }
-export function write_handle(id, bytes, at) { return handles.get(id).write(bytes, { at }); }
+export function write_handle(id, bytes, at) {
+    requireWriteAccess();
+    return handles.get(id).write(bytes, { at });
+}
 export function size_handle(id) { return handles.get(id).getSize(); }
 export function flush_handle(id) { handles.get(id).flush(); }
 export function close_handle(id) {
@@ -89,6 +101,7 @@ export async function list_path(path) {
 }
 
 export async function make_directory(path, recursive) {
+    requireWriteAccess();
     if (recursive) return directory(parts(path), true);
     const [handle, name] = await parent(path);
     await absent(handle, name);
@@ -96,6 +109,7 @@ export async function make_directory(path, recursive) {
 }
 
 export async function remove_path(path, isDirectory, recursive) {
+    requireWriteAccess();
     const [handle, name] = await parent(path);
     if (isDirectory) await handle.getDirectoryHandle(name);
     else await handle.getFileHandle(name);
@@ -114,6 +128,7 @@ async function copyDirectory(source, target) {
 }
 
 export async function move_path(sourcePath, targetPath, replace) {
+    requireWriteAccess();
     const [sourceParent, sourceName] = await parent(sourcePath);
     const [targetParent, targetName] = await parent(targetPath);
     const source = await entry(sourceParent, sourceName);

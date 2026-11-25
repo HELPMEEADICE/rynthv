@@ -22,8 +22,14 @@ pub fn synthesize_owner(
     base: Option<&CompletedOwner>,
     mut checkpoint: impl FnMut(RenderStage) -> Result<()>,
 ) -> Result<RenderResult> {
-    let mut prepared =
-        progressive::prepare(voice, identity, input, lexicon, base, &mut checkpoint)?;
+    let mut prepared = progressive::prepare(
+        voice,
+        identity,
+        input,
+        lexicon,
+        base.and_then(CompletedOwner::local_baseline),
+        &mut checkpoint,
+    )?;
     let network = progressive::Network::prepare(voice)?;
     while let Some(mut cursor) = prepared.start(&network, voice, 0.0)? {
         while !cursor.is_finished() {

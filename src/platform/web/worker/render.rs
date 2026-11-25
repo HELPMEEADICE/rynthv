@@ -1,6 +1,6 @@
 use super::{Worker, event, fs, json, pump_events, yield_events};
 use crate::{
-    platform::web::protocol::{Event, Export, ExportMetrics, Preview, Visuals},
+    platform::web::protocol::{ComputeDiagnostics, Event, Export, ExportMetrics, Preview, Visuals},
     synthesis::{
         audio,
         execution::{self, Cancellation},
@@ -123,7 +123,10 @@ impl Worker {
                     wav_ms,
                     worker_ms: started.elapsed().as_secs_f64() * 1000.0,
                 },
-                diagnostics: output.report.diagnostics.try_into()?,
+                diagnostics: ComputeDiagnostics::for_render(
+                    output.report.diagnostics,
+                    output.report.cpu_activity,
+                )?,
             });
         }
 
@@ -150,7 +153,10 @@ impl Worker {
         json(&Preview {
             metrics,
             cache_bytes: output.report.cache_bytes,
-            diagnostics: output.report.diagnostics.try_into()?,
+            diagnostics: ComputeDiagnostics::for_render(
+                output.report.diagnostics,
+                output.report.cpu_activity,
+            )?,
         })
     }
 }

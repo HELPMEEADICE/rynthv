@@ -162,7 +162,7 @@ pub(super) fn run(
                         identity,
                         &job.request.input,
                         &lexicon,
-                        job.base.as_deref(),
+                        job.base.as_deref().and_then(|base| base.local_baseline()),
                         |stage| checkpoint(&mut state, &commands, &events, owner, stage),
                     )
                 });
@@ -297,13 +297,7 @@ fn finish(
     result: voice::Result<engine::RenderResult>,
 ) {
     let rendered = result
-        .map(|result| {
-            Arc::new(RenderedClip {
-                audio: Arc::new(result.audio),
-                visuals: Arc::new(result.visuals),
-                state: Arc::new(result.state),
-            })
-        })
+        .map(|result| Arc::new(RenderedClip::from(result)))
         .map_err(|error| error.to_string());
     if let Completion::Failed(error) = state.cache.finish(job, rendered) {
         let _ = events.send(Event::Error {

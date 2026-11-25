@@ -1,3 +1,4 @@
+mod cpu;
 mod recordings;
 mod scheduler;
 
@@ -9,7 +10,6 @@ use super::{
     *,
 };
 use crate::synthesis::{
-    engine::RenderResult,
     execution::{self, Cancellation},
     mixer::{PreviewMixer, PreviewSource, block_at},
     plan::RenderPlan,
@@ -49,6 +49,7 @@ impl Offline {
     ) -> Result<(BTreeMap<OwnerId, StageTimings>, PreviewMetrics), String> {
         let demand = options.preview.expect("preview demand");
         let plan = self.prepare_owners(project, options, routes, cancelled, progress)?;
+        let use_cpu_workers = self.use_cpu_workers(options.backend);
         let compute = self.compute.as_ref().expect("preview compute").2.clone();
         if !routes.is_empty() {
             compute
@@ -66,10 +67,6 @@ impl Offline {
         )?;
         let (frames, occupied) = mixer.layout();
         progress(Progress::Layout { frames, occupied });
-        let programs: BTreeMap<_, OnceCell<VoiceProgram<'_>>> =
-            routes.keys().map(|key| (key, OnceCell::new())).collect();
-        let networks: BTreeMap<_, OnceCell<Result<progressive::Network<'_>, String>>> =
-            routes.keys().map(|key| (key, OnceCell::new())).collect();
         let mut scheduler = Scheduler::new(&plan, routes, mixer);
         let mut times = BTreeMap::new();
         let mut metrics = PreviewMetrics::default();
@@ -78,9 +75,62 @@ impl Offline {
         let cancellation = Cancellation::from_flag(Arc::clone(cancelled));
         let events = std::cell::RefCell::new(progress);
         let emit = |event| events.borrow_mut()(event);
+        let mut load_recording =
+            |id, scheduler: &mut Scheduler<'_, '_, '_>, metrics: &mut PreviewMetrics| {
+                emit(Progress::Phase("读取伴奏"));
+                let track = accompaniment
+                    .iter()
+                    .find(|track| track.id == id)
+                    .expect("indexed recording");
+                let clip = track.audio_clip().expect("recording clip");
+                let started = Instant::now();
+                let asset = self.recordings.load(&clip.path, cancelled);
+                metrics.recording_ms += ms(started);
+                let layer = match asset {
+                    Ok(asset) => mixer::recordings([*track], solo, |_| Some(Ok(asset.as_ref())))?
+                        .layers
+                        .pop(),
+                    Err(error) => {
+                        metrics.error.get_or_insert(error);
+                        scheduler.recording_failed(id);
+                        return Ok(());
+                    }
+                };
+                scheduler.recording(id, layer, pending[&id].clone());
+                Ok::<(), String>(())
+            };
+        scheduler.seed(&self.cache, &mut self.partial)?;
+        if use_cpu_workers {
+            let result = execution::scope(cancellation, || {
+                self.cpu_pool.run_batch(|pool| {
+                    cpu::render(
+                        pool,
+                        &mut scheduler,
+                        &mut self.cache,
+                        settings,
+                        library,
+                        group_names,
+                        demand,
+                        cancelled,
+                        started,
+                        &mut metrics,
+                        &mut load_recording,
+                        &emit,
+                    )
+                })
+            });
+            self.cache.requeue_running();
+            times = result?;
+            metrics.duration = scheduler.duration();
+            metrics.worker_ms = ms(started);
+            return Ok((times, metrics));
+        }
+        let programs: BTreeMap<_, OnceCell<VoiceProgram<'_>>> =
+            routes.keys().map(|key| (key, OnceCell::new())).collect();
+        let networks: BTreeMap<_, OnceCell<Result<progressive::Network<'_>, String>>> =
+            routes.keys().map(|key| (key, OnceCell::new())).collect();
         let result: Result<(), String> = compute.scope(|| {
             execution::scope(cancellation.clone(), || {
-                scheduler.seed(&self.cache, &mut self.partial)?;
                 loop {
                     emit(Progress::Checkpoint);
                     if cancellation.is_cancelled() {
@@ -89,7 +139,7 @@ impl Offline {
                     let demand = block_at(demand());
                     let more = scheduler
                         .publish(demand, started, &mut metrics, &mut |event| emit(event))?;
-                    let Some(work) = scheduler.next(demand) else {
+                    let Some(work) = scheduler.next(demand, |_| false) else {
                         if more {
                             continue;
                         }
@@ -97,28 +147,7 @@ impl Offline {
                     };
                     match work {
                         (PreviewSource::Recording(id), _) => {
-                            emit(Progress::Phase("读取伴奏"));
-                            let track = accompaniment
-                                .iter()
-                                .find(|track| track.id == id)
-                                .expect("indexed recording");
-                            let clip = track.audio_clip().expect("recording clip");
-                            let started = Instant::now();
-                            let asset = self.recordings.load(&clip.path, cancelled);
-                            metrics.recording_ms += ms(started);
-                            let layer = match asset {
-                                Ok(asset) => {
-                                    mixer::recordings([*track], solo, |_| Some(Ok(asset.as_ref())))?
-                                        .layers
-                                        .pop()
-                                }
-                                Err(error) => {
-                                    metrics.error.get_or_insert(error);
-                                    scheduler.recording_failed(id);
-                                    continue;
-                                }
-                            };
-                            scheduler.recording(id, layer, pending[&id].clone());
+                            load_recording(id, &mut scheduler, &mut metrics)?;
                         }
                         (PreviewSource::Vocal(id), target) => {
                             let result = scheduler.advance(
@@ -170,11 +199,7 @@ impl Offline {
                                 return Err("CANCELLED: Render cancelled".into());
                             }
                             if let Some(timing) = result? {
-                                metrics.stages.duration_ms += timing.duration_ms;
-                                metrics.stages.pitch_ms += timing.pitch_ms;
-                                metrics.stages.timbre_ms += timing.timbre_ms;
-                                metrics.stages.vocoder_ms += timing.vocoder_ms;
-                                metrics.stages.visuals_ms += timing.visuals_ms;
+                                add_stages(&mut metrics.stages, &timing);
                                 times.insert(id, timing);
                             }
                             if let Some(error) = self.cache.failure(id) {
@@ -204,4 +229,12 @@ impl Offline {
 
 fn ms(started: Instant) -> f64 {
     started.elapsed().as_secs_f64() * 1000.0
+}
+
+fn add_stages(total: &mut StageTimings, timing: &StageTimings) {
+    total.duration_ms += timing.duration_ms;
+    total.pitch_ms += timing.pitch_ms;
+    total.timbre_ms += timing.timbre_ms;
+    total.vocoder_ms += timing.vocoder_ms;
+    total.visuals_ms += timing.visuals_ms;
 }

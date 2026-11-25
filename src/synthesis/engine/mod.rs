@@ -23,6 +23,7 @@ pub use render::{RenderResult, synthesize};
 use serde::Serialize;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(target_arch = "wasm32", derive(serde::Deserialize))]
 pub enum RenderStage {
     Duration,
     Pitch,

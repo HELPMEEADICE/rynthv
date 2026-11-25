@@ -1,5 +1,5 @@
 use super::*;
-use crate::synthesis::{audio::AudioLayer, plan::OwnerRequest};
+use crate::synthesis::{audio::AudioLayer, plan::OwnerRequest, render_cache::CompletedOwner};
 use std::ops::Range;
 
 const DEMAND_BATCH: usize = 64;
@@ -45,20 +45,9 @@ impl<'network, 'tree: 'network, 'plan> Scheduler<'network, 'tree, 'plan> {
             .iter()
             .flat_map(|(key, owners)| owners.iter().map(move |&id| (id, key)))
             .collect();
-        let mut groups = BTreeMap::<&str, Vec<OwnerId>>::new();
-        let mut aliases = BTreeMap::new();
+        let aliases = plan.owner_aliases(plan.requests.keys().copied());
         let mut members = BTreeMap::<OwnerId, Vec<OwnerId>>::new();
-        for (&id, request) in &plan.requests {
-            let group = groups.entry(&request.input.group_id).or_default();
-            let primary = group
-                .iter()
-                .copied()
-                .find(|other| plan.requests[other].input == request.input)
-                .unwrap_or_else(|| {
-                    group.push(id);
-                    id
-                });
-            aliases.insert(id, primary);
+        for (&id, &primary) in &aliases {
             members.entry(primary).or_default().push(id);
         }
         let mut background = mixer
@@ -111,35 +100,57 @@ impl<'network, 'tree: 'network, 'plan> Scheduler<'network, 'tree, 'plan> {
         Ok(())
     }
 
-    pub(super) fn next(&mut self, demand: usize) -> Option<(PreviewSource, Option<f64>)> {
+    pub(super) fn demand_sources(
+        &self,
+        demand: usize,
+    ) -> impl Iterator<Item = (PreviewSource, Option<f64>)> + '_ {
         let first = self.mixer.first_at_or_after(demand).unwrap_or(demand);
-        for block in first..first.saturating_add(4) {
-            for (source, target) in self.mixer.missing(block) {
-                match source {
-                    PreviewSource::Vocal(id) => {
-                        let id = self.aliases[&id];
-                        if self.pending.contains(&id) {
-                            return Some((PreviewSource::Vocal(id), Some(target)));
-                        }
-                    }
-                    PreviewSource::Recording(id) if self.recordings.contains(&id) => {
-                        return Some((source, None));
-                    }
-                    PreviewSource::Recording(_) => {}
+        (first..first.saturating_add(4))
+            .flat_map(|block| self.mixer.missing(block))
+            .filter_map(|(source, target)| match source {
+                PreviewSource::Vocal(id) => {
+                    let id = self.aliases[&id];
+                    self.pending
+                        .contains(&id)
+                        .then_some((PreviewSource::Vocal(id), Some(target)))
                 }
-            }
+                PreviewSource::Recording(id) => {
+                    self.recordings.contains(&id).then_some((source, None))
+                }
+            })
+    }
+
+    pub(super) fn next(
+        &mut self,
+        demand: usize,
+        exclude: impl Fn(OwnerId) -> bool,
+    ) -> Option<(PreviewSource, Option<f64>)> {
+        let eligible = |source| match source {
+            PreviewSource::Vocal(id) => !exclude(id),
+            PreviewSource::Recording(_) => true,
+        };
+        if let Some(work) = self
+            .demand_sources(demand)
+            .find(|&(source, _)| eligible(source))
+        {
+            return Some(work);
         }
-        while let Some(&(_, source)) = self.background.get(self.background_index) {
-            let pending = match source {
-                PreviewSource::Vocal(id) => self.pending.contains(&id),
-                PreviewSource::Recording(id) => self.recordings.contains(&id),
-            };
-            if pending {
-                return Some((source, None));
-            }
+        let pending = |source| match source {
+            PreviewSource::Vocal(id) => self.pending.contains(&id),
+            PreviewSource::Recording(id) => self.recordings.contains(&id),
+        };
+        while self
+            .background
+            .get(self.background_index)
+            .is_some_and(|&(_, source)| !pending(source))
+        {
             self.background_index += 1;
         }
-        None
+        self.background[self.background_index..]
+            .iter()
+            .find_map(|&(_, source)| {
+                (eligible(source) && pending(source)).then_some((source, None))
+            })
     }
 
     pub(super) fn recording(&mut self, id: u64, layer: Option<AudioLayer>, range: Range<usize>) {
@@ -153,6 +164,10 @@ impl<'network, 'tree: 'network, 'plan> Scheduler<'network, 'tree, 'plan> {
 
     pub(super) fn duration(&self) -> Option<f64> {
         self.mixer.duration()
+    }
+
+    pub(super) fn key(&self, id: OwnerId) -> &VoiceSelection {
+        self.keys[&id]
     }
 
     pub(super) fn publish(
@@ -213,10 +228,14 @@ impl<'network, 'tree: 'network, 'plan> Scheduler<'network, 'tree, 'plan> {
                 Some(work) => Ok(work.prepared),
                 None => get_program(key).and_then(|(program, _)| {
                     program
-                        .prepare(&job, |stage| {
-                            update(Update::Stage(stage));
-                            execution::checkpoint()
-                        })
+                        .prepare(
+                            &job.request.input,
+                            job.base.as_deref().and_then(CompletedOwner::local_baseline),
+                            |stage| {
+                                update(Update::Stage(stage));
+                                execution::checkpoint()
+                            },
+                        )
                         .map_err(|error| error.to_string())
                 }),
             };
@@ -295,7 +314,14 @@ impl<'network, 'tree: 'network, 'plan> Scheduler<'network, 'tree, 'plan> {
         }
         if self.active[&id].prepared.is_complete() {
             let active = self.active.remove(&id).expect("finished owner");
-            let result = active.prepared.finish().map_err(|error| error.to_string());
+            let result = active
+                .prepared
+                .finish()
+                .map(|result| {
+                    let timings = result.timings.clone();
+                    (Arc::new(RenderedClip::from(result)), timings)
+                })
+                .map_err(|error| error.to_string());
             let timing = self.complete(cache, id, &active.job, result)?;
             update(Update::Counts(cache.counts()));
             return Ok(timing);
@@ -303,7 +329,7 @@ impl<'network, 'tree: 'network, 'plan> Scheduler<'network, 'tree, 'plan> {
         Ok(None)
     }
 
-    fn vocal(&mut self, id: OwnerId, audio: RenderedAudio) -> Result<(), String> {
+    pub(super) fn vocal(&mut self, id: OwnerId, audio: RenderedAudio) -> Result<(), String> {
         let audio = Arc::new(audio);
         for &member in &self.members[&id] {
             self.mixer.vocal(member, Arc::clone(&audio))?;
@@ -311,22 +337,35 @@ impl<'network, 'tree: 'network, 'plan> Scheduler<'network, 'tree, 'plan> {
         Ok(())
     }
 
-    fn complete(
+    pub(super) fn remote_prepared(&mut self, id: OwnerId, range: Range<i64>) {
+        for &member in &self.members[&id] {
+            self.mixer.prepared(member, range.clone());
+        }
+    }
+
+    pub(super) fn remote_completed_pcm(
+        &mut self,
+        id: OwnerId,
+        audio: &Arc<RenderedAudio>,
+    ) -> Result<(), String> {
+        for &member in &self.members[&id] {
+            self.mixer.cached(member, Arc::clone(audio))?;
+        }
+        Ok(())
+    }
+
+    pub(super) fn complete(
         &mut self,
         cache: &mut RenderCache,
         id: OwnerId,
         job: &RenderJob,
-        result: Result<RenderResult, String>,
+        result: Result<(Arc<RenderedClip>, StageTimings), String>,
     ) -> Result<Option<StageTimings>, String> {
         self.pending.remove(&id);
         let mut timing = None;
-        let result = result.map(|result| {
-            timing = Some(result.timings);
-            Arc::new(RenderedClip {
-                audio: Arc::new(result.audio),
-                visuals: Arc::new(result.visuals),
-                state: Arc::new(result.state),
-            })
+        let result = result.map(|(clip, timings)| {
+            timing = Some(timings);
+            clip
         });
         match cache.finish(job, result) {
             Completion::Published => {

@@ -30,7 +30,8 @@ ASSETS = {
 }
 STATIC = (
     "style.css", "main.js", "browser.js", "documents.js",
-    "worker.js", "worker-bridge.js", "opfs.js", "audio.js", "pcm-worklet.js",
+    "worker.js", "worker-bridge.js", "cpu-pool.js", "cpu-worker.js", "cpu-worker-bridge.js",
+    "opfs.js", "audio.js", "pcm-worklet.js",
 )
 
 
@@ -109,15 +110,14 @@ def staging_directory(dist):
         shutil.rmtree(staging)
 
 
-def package_site(bindgen, wasm, debug):
+def package_site(bindgen, wasm, debug, dist):
     cache = ROOT / "target" / "web-fonts"
     cache.mkdir(parents=True, exist_ok=True)
-    dist = ROOT / "dist"
     site_output = dist / "web"
     archive_output = dist / "rynthv-web.zip"
     if dist.resolve() != dist:
         raise SystemExit(f"Expected the generated output directory at {dist}")
-    dist.mkdir(exist_ok=True)
+    dist.mkdir(parents=True, exist_ok=True)
 
     with staging_directory(dist) as staging:
         bundle = staging / "bundle"
@@ -158,6 +158,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="Run compile and strict Clippy checks only")
     parser.add_argument("--debug", action="store_true", help="Package an unoptimized development build")
+    parser.add_argument("--output-dir", type=Path, default=ROOT / "dist", help="Directory for the site and deployment archive")
     args = parser.parse_args()
     cargo = os.environ.get("CARGO", "cargo")
     env = os.environ.copy()
@@ -180,7 +181,10 @@ def main():
         env["CARGO_PROFILE_RELEASE_STRIP"] = "debuginfo"
     run(cargo, "build", *FEATURES, *(() if args.debug else ("--release",)), env=env)
     wasm = target_dir / TARGET / ("debug" if args.debug else "release") / "rynthv.wasm"
-    package_site(bindgen, wasm, args.debug)
+    dist = args.output_dir
+    if not dist.is_absolute():
+        dist = ROOT / dist
+    package_site(bindgen, wasm, args.debug, dist)
 
 
 if __name__ == "__main__":

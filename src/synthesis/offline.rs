@@ -1,5 +1,7 @@
 //! Project rendering without a window, a display surface, or a playback device.
 #[cfg(target_arch = "wasm32")]
+pub(crate) mod cpu;
+#[cfg(target_arch = "wasm32")]
 mod preview;
 mod voices;
 
@@ -46,6 +48,8 @@ pub struct Offline {
     recordings: preview::RecordingCache,
     #[cfg(target_arch = "wasm32")]
     partial: BTreeMap<OwnerId, preview::Partial>,
+    #[cfg(target_arch = "wasm32")]
+    cpu_pool: cpu::Pool,
 }
 
 pub struct Options {
@@ -98,6 +102,8 @@ pub struct Report {
     pub elapsed_ms: f64,
     #[cfg(target_arch = "wasm32")]
     pub preview: Option<PreviewMetrics>,
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) cpu_activity: cpu::Activity,
 }
 
 pub struct OwnerReport {
@@ -176,7 +182,10 @@ impl Offline {
         self.cache.reset();
         self.planner.reset();
         #[cfg(target_arch = "wasm32")]
-        self.partial.clear();
+        {
+            self.partial.clear();
+            self.cpu_pool.clear_resources();
+        }
     }
 
     pub fn library(&mut self, settings: &SynthesisSettings) -> &LibraryScan {
@@ -473,6 +482,8 @@ impl Offline {
                 elapsed_ms: started.elapsed().as_secs_f64() * 1000.0,
                 #[cfg(target_arch = "wasm32")]
                 preview: metrics,
+                #[cfg(target_arch = "wasm32")]
+                cpu_activity: self.cpu_pool.take_activity(),
             },
             solo,
             recordings,

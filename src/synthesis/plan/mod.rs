@@ -59,6 +59,33 @@ pub struct RenderPlan {
     pub obsolete_clear: BTreeMap<OwnerId, Coverage>,
 }
 
+#[cfg(target_arch = "wasm32")]
+impl RenderPlan {
+    /// Pick the first occurrence of each exact acoustic input in scheduling order.
+    pub(crate) fn owner_aliases(
+        &self,
+        order: impl IntoIterator<Item = OwnerId>,
+    ) -> BTreeMap<OwnerId, OwnerId> {
+        let mut groups = BTreeMap::<&str, Vec<OwnerId>>::new();
+        order
+            .into_iter()
+            .map(|id| {
+                let input = &self.requests[&id].input;
+                let candidates = groups.entry(&input.group_id).or_default();
+                let primary = candidates
+                    .iter()
+                    .copied()
+                    .find(|other| self.requests[other].input == *input)
+                    .unwrap_or_else(|| {
+                        candidates.push(id);
+                        id
+                    });
+                (id, primary)
+            })
+            .collect()
+    }
+}
+
 #[derive(Clone, Debug, Serialize)]
 pub struct OwnerPlanSummary {
     pub owner: OwnerId,

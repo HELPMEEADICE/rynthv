@@ -1,12 +1,11 @@
 use super::{PcmStore, PreparedRender};
 use crate::synthesis::{
     engine::{
-        PreparedModelFeatures, PreparedRenderAcoustics, RenderStage,
+        OwnerSynthesis, PreparedModelFeatures, PreparedRenderAcoustics, RenderStage,
         incremental::{IncrementalEdit, acoustics},
         models, prepare_acoustics,
     },
     plan::OwnerInput,
-    render_cache::CompletedOwner,
     rendered::RenderedPhonemeTrack,
     score::{self, HOP_SAMPLES, LyricFrontend, PreparedPhrase, SAMPLE_RATE},
     voice::{PreparedVoice, Result, VoiceError, VoiceFamily},
@@ -19,51 +18,40 @@ pub fn prepare(
     identity: Option<u64>,
     input: &OwnerInput,
     lexicon: &LyricFrontend,
-    base: Option<&CompletedOwner>,
+    base: Option<(&OwnerInput, &OwnerSynthesis)>,
     mut checkpoint: impl FnMut(RenderStage) -> Result<()>,
 ) -> Result<PreparedRender> {
     let phrase = score::prepare_owner(input, lexicon, voice)?;
     // Local invalidation currently uses the SV2 feature program. Compatible
     // voices still retain progressive PCM, but prepare a fresh owner on edits.
-    let base = base.filter(|base| {
+    let base = base.filter(|(_, state)| {
         voice.family == VoiceFamily::Sv2
-            && matches!(
-                base.clip.state.prepared.features,
-                PreparedModelFeatures::Sv2 { .. }
-            )
+            && matches!(state.prepared.features, PreparedModelFeatures::Sv2 { .. })
     });
     let edit = base
-        .map(|base| {
-            IncrementalEdit::between(
-                &base.input,
-                input,
-                &base.clip.state.prepared.phrase,
-                &phrase,
-            )
+        .map(|(previous, state)| {
+            IncrementalEdit::between(previous, input, &state.prepared.phrase, &phrase)
         })
         .transpose()?
         .flatten()
         .filter(|_| {
-            let previous = &base.expect("an edit requires a baseline").clip.state;
+            let (_, previous) = base.expect("an edit requires a baseline");
             let pcm = &previous.components;
             previous.pitch.pitch.len().checked_mul(HOP_SAMPLES) == Some(pcm.primary.len())
                 && pcm.primary.len() == pcm.secondary.len()
                 && ((pcm.start_seconds - phrase.start_seconds) * f64::from(SAMPLE_RATE)).abs()
                     < 0.0001
         });
-    if let Some((base, edit)) = base.zip(edit) {
+    if let Some(((_, previous), edit)) = base.zip(edit) {
         let updated = acoustics::recompute(
             voice,
             models::required_identity(identity)?,
             &phrase,
-            &base.clip.state,
+            previous,
             &edit,
             &mut checkpoint,
         )?;
-        let pcm = PcmStore::from_existing(
-            &base.clip.state.components,
-            edit.first_block..edit.stop_block,
-        )?;
+        let pcm = PcmStore::from_existing(&previous.components, edit.first_block..edit.stop_block)?;
         prepared(
             voice,
             PreparedRenderAcoustics {

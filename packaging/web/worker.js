@@ -1,5 +1,6 @@
 import init, { cancel_worker_request, prioritize_worker_preview, run_worker_request } from "./rynthv.js";
 import { setActive } from "./worker-bridge.js";
+import { configureCpuPool, resetCpuPool, wakeCpuPool } from "./cpu-pool.js";
 
 let ready;
 const queue = [];
@@ -15,6 +16,7 @@ async function drain() {
         await ready;
         const run = () => {
             if (active.cancelled) throw new Error("CANCELLED");
+            if (writes) resetCpuPool();
             active.started = true;
             return run_worker_request(request, active.seconds);
         };
@@ -32,6 +34,7 @@ async function drain() {
 
 self.onmessage = ({ data }) => {
     if (data.module) {
+        configureCpuPool(data.module);
         ready = init({ module_or_path: data.module });
         void ready.catch(() => {});
         return;
@@ -39,7 +42,10 @@ self.onmessage = ({ data }) => {
     if (data.demand !== undefined) {
         if (active?.id === data.demand) {
             active.seconds = data.seconds;
-            if (active.started) prioritize_worker_preview(data.seconds);
+            if (active.started) {
+                prioritize_worker_preview(data.seconds);
+                wakeCpuPool();
+            }
         } else {
             const queued = queue.find(item => item.id === data.demand);
             if (queued) queued.seconds = data.seconds;
@@ -49,7 +55,10 @@ self.onmessage = ({ data }) => {
     if (data.cancel !== undefined) {
         if (active?.id === data.cancel) {
             active.cancelled = true;
-            if (active.started) cancel_worker_request();
+            if (active.started) {
+                cancel_worker_request();
+                wakeCpuPool();
+            }
         }
         const index = queue.findIndex(item => item.id === data.cancel);
         if (index >= 0) {

@@ -78,10 +78,8 @@ pub fn run_worker_request(request: &str, position: Option<f64>) -> Result<String
     }
     let cancelled = Arc::new(AtomicBool::new(false));
     CANCELLATION.with(|value| value.replace(Some(Arc::clone(&cancelled))));
-    LAST_YIELD.set(Some(Instant::now()));
-    let result = crate::synthesis::execution::with_event_pump(pump_events, || {
-        WORKER.with_borrow_mut(|worker| worker.run(request, cancelled))
-    });
+    let result =
+        with_event_pump(|| WORKER.with_borrow_mut(|worker| worker.run(request, cancelled)));
     CANCELLATION.with(|value| value.take());
     result.map_err(|error| JsError::new(&error))
 }
@@ -156,6 +154,11 @@ fn yield_events() -> Result<(), String> {
     wasm_bindgen_futures::jspi_block_on_promise(&yield_worker())
         .map(drop)
         .map_err(js_error)
+}
+
+pub(super) fn with_event_pump<T>(run: impl FnOnce() -> T) -> T {
+    LAST_YIELD.set(Some(Instant::now()));
+    crate::synthesis::execution::with_event_pump(pump_events, run)
 }
 
 fn pump_events() {

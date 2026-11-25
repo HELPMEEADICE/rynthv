@@ -6,6 +6,7 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(target_arch = "wasm32", derive(serde::Serialize, serde::Deserialize))]
 pub struct NoteInput {
     pub id: u64,
     pub onset: LocalBlick,
@@ -42,6 +43,7 @@ impl From<&Note> for NoteInput {
 /// Preserve both raw option layers as conservative dependencies: a partially
 /// filled instance object must not hide an inherited track-level dependency.
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(target_arch = "wasm32", derive(serde::Serialize, serde::Deserialize))]
 pub struct VoiceInput {
     pub model_content_identity: Option<String>,
     pub database: Value,
@@ -63,12 +65,14 @@ impl VoiceInput {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(target_arch = "wasm32", derive(serde::Serialize, serde::Deserialize))]
 pub struct TempoPoint {
     pub position: GlobalBlick,
     pub bpm: f64,
 }
 
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(target_arch = "wasm32", derive(serde::Serialize, serde::Deserialize))]
 pub struct TempoMapping {
     pub origin_seconds: f64,
     pub points: Vec<TempoPoint>,
@@ -197,6 +201,7 @@ impl TempoCursor<'_> {
 /// Exact structural dependency identity, not a revision number or a hash with
 /// unchecked collisions. Unknown synthesis fields are retained, not defaulted.
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(target_arch = "wasm32", derive(serde::Serialize, serde::Deserialize))]
 pub struct OwnerInput {
     pub group_id: String,
     pub content_offset: GlobalBlick,

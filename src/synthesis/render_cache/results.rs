@@ -80,7 +80,7 @@ impl RenderCache {
                     coverage: owner.request.coverage,
                     controls: owner.controls.clone(),
                     audio: Arc::clone(&completed.clip.audio),
-                    components: completed.clip.state.components.clone(),
+                    components: completed.clip.components().clone(),
                     visuals: Arc::clone(&completed.clip.visuals),
                 })
             })
@@ -205,6 +205,17 @@ impl RenderCache {
             }
             retain
         });
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn requeue_owner(&mut self, job: &RenderJob) {
+        if let Some(owner) = self.owners.get_mut(&job.request.owner)
+            && matches!(&owner.state, State::Running(active) if active.serial == job.serial)
+        {
+            owner.cancel();
+            owner.state = State::Queued;
+            self.reuse_pending = true;
+        }
     }
 
     #[cfg(target_arch = "wasm32")]

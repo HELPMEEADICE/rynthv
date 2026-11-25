@@ -14,7 +14,7 @@ pub use network::Network;
 pub use prepare::prepare;
 pub use render::synthesize;
 
-use super::{OwnerSynthesis, PreparedRenderAcoustics, RenderResult};
+use super::{OwnerSynthesis, PreparedRenderAcoustics, RenderResult, StageTimings};
 use crate::synthesis::{
     audio::RenderedAudio,
     rendered::{PitchTrack, RenderVisuals, RenderedPhonemeTrack, Waveform},
@@ -31,6 +31,13 @@ pub struct PreparedRender {
     pitch: PitchTrack,
     phonemes: RenderedPhonemeTrack,
     timbre_frames: OnceLock<PreparedFrames>,
+}
+
+pub(crate) struct CompletedRender {
+    pub(crate) state: OwnerSynthesis,
+    pub(crate) pitch: PitchTrack,
+    pub(crate) phonemes: RenderedPhonemeTrack,
+    pub(crate) timings: StageTimings,
 }
 
 impl PreparedRender {
@@ -85,26 +92,38 @@ impl PreparedRender {
     /// Only a complete owner creates a history snapshot. Progressive display
     /// patches never become synthesis baselines for a later source revision.
     pub fn finish(self) -> Result<RenderResult> {
-        let components = self.pcm.into_components()?;
-        let phrase = &self.acoustic.prepared.phrase;
-        let audio = components.publish(phrase.visible_begin_seconds, phrase.visible_end_seconds)?;
+        let completed = self.into_completed()?;
+        let phrase = &completed.state.prepared.phrase;
+        let audio = completed
+            .state
+            .components
+            .publish(phrase.visible_begin_seconds, phrase.visible_end_seconds)?;
         let started = Instant::now();
         let visuals = RenderVisuals {
-            pitch: self.pitch,
-            phonemes: self.phonemes,
+            pitch: completed.pitch,
+            phonemes: completed.phonemes,
             waveform: Waveform::new(&audio),
         };
-        let mut timings = self.acoustic.timings;
+        let mut timings = completed.timings;
         timings.visuals_ms = started.elapsed().as_secs_f64() * 1000.0;
         Ok(RenderResult {
             audio,
             visuals,
             timings,
+            state: completed.state,
+        })
+    }
+
+    pub(crate) fn into_completed(self) -> Result<CompletedRender> {
+        Ok(CompletedRender {
+            pitch: self.pitch,
+            phonemes: self.phonemes,
+            timings: self.acoustic.timings,
             state: OwnerSynthesis {
                 prepared: self.acoustic.prepared,
                 duration: self.acoustic.duration,
                 pitch: self.acoustic.pitch,
-                components,
+                components: self.pcm.into_components()?,
             },
         })
     }

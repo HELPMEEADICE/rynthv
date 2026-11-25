@@ -5,6 +5,7 @@ use wasm_bindgen_futures::{future_to_promise, jspi_block_on_promise};
 
 pub(crate) mod audio;
 pub(crate) mod client;
+pub(crate) mod cpu;
 pub(crate) mod documents;
 pub(crate) mod fs;
 pub(crate) mod protocol;

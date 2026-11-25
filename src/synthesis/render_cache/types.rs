@@ -1,8 +1,8 @@
 use super::super::{
     audio::RenderedAudio,
-    engine::PcmComponents,
+    engine::{OwnerSynthesis, PcmComponents},
     plan::{Coverage, OwnerId, OwnerInput, OwnerOutputControls, OwnerRequest},
-    rendered::{RenderVisuals, RenderedClip},
+    rendered::{RenderState, RenderVisuals, RenderedClip},
 };
 use std::{
     collections::BTreeMap,
@@ -20,6 +20,16 @@ pub struct CompletedOwner {
     pub clip: Arc<RenderedClip>,
 }
 
+impl CompletedOwner {
+    pub(crate) fn local_baseline(&self) -> Option<(&OwnerInput, &OwnerSynthesis)> {
+        match &self.clip.state {
+            RenderState::Local(state) => Some((&self.input, state)),
+            #[cfg(target_arch = "wasm32")]
+            RenderState::CpuWorker { .. } => None,
+        }
+    }
+}
+
 /// A captured run, not a cache key. Execution checks its shared cancellation
 /// flag within expensive stages; `finish` always checks identity again.
 #[derive(Clone, Debug)]
@@ -33,6 +43,11 @@ pub struct RenderJob {
 }
 
 impl RenderJob {
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn serial(&self) -> u64 {
+        self.serial
+    }
+
     #[cfg(feature = "gui")]
     pub(crate) fn cancellation(&self) -> super::super::execution::Cancellation {
         super::super::execution::Cancellation::from_flag(Arc::clone(&self.cancelled))

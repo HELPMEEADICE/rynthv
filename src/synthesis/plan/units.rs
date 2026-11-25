@@ -10,9 +10,11 @@ pub struct ProjectRevision(pub u64);
 pub struct RunEpoch(pub u64);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(target_arch = "wasm32", derive(serde::Deserialize))]
 pub struct LocalBlick(pub i64);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(target_arch = "wasm32", derive(serde::Deserialize))]
 pub struct GlobalBlick(pub i64);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
