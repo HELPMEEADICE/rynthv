@@ -8,7 +8,7 @@ pub(super) const CONFIGURATION_ID: ResourceId = ResourceId([
     0x21, 0x19, 0x4a, 0xe9, 0x56, 0x77, 0x3e, 0x78, 0x8d, 0x0e, 0x8c, 0xe2, 0xd3, 0x26, 0xbc, 0x44,
 ]);
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize, serde::Deserialize)]
 pub struct VoiceConfiguration {
     pub family: VoiceFamily,
     pub model_version: u8,
@@ -20,7 +20,7 @@ pub struct VoiceConfiguration {
     pub supported_languages: Vec<String>,
     pub styles: Vec<String>,
     pub additional_fields: usize,
-    pub parser_scope: &'static str,
+    pub parser_scope: std::borrow::Cow<'static, str>,
     #[serde(skip)]
     _uninterpreted: BTreeMap<String, String>,
 }
@@ -44,7 +44,7 @@ impl VoiceConfiguration {
             supported_languages: languages,
             styles,
             additional_fields: manifest.additional.len(),
-            parser_scope: "Flat NOFS-JSON with native DDS model resources",
+            parser_scope: "Flat NOFS-JSON with native DDS model resources".into(),
             _uninterpreted: BTreeMap::new(),
         }
     }
@@ -106,7 +106,7 @@ impl VoiceConfiguration {
             supported_languages,
             styles,
             additional_fields: fields.len(),
-            parser_scope: "observed model-version 1/2 key-space-value grammar; extended style grammar and duplicate policy not recovered",
+            parser_scope: "observed model-version 1/2 key-space-value grammar; extended style grammar and duplicate policy not recovered".into(),
             _uninterpreted: fields,
         })
     }
@@ -165,7 +165,7 @@ impl VoiceConfiguration {
             supported_languages,
             styles,
             additional_fields: fields.len(),
-            parser_scope: "SV1 AI NOFS public metadata; DDS model family",
+            parser_scope: "SV1 AI NOFS public metadata; DDS model family".into(),
             _uninterpreted: fields,
         })
     }

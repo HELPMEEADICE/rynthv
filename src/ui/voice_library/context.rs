@@ -1,12 +1,11 @@
 mod fields;
 
 use super::{error_label, text, weak};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::synthesis::voice::session_identity;
 use crate::{
     app::App,
-    synthesis::{
-        runtime::{ContextImportPhase, ContextImportSource},
-        voice::session_identity,
-    },
+    synthesis::runtime::{ContextImportPhase, ContextImportSource},
 };
 use eframe::egui::*;
 
@@ -54,6 +53,7 @@ pub(super) fn dialog(app: &mut App, ctx: &Context) {
     let Some(dialog) = &mut app.synthesis.context_import.dialog else {
         return;
     };
+    #[cfg(not(target_arch = "wasm32"))]
     let mut refresh = false;
     let mut import = false;
     let mut cancel = false;
@@ -75,6 +75,7 @@ pub(super) fn dialog(app: &mut App, ctx: &Context) {
             },
         );
         ui.add_enabled_ui(!importing, |ui| {
+            #[cfg(not(target_arch = "wasm32"))]
             ui.horizontal(|ui| {
                 ui.add_enabled_ui(session_identity::supports_session_import(), |ui| {
                     ui.selectable_value(
@@ -118,6 +119,7 @@ pub(super) fn dialog(app: &mut App, ctx: &Context) {
         }
         ui.add_space(4.0);
         ui.horizontal(|ui| {
+            #[cfg(not(target_arch = "wasm32"))]
             if dialog.source == ContextImportSource::Online {
                 refresh = ui
                     .add_enabled(
@@ -146,20 +148,25 @@ pub(super) fn dialog(app: &mut App, ctx: &Context) {
         app.synthesis.set_context_import_source(source);
     } else if import {
         app.synthesis.import_context();
-    } else if refresh {
-        app.synthesis.refresh_context_sources();
-    } else if let Some(picker) = picker {
-        app.pick_one(ctx, picker, move |app, _, path| {
-            if let Some(dialog) = &mut app.synthesis.context_import.dialog
-                && dialog.source == source
-            {
-                match source {
-                    ContextImportSource::SessionFile => dialog.session_path = Some(path),
-                    ContextImportSource::File => dialog.file_path = Some(path),
-                    _ => return,
+    } else {
+        #[cfg(not(target_arch = "wasm32"))]
+        if refresh {
+            app.synthesis.refresh_context_sources();
+            return;
+        }
+        if let Some(picker) = picker {
+            app.pick_one(ctx, picker, move |app, _, path| {
+                if let Some(dialog) = &mut app.synthesis.context_import.dialog
+                    && dialog.source == source
+                {
+                    match source {
+                        ContextImportSource::SessionFile => dialog.session_path = Some(path),
+                        ContextImportSource::File => dialog.file_path = Some(path),
+                        _ => return,
+                    }
+                    app.synthesis.clear_context_import_error();
                 }
-                app.synthesis.clear_context_import_error();
-            }
-        });
+            });
+        }
     }
 }

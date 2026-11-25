@@ -5,6 +5,7 @@
 //! first half and sigmoid to the second, then multiplies the halves. Temporal
 //! convolution and its condition queue belong to the caller.
 
+#[cfg(not(target_arch = "wasm32"))]
 mod parallel;
 
 use crate::synthesis::{
@@ -89,7 +90,7 @@ pub fn activate_projected(
     // Capture cancellation before dispatch: worker thread locals do not carry
     // the active render's execution scope.
     let cancellation = execution::current();
-    parallel::for_frames(output, channels, |first, target| {
+    let execute = |first: usize, target: &mut [f32]| {
         let start = first * projected_channels;
         let end = start + target.len() * 2;
         activate_frames(
@@ -99,7 +100,11 @@ pub fn activate_projected(
             channels,
             cancellation.as_ref(),
         )
-    })
+    };
+    #[cfg(target_arch = "wasm32")]
+    return execute(0, output);
+    #[cfg(not(target_arch = "wasm32"))]
+    parallel::for_frames(output, channels, execute)
 }
 
 fn activate_frames(

@@ -20,7 +20,7 @@ pub(super) fn field(ui: &mut Ui, value: &str, dropdown: bool, reason: &str) {
         rect,
         4,
         CONTROL_FILL,
-        Stroke::new(0.6, BUTTON),
+        Stroke::new(0.6, button_color()),
         StrokeKind::Inside,
     );
     let text_rect = Rect::from_min_max(
@@ -34,13 +34,13 @@ pub(super) fn field(ui: &mut Ui, value: &str, dropdown: bool, reason: &str) {
             Align2::LEFT_CENTER,
             value,
             FontId::proportional(12.0),
-            TEXT,
+            text_color(),
         );
     if dropdown {
         Icon::ChevronDown.paint(
             ui,
             Rect::from_center_size(rect.right_center() - vec2(17.0, 0.0), Vec2::splat(12.0)),
-            MUTED,
+            muted_color(),
         );
     }
     response.widget_info(|| WidgetInfo::labeled(WidgetType::ComboBox, false, value));
@@ -57,7 +57,7 @@ pub(super) fn readout(ui: &mut Ui, value: &str) {
         rect,
         4,
         CONTROL_FILL,
-        Stroke::new(0.6, BUTTON),
+        Stroke::new(0.6, button_color()),
         StrokeKind::Inside,
     );
     ui.painter()
@@ -67,6 +67,6 @@ pub(super) fn readout(ui: &mut Ui, value: &str) {
             Align2::LEFT_CENTER,
             value,
             FontId::proportional(12.0),
-            TEXT,
+            text_color(),
         );
 }

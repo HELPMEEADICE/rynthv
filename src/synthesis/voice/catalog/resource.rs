@@ -1,8 +1,8 @@
 //! Seek only the public voice configuration, never tensor or session resources.
 
+use crate::platform::fs::{self, File};
 use std::{
     collections::{BTreeMap, HashSet},
-    fs::{self, File},
     io::{Read, Seek, SeekFrom},
     path::Path,
 };
@@ -67,7 +67,7 @@ pub(super) fn configuration(directory: &Path, context: &FormatContext) -> Result
         .map(|entry| entry.map(|entry| entry.path()))
         .collect::<std::io::Result<Vec<_>>>()?;
     files.retain(|path| {
-        path.is_file()
+        fs::is_file(path)
             && path
                 .extension()
                 .and_then(|ext| ext.to_str())

@@ -1,5 +1,6 @@
+use crate::platform::fs;
 use crate::synthesis::voice::{Result, VoiceError};
-use std::{collections::HashMap, fs, path::Path};
+use std::{collections::HashMap, path::Path};
 
 #[derive(Debug)]
 pub(super) struct Pinyin {

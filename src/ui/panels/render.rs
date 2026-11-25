@@ -1,8 +1,9 @@
 use super::controls::*;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::synthesis::runtime::ExportRequest;
 use crate::{
     app::App,
     model::Extra,
-    synthesis::runtime::ExportRequest,
     ui::{theme::*, track_color::TrackColors},
 };
 use eframe::egui::*;
@@ -14,7 +15,7 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
     let editable = !app.editor.is_editing();
 
     padded(ui, |ui| {
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
         let directory = directory_field(app, ui, editable);
         ui.weak("文件名称");
         let name = string(&app.editor.project.render_config, "filename");
@@ -42,7 +43,7 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
                     .unwrap_or("等待伴奏加载和当前歌声合成完成后导出"),
             )
             .clicked();
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
         if let Some(path) = directory.commit(ui, editable, export_clicked) {
             pending_config.push(("destination", path.into()));
         }
@@ -80,6 +81,20 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
                         app.error = Some(error);
                     }
                 });
+            }
+        }
+        #[cfg(target_arch = "wasm32")]
+        if let Some(Ok(paths)) = &app.synthesis.export_result {
+            for path in paths {
+                if ui
+                    .button(format!(
+                        "下载 {}",
+                        path.file_name().unwrap_or_default().to_string_lossy()
+                    ))
+                    .clicked()
+                {
+                    crate::app::web::download(path, ui.ctx());
+                }
             }
         }
         if let Some(result) = &app.synthesis.export_result {
@@ -127,13 +142,13 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
             .collect();
         let mut mix_changed = false;
         Frame::new()
-            .fill(BACKGROUND)
+            .fill(background_color())
             .inner_margin(4)
             .show(ui, |ui| {
                 ui.set_min_height(190.0);
                 ui.set_width(ui.available_width());
                 ui.spacing_mut().item_spacing.y = 3.0;
-                if track_row(ui, &mut mix, "混音导出", TEXT) {
+                if track_row(ui, &mut mix, "混音导出", text_color()) {
                     mix_changed = true;
                 }
                 for (id, name, _, enabled, color) in &mut tracks {
@@ -255,6 +270,14 @@ impl RenderDraft {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+fn start_export(app: &mut App) {
+    app.synthesis
+        .sync_project(&app.editor.project, app.editor.revision);
+    app.synthesis.export_project(app.editor.revision);
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 fn start_export(app: &mut App) {
     #[cfg(not(target_os = "android"))]
     let request = ExportRequest::from_project(&app.editor.project);
@@ -281,7 +304,7 @@ fn start_export(app: &mut App) {
     app.synthesis.export_project(request, app.editor.revision);
 }
 
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
 fn confirm_overwrite(request: &ExportRequest) -> bool {
     let existing: Vec<_> = request
         .paths()
@@ -323,7 +346,7 @@ fn numeric(
 }
 fn track_row(ui: &mut Ui, checked: &mut bool, name: &str, color: Color32) -> bool {
     let row = Frame::new()
-        .fill(PANEL)
+        .fill(panel_color())
         .corner_radius(2)
         .inner_margin(Margin {
             left: 12,
@@ -342,18 +365,18 @@ fn track_row(ui: &mut Ui, checked: &mut bool, name: &str, color: Color32) -> boo
     );
     row.inner
 }
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
 fn folder_button(ui: &mut Ui) -> Response {
     let (rect, response) = ui.allocate_exact_size(Vec2::splat(28.0), Sense::click());
     ui.painter().rect(
         rect,
         3,
         if response.hovered() {
-            BUTTON_HOVER
+            button_hover_color()
         } else {
-            BORDER
+            border_color()
         },
-        Stroke::new(0.6, BUTTON),
+        Stroke::new(0.6, button_color()),
         StrokeKind::Inside,
     );
     let c = rect.center();
@@ -369,12 +392,12 @@ fn folder_button(ui: &mut Ui) -> Response {
     ];
     ui.painter().add(Shape::line(
         points.into_iter().map(|(x, y)| c + vec2(x, y)).collect(),
-        Stroke::new(1.1, MUTED),
+        Stroke::new(1.1, muted_color()),
     ));
     response.on_hover_text("选择目标文件夹")
 }
 
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
 struct DirectoryField {
     id: Id,
     original: String,
@@ -383,7 +406,7 @@ struct DirectoryField {
     changed: bool,
 }
 
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
 impl DirectoryField {
     fn commit(self, ui: &Ui, editable: bool, export_clicked: bool) -> Option<String> {
         let Self {
@@ -407,7 +430,7 @@ impl DirectoryField {
     }
 }
 
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
 fn directory_field(app: &App, ui: &mut Ui, editable: bool) -> DirectoryField {
     ui.weak("目标文件夹");
     let directory = string(&app.editor.project.render_config, "destination");
@@ -426,7 +449,7 @@ fn directory_field(app: &App, ui: &mut Ui, editable: bool) -> DirectoryField {
             TextEdit::singleline(&mut dir_draft.text)
                 .vertical_align(Align::Center)
                 .margin(vec2(7.0, 5.0))
-                .background_color(BORDER),
+                .background_color(border_color()),
         );
         dir_has_focus = response.has_focus();
         if dir_draft.text != directory

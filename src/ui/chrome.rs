@@ -35,7 +35,7 @@ fn menus(app: &mut App, ui: &mut Ui) {
     });
 }
 
-#[cfg(target_os = "android")]
+#[cfg(any(target_os = "android", target_arch = "wasm32"))]
 pub(super) fn mobile_menus(app: &mut App, ui: &mut Ui, separate: bool) {
     if separate {
         file_menu(app, ui);
@@ -59,15 +59,33 @@ fn file_menu(app: &mut App, ui: &mut Ui) {
         if item(ui, "打开…", "Ctrl+O", true) {
             app.request_file(FileAction::Open, &ctx);
         }
-        #[cfg(target_os = "android")]
-        if item(ui, "本机工程…", "", true) {
+        #[cfg(any(target_os = "android", target_arch = "wasm32"))]
+        if item(
+            ui,
+            if cfg!(target_arch = "wasm32") {
+                "浏览器工程…"
+            } else {
+                "本机工程…"
+            },
+            "",
+            true,
+        ) {
             app.request_file(FileAction::OpenLocal, &ctx);
         }
         ui.separator();
         if item(ui, "保存", "Ctrl+S", true) {
             app.save_project(false, &ctx);
         }
-        if item(ui, "另存为…", "Ctrl+Shift+S", true) {
+        if item(
+            ui,
+            if cfg!(target_arch = "wasm32") {
+                "下载 SVP…"
+            } else {
+                "另存为…"
+            },
+            "Ctrl+Shift+S",
+            true,
+        ) {
             app.save_project(true, &ctx);
         }
         #[cfg(target_os = "android")]
@@ -86,11 +104,19 @@ fn file_menu(app: &mut App, ui: &mut Ui) {
             app.commit_lyric();
             app.import_audio(None, &ctx);
         }
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
         item(ui, "导出音频", "", false);
         #[cfg(target_os = "android")]
         if item(ui, "导出音频…", "", true) {
             super::mobile::open_panel(app, &ctx, Column::Render);
+        }
+        #[cfg(target_arch = "wasm32")]
+        if item(ui, "导出音频…", "", true) {
+            if super::mobile::compact(&ctx) {
+                super::mobile::open_panel(app, &ctx, Column::Render);
+            } else if !app.view.columns.contains(&Column::Render) {
+                app.view.toggle(Column::Render);
+            }
         }
     });
 }

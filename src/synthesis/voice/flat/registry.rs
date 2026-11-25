@@ -1,6 +1,6 @@
+use crate::platform::fs;
 use std::{
     collections::{BTreeMap, BTreeSet},
-    fs,
     path::{Path, PathBuf},
 };
 
@@ -9,7 +9,7 @@ use serde::Serialize;
 use super::{FlatArchive, FlatPackage, ModelRole, archive::is_sfpk, manifest::validate_id};
 use crate::synthesis::voice::Result;
 
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, serde::Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ModelSource {
     File { path: PathBuf },

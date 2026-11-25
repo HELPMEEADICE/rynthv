@@ -14,7 +14,7 @@ use crate::synthesis::{
     },
     voice::{PreparedVoice, Result, VoiceError},
 };
-use std::time::Instant;
+use web_time::Instant;
 
 pub struct RecomputedAcoustics {
     pub state: OwnerSynthesis,

@@ -1,6 +1,10 @@
 use super::App;
-use crate::{editor::Editor, model::*, storage, ui};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::storage;
+use crate::{editor::Editor, model::*, ui};
+#[cfg(not(target_arch = "wasm32"))]
 use eframe::egui::Context;
+#[cfg(not(target_arch = "wasm32"))]
 use std::path::PathBuf;
 
 impl App {
@@ -76,6 +80,7 @@ impl App {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn open_path(&mut self, path: PathBuf) {
         ui::phonemes::phoneme_deactivate(self);
         ui::piano::cancel_audition(self);
@@ -106,6 +111,10 @@ impl App {
     pub(super) fn install_project(&mut self, project: Project) {
         self.editor = Editor::new(project);
         self.synthesis.reset_project();
+        #[cfg(target_arch = "wasm32")]
+        {
+            self.browser.recovered_dirty = false;
+        }
         #[cfg(target_os = "android")]
         {
             self.recovery.invalidate();
@@ -143,6 +152,7 @@ impl App {
             self.view.top_pitch = (pitch + 9).clamp(12, 127) as f32;
         }
     }
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn save_project(&mut self, save_as: bool, _ctx: &Context) -> bool {
         ui::phonemes::phoneme_deactivate(self);
         ui::piano::cancel_audition(self);

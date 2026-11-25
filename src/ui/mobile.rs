@@ -48,6 +48,7 @@ fn set_page(app: &mut App, ctx: &Context, page: Page) {
     }
 }
 
+#[cfg(target_os = "android")]
 pub(crate) fn back_to_editor(app: &mut App, ctx: &Context) -> bool {
     if current_page(ctx) == Page::Piano {
         return false;
@@ -60,7 +61,14 @@ pub(super) fn open_panel(app: &mut App, ctx: &Context, column: Column) {
     set_page(app, ctx, Page::Panel(column));
 }
 
+#[cfg(target_os = "android")]
 pub(super) use toolbar::transport_options;
+
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn compact(ctx: &Context) -> bool {
+    let viewport = ctx.content_rect();
+    viewport.width() < 760.0 || viewport.height() < 390.0
+}
 
 pub(crate) fn show(app: &mut App, ui: &mut Ui, safe: Rect) {
     if safe.width() < 48.0 || safe.height() < 38.0 {
@@ -127,7 +135,8 @@ fn content(app: &mut App, ui: &mut Ui) {
 }
 
 fn mixer(app: &mut App, ui: &mut Ui) {
-    ui.painter().rect_filled(ui.max_rect(), 4, theme::PANEL);
+    ui.painter()
+        .rect_filled(ui.max_rect(), 4, theme::panel_color());
     ScrollArea::vertical().show(ui, |ui| {
         ui.set_width(ui.available_width());
         for index in 0..app.editor.project.tracks.len() {

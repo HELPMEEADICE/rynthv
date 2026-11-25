@@ -30,7 +30,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         crate::ui::phonemes::phoneme_deactivate(app);
     }
     let phoneme_dragging = crate::ui::phonemes::phoneme_dragging(app);
-    ui.painter().rect_filled(all, 0, PANEL);
+    ui.painter().rect_filled(all, 0, panel_color());
     let ruler_height = if cfg!(target_os = "android") {
         26.0
     } else {
@@ -47,9 +47,9 @@ pub fn show(app: &mut App, ui: &mut Ui) {
     if canvas.height() < 8.0 || canvas.width() < 18.0 {
         return;
     }
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os = "android", target_arch = "wasm32"))]
     let touch_transforming = super::touch::transform(app, ui, canvas);
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
     let touch_transforming = false;
     let pan = app.view_pan.drag(
         ui,
@@ -169,9 +169,10 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         && let Some(p) = ui.input(|i| i.pointer.interact_pos())
     {
         let r = Rect::from_two_pos(*origin, p).intersect(canvas);
-        ui.painter().rect_filled(r, 0, GREEN.gamma_multiply(0.12));
         ui.painter()
-            .rect_stroke(r, 0, Stroke::new(1.0, GREEN), StrokeKind::Inside);
+            .rect_filled(r, 0, green_color().gamma_multiply(0.12));
+        ui.painter()
+            .rect_stroke(r, 0, Stroke::new(1.0, green_color()), StrokeKind::Inside);
     }
     playhead(
         ui,
@@ -256,7 +257,10 @@ fn interaction(
             } else {
                 app.editor.selected = BTreeSet::from([note.id]);
             }
-        } else if cfg!(target_os = "android") && app.piano_tool == super::Tool::NoteDraw {
+        } else if (cfg!(target_os = "android")
+            || cfg!(target_arch = "wasm32") && ui.input(|input| input.has_touch_screen()))
+            && app.piano_tool == super::Tool::NoteDraw
+        {
             app.editor.begin("创建音符");
             let at = ticks(app.view.snap_beat(beat_at(canvas, &app.view.piano, p.x))).max(0);
             let duration = ticks(app.view.step());

@@ -4,9 +4,9 @@ use super::{
     inference::compute::{AdapterId, Backend},
     voice::{flat::FlatModelRegistry, svpk},
 };
+use crate::platform::fs;
 use serde::{Deserialize, Serialize};
 use std::{
-    fs,
     io::Write,
     path::{Path, PathBuf},
 };
@@ -46,8 +46,8 @@ impl SynthesisSettings {
         self.databases.is_some()
             || self.sv1_databases.is_some()
             || self.flat_databases.is_some()
-            || self.flat_voice_directory().is_ok_and(|path| path.is_dir())
-            || svpk::root().is_ok_and(|path| path.is_dir())
+            || self.flat_voice_directory().is_ok_and(fs::is_dir)
+            || svpk::root().is_ok_and(fs::is_dir)
     }
 
     pub fn flat_voice_directory(&self) -> Result<PathBuf, String> {
@@ -61,7 +61,7 @@ impl SynthesisSettings {
         let voices = self
             .flat_voice_directory()
             .ok()
-            .filter(|path| self.flat_databases.is_some() || path.is_dir());
+            .filter(|path| self.flat_databases.is_some() || fs::is_dir(path));
         FlatModelRegistry::scan(voices.as_deref(), self.flat_models.as_deref())
     }
 

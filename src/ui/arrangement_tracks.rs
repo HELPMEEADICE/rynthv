@@ -38,7 +38,7 @@ pub fn show(app: &mut App, ui: &mut Ui, timeline_left: f32, first_y: f32) {
             if track_id == app.editor.track && !is_instrumental {
                 Color32::from_rgb(57, 55, 60)
             } else {
-                PANEL
+                panel_color()
             },
         );
         ui.painter().rect_filled(
@@ -149,7 +149,7 @@ fn group(
     let selected = app.editor.reference == Some(reference.id);
     let painter = ui.painter().with_clip_rect(body.intersect(ui.clip_rect()));
     let fill = if selected {
-        colors.accent.lerp_to_gamma(CANVAS, 0.15)
+        colors.accent.lerp_to_gamma(canvas_color(), 0.15)
     } else {
         colors.note
     };

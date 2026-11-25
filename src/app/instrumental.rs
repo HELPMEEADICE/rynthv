@@ -58,7 +58,13 @@ impl App {
         }
     }
 
-    fn begin_audio_import(&mut self, track: EntityId, path: PathBuf, relink: bool, ctx: &Context) {
+    pub(super) fn begin_audio_import(
+        &mut self,
+        track: EntityId,
+        path: PathBuf,
+        relink: bool,
+        ctx: &Context,
+    ) {
         let clip = self
             .editor
             .project
@@ -110,7 +116,7 @@ impl App {
         if self.editor.is_editing() {
             return;
         }
-        let duration = asset.audio.duration_seconds();
+        let duration = asset.duration_seconds();
         let import = self.audio_import.take().unwrap();
         self.synthesis.instrumentals.finish_import();
         let clip = if let Some(mut clip) = import.placement {

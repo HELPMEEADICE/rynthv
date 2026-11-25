@@ -1,5 +1,5 @@
 mod compute;
-mod context;
+pub(super) mod context;
 mod control;
 mod events;
 mod export;

@@ -13,7 +13,7 @@ pub(super) fn section(ui: &mut Ui, title: &str, content: impl FnOnce(&mut Ui)) {
     ui.painter().hline(
         ui.available_rect_before_wrap().x_range(),
         ui.next_widget_position().y,
-        Stroke::new(1.0, EDGE),
+        Stroke::new(1.0, edge_color()),
     );
     padded(ui, |ui| {
         CollapsingHeader::new(RichText::new(title).font(section_title_font()))
@@ -32,7 +32,7 @@ pub(super) fn field(ui: &mut Ui, text: &mut String) -> Response {
         TextEdit::singleline(text)
             .vertical_align(Align::Center)
             .margin(vec2(7.0, 5.0))
-            .background_color(BORDER),
+            .background_color(border_color()),
     )
 }
 

@@ -6,17 +6,12 @@
 //! Parallel worker measurements are reported separately: their summed wall
 //! time may exceed the session's elapsed time and must not be added to it.
 
+use web_time::Instant;
 mod parallel;
 
 pub use parallel::{ParallelTiming, ParallelWork};
 
-use std::{
-    cell::RefCell,
-    collections::HashMap,
-    marker::PhantomData,
-    rc::Rc,
-    time::{Duration, Instant},
-};
+use std::{cell::RefCell, collections::HashMap, marker::PhantomData, rc::Rc, time::Duration};
 
 use serde::Serialize;
 

@@ -3,6 +3,8 @@ mod decode;
 
 use super::{audio::RenderedAudio, rendered::Waveform};
 use crate::model::Project;
+#[cfg(not(target_arch = "wasm32"))]
+use std::thread;
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
@@ -11,7 +13,6 @@ use std::{
         atomic::{AtomicBool, Ordering},
         mpsc,
     },
-    thread,
 };
 
 pub struct AudioAsset {
@@ -24,17 +25,46 @@ pub fn read_audio(path: &Path, cancelled: &AtomicBool) -> Result<RenderedAudio, 
 }
 
 impl AudioAsset {
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn read_for_mix(path: &Path, cancelled: &AtomicBool) -> Result<Self, String> {
         decode::load(path, cancelled, false)
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn duration_seconds(&self) -> f64 {
+        self.audio.duration_seconds()
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn read_with_waveforms(path: &Path, cancelled: &AtomicBool) -> Result<Self, String> {
+        decode::load(path, cancelled, true)
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub type EditorAudioAsset = AudioAsset;
+
+#[cfg(target_arch = "wasm32")]
+pub struct EditorAudioAsset {
+    duration: f64,
+    pub waveforms: Vec<Waveform>,
+}
+
+#[cfg(target_arch = "wasm32")]
+impl EditorAudioAsset {
+    pub fn duration_seconds(&self) -> f64 {
+        self.duration
     }
 }
 
 enum Entry {
     Loading {
-        rx: mpsc::Receiver<Result<Arc<AudioAsset>, String>>,
+        rx: mpsc::Receiver<Result<Arc<EditorAudioAsset>, String>>,
         cancel: Arc<AtomicBool>,
+        #[cfg(target_arch = "wasm32")]
+        web: crate::platform::web::client::Pending<()>,
     },
-    Ready(Arc<AudioAsset>),
+    Ready(Arc<EditorAudioAsset>),
     Failed(String),
 }
 
@@ -42,6 +72,10 @@ impl Drop for Entry {
     fn drop(&mut self) {
         if let Self::Loading { cancel, .. } = self {
             cancel.store(true, Ordering::Relaxed);
+        }
+        #[cfg(target_arch = "wasm32")]
+        if let Self::Loading { web, .. } = self {
+            web.cancel();
         }
     }
 }
@@ -86,7 +120,17 @@ impl AudioLibrary {
             let result = match rx.try_recv() {
                 Ok(result) => result,
                 Err(mpsc::TryRecvError::Empty) => continue,
-                Err(mpsc::TryRecvError::Disconnected) => Err("音频加载线程意外停止".into()),
+                Err(mpsc::TryRecvError::Disconnected) => {
+                    #[cfg(target_arch = "wasm32")]
+                    if let Entry::Loading { web, .. } = entry
+                        && let Some(Err(error)) = web.poll()
+                    {
+                        *entry = Entry::Failed(error);
+                        self.generation = self.generation.wrapping_add(1);
+                        continue;
+                    }
+                    Err("音频加载任务意外停止".into())
+                }
             };
             *entry = match result {
                 Ok(asset) => Entry::Ready(asset),
@@ -96,7 +140,7 @@ impl AudioLibrary {
         }
     }
 
-    pub fn asset(&self, path: &Path) -> Option<&Arc<AudioAsset>> {
+    pub fn asset(&self, path: &Path) -> Option<&Arc<EditorAudioAsset>> {
         match self.entries.get(path) {
             Some(Entry::Ready(asset)) => Some(asset),
             _ => None,
@@ -125,6 +169,7 @@ impl AudioLibrary {
         let worker_cancel = Arc::clone(&cancel);
         let file = path.clone();
         let ctx = ctx.clone();
+        #[cfg(not(target_arch = "wasm32"))]
         let result = thread::Builder::new()
             .name("audio-import".into())
             .spawn(move || {
@@ -136,10 +181,65 @@ impl AudioLibrary {
                     ctx.wake();
                 }
             });
+        #[cfg(target_arch = "wasm32")]
+        let result: Result<crate::platform::web::client::Pending<()>, std::io::Error> = {
+            use crate::platform::web::{
+                client,
+                protocol::{Event, Request},
+            };
+            let pending = client::submit::<()>(
+                Request::Audio { path: file },
+                ctx.clone(),
+                move |event, samples| {
+                    if let (
+                        Event::Audio {
+                            channels,
+                            rate,
+                            frames,
+                        },
+                        Some(samples),
+                    ) = (event, samples)
+                        && !worker_cancel.load(Ordering::Relaxed)
+                    {
+                        let samples = samples.to_vec();
+                        let per_channel = samples.len() / channels.max(1);
+                        let asset = (0..channels)
+                            .map(|channel| {
+                                let first = channel * per_channel;
+                                Waveform::from_peaks(
+                                    0.0,
+                                    rate,
+                                    frames,
+                                    &samples[first..first + per_channel],
+                                )
+                            })
+                            .collect::<Option<Vec<_>>>()
+                            .filter(|waves| !waves.is_empty())
+                            .map(|waveforms| {
+                                Arc::new(EditorAudioAsset {
+                                    duration: frames as f64 / f64::from(rate),
+                                    waveforms,
+                                })
+                            })
+                            .ok_or_else(|| "无效的伴奏波形".into());
+                        let _ = tx.send(asset);
+                        ctx.wake();
+                    }
+                },
+            );
+            // The data event precedes successful completion. Forward a worker
+            // failure separately because it has no data packet.
+            Ok(pending)
+        };
         self.entries.insert(
             path,
             match result {
-                Ok(_) => Entry::Loading { rx, cancel },
+                Ok(_task) => Entry::Loading {
+                    rx,
+                    cancel,
+                    #[cfg(target_arch = "wasm32")]
+                    web: _task,
+                },
                 Err(error) => Entry::Failed(format!("无法加载音频：{error}")),
             },
         );

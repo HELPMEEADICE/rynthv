@@ -65,14 +65,16 @@ pub fn show(app: &mut App, ctx: &Context) {
                         .font(FontId::new(17.0, FontFamily::Name("SectionTitle".into()))),
                 );
                 ui.add_space(4.0);
-                ui.label(RichText::new("用空格隔开字词。\n每个音符对应一个字词。").color(MUTED));
+                ui.label(
+                    RichText::new("用空格隔开字词。\n每个音符对应一个字词。").color(muted_color()),
+                );
                 let input_id = Id::new("fill-lyrics-text");
                 if edit.focus {
                     TextEdit::store_state(ctx, input_id, Default::default());
                 }
                 Frame::new()
-                    .fill(PANEL)
-                    .stroke(Stroke::new(1.0, MUTED))
+                    .fill(panel_color())
+                    .stroke(Stroke::new(1.0, muted_color()))
                     .corner_radius(4)
                     .inner_margin(5)
                     .show(ui, |ui| {
@@ -123,7 +125,7 @@ pub fn show(app: &mut App, ctx: &Context) {
                 } else {
                     format!("{} 个字词 · 填入 {notes} 个音符", words.len())
                 };
-                ui.label(RichText::new(hint).size(11.0).color(MUTED))
+                ui.label(RichText::new(hint).size(11.0).color(muted_color()))
                     .on_hover_text("更改歌词时会清除对应音符的自定义音素，以便重新生成发音。");
                 ui.add_space(8.0);
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -131,14 +133,14 @@ pub fn show(app: &mut App, ctx: &Context) {
                     submit = ui
                         .add_enabled(
                             !words.is_empty(),
-                            Button::new(RichText::new("确定").color(CANVAS))
-                                .fill(GREEN)
+                            Button::new(RichText::new("确定").color(canvas_color()))
+                                .fill(green_color())
                                 .min_size(size),
                         )
                         .on_hover_text("Ctrl+Enter 确定")
                         .clicked();
                     cancel = ui
-                        .add_sized(size, Button::new("取消").fill(BUTTON_HOVER))
+                        .add_sized(size, Button::new("取消").fill(button_hover_color()))
                         .clicked();
                 });
             })

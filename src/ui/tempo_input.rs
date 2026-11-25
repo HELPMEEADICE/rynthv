@@ -77,8 +77,8 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         TextEdit::singleline(&mut edit.text)
             .id(Id::new("transport-bpm-input"))
             .font(FontId::proportional(18.0))
-            .text_color(TEXT)
-            .background_color(PANEL)
+            .text_color(text_color())
+            .background_color(panel_color())
             .margin(vec2(4.0, 0.0))
             .horizontal_align(Align::Center)
             .vertical_align(Align::Center),

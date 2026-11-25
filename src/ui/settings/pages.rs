@@ -4,6 +4,11 @@ use eframe::egui::*;
 
 pub(super) fn general(app: &mut App, ui: &mut Ui) {
     fixed(ui, "界面语言", "简体中文", "当前界面仅支持简体中文");
+    #[cfg(target_arch = "wasm32")]
+    row(ui, "界面主题", |ui| {
+        ui.selectable_value(&mut app.preferences.light_theme, false, "深色");
+        ui.selectable_value(&mut app.preferences.light_theme, true, "浅色");
+    });
     row(ui, "界面缩放", |ui| {
         let id = ui.make_persistent_id("zoom-draft");
         let mut percent = ui

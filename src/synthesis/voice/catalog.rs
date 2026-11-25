@@ -1,15 +1,13 @@
 //! Lightweight discovery of installed voice revisions, without loading model weights.
 
+use crate::platform::fs;
 mod dnni;
 mod flat;
 mod metadata;
 mod nofs;
 mod resource;
 
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
@@ -17,7 +15,7 @@ use super::{Result, VoiceFamily};
 pub use flat::FlatCatalogEntry;
 use metadata::MetadataIndex;
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, serde::Deserialize)]
 pub enum VoiceAvailability {
     /// The revision uses a supported format; full model validation happens on load.
     Loadable,
@@ -30,7 +28,7 @@ impl VoiceAvailability {
     }
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, serde::Deserialize)]
 pub struct VoiceCatalogEntry {
     pub database_id: String,
     pub revision: u32,
@@ -48,7 +46,7 @@ pub struct VoiceCatalogEntry {
     pub availability: VoiceAvailability,
 }
 
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Default, Serialize, serde::Deserialize)]
 pub struct VoiceCatalog {
     pub entries: Vec<VoiceCatalogEntry>,
     pub warnings: Vec<String>,

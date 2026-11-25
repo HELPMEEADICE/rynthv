@@ -122,7 +122,7 @@ pub(super) fn show(app: &mut App, ui: &mut Ui, viewport_height: f32) {
     ui.painter().hline(
         ui.available_rect_before_wrap().x_range(),
         ui.next_widget_position().y,
-        Stroke::new(1.0, EDGE),
+        Stroke::new(1.0, edge_color()),
     );
     padded(ui, |ui| {
         let dictionary = app.editor.project.dictionaries.get(&name).cloned();
@@ -171,7 +171,7 @@ pub(super) fn show(app: &mut App, ui: &mut Ui, viewport_height: f32) {
         let height =
             (viewport_height - (ui.next_widget_position().y - content_top) - 32.0).max(210.0);
         Frame::new()
-            .fill(BACKGROUND)
+            .fill(background_color())
             .inner_margin(8)
             .show(ui, |ui| {
                 ui.set_min_height(height);
@@ -180,7 +180,7 @@ pub(super) fn show(app: &mut App, ui: &mut Ui, viewport_height: f32) {
                 ui.horizontal(|ui| {
                     ui.add_sized(
                         vec2(half, 24.0),
-                        Label::new(RichText::new("字词").color(MUTED)),
+                        Label::new(RichText::new("字词").color(muted_color())),
                     );
                     ui.weak("发音");
                 });

@@ -1,13 +1,15 @@
 //! Parallelize independent frames, retaining the reduction order of every dot.
 
 use super::{Affine, MatrixError, baseline_dot};
-use crate::synthesis::{
-    execution::{self, Cancellation},
-    inference::parallel,
-};
+use crate::synthesis::execution::{self, Cancellation};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::synthesis::inference::parallel;
+#[cfg(not(target_arch = "wasm32"))]
 use rayon::prelude::*;
 
+#[cfg(not(target_arch = "wasm32"))]
 const MIN_PARALLEL_MACS: usize = 2 * 1024 * 1024;
+#[cfg(not(target_arch = "wasm32"))]
 const MIN_TASK_MACS: usize = 256 * 1024;
 
 impl Affine {
@@ -23,6 +25,21 @@ impl Affine {
             return self.execute_block(input, output, None);
         }
         let cancellation = execution::current();
+        #[cfg(target_arch = "wasm32")]
+        return self.execute_block(input, output, cancellation.as_ref());
+
+        #[cfg(not(target_arch = "wasm32"))]
+        self.execute_parallel(input, output, frames, cancellation)
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn execute_parallel(
+        &self,
+        input: &[f32],
+        output: &mut [f32],
+        frames: usize,
+        cancellation: Option<Cancellation>,
+    ) -> Result<(), MatrixError> {
         let macs = self.input_channels().saturating_mul(self.output_channels());
         if frames.saturating_mul(macs) < MIN_PARALLEL_MACS {
             return self.execute_block(input, output, cancellation.as_ref());

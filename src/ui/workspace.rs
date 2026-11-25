@@ -44,7 +44,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
                     ui.input(|i| i.pointer.hover_pos().is_some_and(|p| p.x < r.center().x));
                 let target = if before { r.left() } else { r.right() };
                 ui.painter()
-                    .vline(target, r.y_range(), Stroke::new(3.0, GREEN));
+                    .vline(target, r.y_range(), Stroke::new(3.0, green_color()));
                 if response.dnd_release_payload::<DragPayload>().is_some() {
                     drop = Some((source, index + usize::from(!before)));
                 }
@@ -135,7 +135,7 @@ fn editor(app: &mut App, ui: &mut Ui) {
             ui.painter().hline(
                 rect.x_range(),
                 if first { rect.top() } else { rect.bottom() },
-                Stroke::new(3.0, GREEN),
+                Stroke::new(3.0, green_color()),
             );
             if response.dnd_release_payload::<DragPayload>().is_some() {
                 app.view.arrangement_first = if matches!(*payload, DragPayload::Arrangement) {
@@ -162,9 +162,13 @@ pub(super) fn piano_stack(app: &mut App, ui: &mut Ui) {
         } else {
             28.0
         };
-    ui.painter().rect_filled(rect, 4, PANEL);
-    ui.painter()
-        .rect_stroke(rect, 4, Stroke::new(1.0, BORDER), StrokeKind::Inside);
+    ui.painter().rect_filled(rect, 4, panel_color());
+    ui.painter().rect_stroke(
+        rect,
+        4,
+        Stroke::new(1.0, border_color()),
+        StrokeKind::Inside,
+    );
     super::piano::toolbar(app, &mut child(ui, toolbar, "piano-toolbar"));
     if app.piano_collapsed || rect.height() <= super::piano::TOOLBAR_HEIGHT {
         return;
@@ -249,7 +253,7 @@ pub(super) fn piano_stack(app: &mut App, ui: &mut Ui) {
             let response = ui.interact(r, Id::new(("lane-drop", lane.id)), Sense::hover());
             if response.contains_pointer() {
                 ui.painter()
-                    .hline(r.x_range(), r.top(), Stroke::new(3.0, GREEN));
+                    .hline(r.x_range(), r.top(), Stroke::new(3.0, green_color()));
                 if response.dnd_release_payload::<DragPayload>().is_some() {
                     reorder = Some((source, lane.id));
                 }

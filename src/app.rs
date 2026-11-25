@@ -7,26 +7,30 @@ mod project;
 #[cfg(target_os = "android")]
 mod recovery;
 mod voice;
+#[cfg(target_arch = "wasm32")]
+pub(crate) mod web;
 pub use midi::{MidiImport, MidiImportMode, MidiImportPhase};
 
+#[cfg(not(target_arch = "wasm32"))]
+use crate::storage;
 use crate::{
     editor::Editor,
     model::*,
-    storage, synthesis,
+    synthesis,
     ui::{self, state::ViewState},
 };
 use eframe::egui::*;
-use std::{
-    path::PathBuf,
-    time::{Duration, Instant},
-};
+use std::{path::PathBuf, time::Duration};
+use web_time::Instant;
 
 #[derive(Clone, Copy)]
 pub enum FileAction {
     New,
     Open,
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os = "android", target_arch = "wasm32"))]
     OpenLocal,
+    #[cfg(target_arch = "wasm32")]
+    OpenDropped,
     ImportMidi,
     #[cfg(not(target_os = "android"))]
     Close,
@@ -38,6 +42,7 @@ pub struct App {
     pub view: ViewState,
     pub preferences: ui::settings::Preferences,
     pub path: Option<PathBuf>,
+    #[cfg(not(target_arch = "wasm32"))]
     project_revision: Option<storage::Revision>,
     pub error: Option<String>,
     pub settings: bool,
@@ -77,9 +82,12 @@ pub struct App {
     audio_wanted: bool,
     #[cfg(target_os = "android")]
     local_projects: Option<Vec<PathBuf>>,
+    #[cfg(target_arch = "wasm32")]
+    browser: web::State,
     #[cfg(not(target_os = "android"))]
     pub allow_close: bool,
     pub status: String,
+    #[cfg(not(target_arch = "wasm32"))]
     settings_path: Option<PathBuf>,
     last_layout: String,
     last_preferences: String,
@@ -88,10 +96,18 @@ pub struct App {
     last_persist: Instant,
 }
 impl App {
-    pub fn new(cc: &eframe::CreationContext<'_>, path: Option<PathBuf>) -> Self {
+    pub fn new(
+        cc: &eframe::CreationContext<'_>,
+        path: Option<PathBuf>,
+        #[cfg(target_arch = "wasm32")] start: web::Startup,
+    ) -> Self {
         ui::theme::install(&cc.egui_ctx);
         egui_extras::install_image_loaders(&cc.egui_ctx);
+        #[cfg(not(target_arch = "wasm32"))]
         let mut error = ui::theme::fonts(&cc.egui_ctx).err();
+        #[cfg(target_arch = "wasm32")]
+        let mut error = None;
+        #[cfg(not(target_arch = "wasm32"))]
         let settings_path = match crate::platform::config_directory() {
             Ok(directory) => Some(directory.join("workspace.json")),
             Err(message) => {
@@ -101,6 +117,7 @@ impl App {
         };
         let mut view = ViewState::default();
         let mut last_layout = String::new();
+        #[cfg(not(target_arch = "wasm32"))]
         if let Some(path) = settings_path.as_ref().filter(|path| path.exists()) {
             match std::fs::read(path)
                 .map_err(|e| e.to_string())
@@ -117,6 +134,15 @@ impl App {
                 Err(e) => error = Some(format!("无法读取工作区：{e}")),
             }
         }
+        #[cfg(target_arch = "wasm32")]
+        if let Some(mut saved) = start.view.filter(ViewState::valid) {
+            for lane in &mut saved.lanes {
+                lane.id = new_id();
+            }
+            last_layout = serde_json::to_string_pretty(&saved).unwrap_or_default();
+            view = saved;
+        }
+        #[cfg(not(target_arch = "wasm32"))]
         let preferences = match settings_path
             .as_ref()
             .map(|path| ui::settings::Preferences::load(&path.with_file_name("preferences.json")))
@@ -128,6 +154,15 @@ impl App {
                 ui::settings::Preferences::default()
             }
         };
+        #[cfg(target_arch = "wasm32")]
+        let preferences = start
+            .preferences
+            .filter(ui::settings::Preferences::valid)
+            .unwrap_or_default();
+        #[cfg(target_arch = "wasm32")]
+        if let Err(message) = ui::theme::web_fonts(&cc.egui_ctx, start.font) {
+            error = Some(message);
+        }
         preferences.apply(&cc.egui_ctx);
         cc.egui_ctx
             .options_mut(|options| options.zoom_with_keyboard = false);
@@ -147,6 +182,7 @@ impl App {
             view,
             preferences,
             path: None,
+            #[cfg(not(target_arch = "wasm32"))]
             project_revision: None,
             error,
             settings: false,
@@ -186,9 +222,12 @@ impl App {
             audio_wanted: false,
             #[cfg(target_os = "android")]
             local_projects: None,
+            #[cfg(target_arch = "wasm32")]
+            browser: web::State::default(),
             #[cfg(not(target_os = "android"))]
             allow_close: false,
             status: String::new(),
+            #[cfg(not(target_arch = "wasm32"))]
             settings_path,
             last_layout,
             last_preferences,
@@ -198,6 +237,10 @@ impl App {
         };
         if let Some(path) = path {
             app.open_path(path);
+        }
+        #[cfg(target_arch = "wasm32")]
+        if let Some(recovery) = start.recovery {
+            app.restore_web_project(recovery);
         }
         #[cfg(target_os = "android")]
         match recovery::Recovery::init(&cc.egui_ctx) {
@@ -217,6 +260,10 @@ impl App {
     fn has_unsaved_changes(&self) -> bool {
         #[cfg(target_os = "android")]
         if self.recovered_dirty {
+            return true;
+        }
+        #[cfg(target_arch = "wasm32")]
+        if self.browser.recovered_dirty {
             return true;
         }
         self.editor.dirty()
@@ -258,7 +305,10 @@ impl App {
             FileAction::New => {
                 self.install_project(Project::default());
                 self.path = None;
-                self.project_revision = None;
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    self.project_revision = None;
+                }
             }
             FileAction::Open => self.pick_one(
                 ctx,
@@ -266,8 +316,14 @@ impl App {
                     .filter("Synthesizer V 工程", &["svp"]),
                 |app, _, path| app.open_path(path),
             ),
-            #[cfg(target_os = "android")]
+            #[cfg(any(target_os = "android", target_arch = "wasm32"))]
             FileAction::OpenLocal => self.list_local_projects(),
+            #[cfg(target_arch = "wasm32")]
+            FileAction::OpenDropped => {
+                if let Some(path) = self.browser.dropped_project.take() {
+                    self.open_path(path);
+                }
+            }
             FileAction::ImportMidi => self.begin_midi_import(MidiImportMode::NewProject, ctx),
             #[cfg(not(target_os = "android"))]
             FileAction::Close => {
@@ -320,7 +376,7 @@ impl App {
         }
     }
     #[cfg(not(target_os = "android"))]
-    fn update_title(&mut self, ctx: &Context) {
+    fn update_title(&mut self, _ctx: &Context) {
         let title = format!(
             "RynthV - {}{}",
             self.path
@@ -332,10 +388,14 @@ impl App {
         );
         if title != self.last_title {
             self.last_title = title.clone();
-            ctx.send_viewport_cmd(ViewportCommand::Title(title));
+            #[cfg(target_arch = "wasm32")]
+            web::set_title(&title);
+            #[cfg(not(target_arch = "wasm32"))]
+            _ctx.send_viewport_cmd(ViewportCommand::Title(title));
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn persist_layout(&mut self) {
         self.last_persist = Instant::now();
         let Some(settings_path) = self.settings_path.as_ref() else {
@@ -366,7 +426,7 @@ impl App {
         }
     }
     fn dialogs(&mut self, ctx: &Context) {
-        #[cfg(target_os = "android")]
+        #[cfg(any(target_os = "android", target_arch = "wasm32"))]
         self.local_project_dialog(ctx);
         if let Some(action) = self.pending {
             Modal::new(Id::new("unsaved")).show(ctx, |ui| {
@@ -402,7 +462,7 @@ impl App {
                 ui.heading(format!("RynthV {}", env!("CARGO_PKG_VERSION")));
                 ui.label("Rust + egui 歌声合成引擎");
                 ui.label("多音轨编辑、歌词与音高调整、MIDI 导入和 WAV 导出。");
-                ui.label("支持 Windows、Linux 和 Android。");
+                ui.label("支持 Windows、Linux、Android 和 Web。");
                 if ui.button("关闭").clicked() {
                     self.about = false;
                 }
@@ -431,6 +491,8 @@ impl eframe::App for App {
 
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        #[cfg(target_arch = "wasm32")]
+        self.poll_browser(&ctx);
         #[cfg(target_os = "android")]
         {
             self.handle_mobile_events(&ctx);
@@ -476,11 +538,17 @@ impl eframe::App for App {
         #[cfg(not(target_os = "android"))]
         self.update_title(&ctx);
         ui.painter()
-            .rect_filled(ui.max_rect(), 0, ui::theme::BACKGROUND);
+            .rect_filled(ui.max_rect(), 0, ui::theme::background_color());
         #[cfg(target_os = "android")]
         ui::mobile::show(self, ui, ctx.content_rect().intersect(ui.max_rect()));
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
         ui::chrome::desktop(self, ui);
+        #[cfg(target_arch = "wasm32")]
+        if ui::mobile::compact(&ctx) {
+            ui::mobile::show(self, ui, ctx.content_rect().intersect(ui.max_rect()));
+        } else {
+            ui::chrome::desktop(self, ui);
+        }
         ui::instrumental::update_drag(self, &ctx);
         ui::group_edit::end_frame(self, &ctx);
         self.dialogs(&ctx);

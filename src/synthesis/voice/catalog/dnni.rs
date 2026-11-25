@@ -1,8 +1,9 @@
 use super::{
     VoiceAvailability, VoiceCatalog, VoiceCatalogEntry, metadata::MetadataIndex, resource,
 };
+use crate::platform::fs;
 use crate::synthesis::voice::{Result, VoiceFamily, format::FormatContext};
-use std::{fs, path::Path};
+use std::path::Path;
 
 pub(super) fn scan(
     database: &Path,

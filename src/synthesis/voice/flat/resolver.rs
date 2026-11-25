@@ -1,6 +1,6 @@
+use crate::platform::fs::File;
 use std::{
     collections::HashMap,
-    fs::File,
     io::Read,
     path::Path,
     sync::{Arc, Mutex, OnceLock, Weak},
@@ -22,7 +22,7 @@ const REQUIRED: [ModelRole; 4] = [
     ModelRole::F0,
 ];
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, serde::Deserialize)]
 pub struct FlatDependency {
     pub role: ModelRole,
     pub id: Option<String>,

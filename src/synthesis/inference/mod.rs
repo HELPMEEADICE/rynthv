@@ -9,6 +9,7 @@ mod gpu;
 pub mod matrix;
 pub mod noise;
 pub mod ops;
+#[cfg(not(target_arch = "wasm32"))]
 mod parallel;
 pub mod pooling;
 pub mod recurrent;

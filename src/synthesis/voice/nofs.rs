@@ -1,13 +1,13 @@
 //! Original SV1 AI database resources. Only public metadata and model payloads
 //! are accessed; unrelated registration records have no synthesis role.
 
+use crate::platform::fs;
 mod container;
 
 pub(super) use container::NofsArchive;
 
 use std::{
     collections::BTreeMap,
-    fs,
     path::{Path, PathBuf},
 };
 
@@ -35,7 +35,7 @@ pub(super) fn paths(directory: &Path) -> Result<Vec<PathBuf>> {
 }
 
 pub(super) fn is_file(path: &Path) -> bool {
-    path.is_file()
+    fs::is_file(path)
         && path
             .extension()
             .is_some_and(|ext| ext.eq_ignore_ascii_case("nofs"))

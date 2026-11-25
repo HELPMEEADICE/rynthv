@@ -8,7 +8,7 @@ use super::{
 use crate::{app::App, model::*};
 use eframe::egui::*;
 
-#[cfg(target_os = "android")]
+#[cfg(any(target_os = "android", target_arch = "wasm32"))]
 mod touch;
 
 pub fn show(app: &mut App, ui: &mut Ui) {
@@ -17,7 +17,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         super::lanes::parameter_deactivate(app);
         super::phonemes::phoneme_deactivate(app);
     }
-    ui.painter().rect_filled(rect, 4, CANVAS);
+    ui.painter().rect_filled(rect, 4, canvas_color());
     let mobile = cfg!(target_os = "android");
     let (gutter, header_height, scrollbar_width) = if mobile {
         (
@@ -44,10 +44,14 @@ pub fn show(app: &mut App, ui: &mut Ui) {
                 se: 0,
             }
         },
-        PANEL,
+        panel_color(),
     );
-    ui.painter()
-        .rect_stroke(rect, 4, Stroke::new(1.0, BORDER), StrokeKind::Inside);
+    ui.painter().rect_stroke(
+        rect,
+        4,
+        Stroke::new(1.0, border_color()),
+        StrokeKind::Inside,
+    );
     let header_padding = if mobile { 2.0 } else { 8.0 };
     let mut bar = child(
         ui,
@@ -101,7 +105,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
                         .size(if mobile { size } else { Vec2::splat(24.0) })
                         .icon_size(17.0)
                         .selected(app.show_time_tracks)
-                        .background(PANEL),
+                        .background(panel_color()),
                 )
                 .clicked()
             {
@@ -119,7 +123,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
     ui.painter().hline(
         header.left()..=ruler.left(),
         header.bottom(),
-        Stroke::new(1.0, EDGE),
+        Stroke::new(1.0, edge_color()),
     );
     let time_height = if app.show_time_tracks {
         super::time_tracks::ROW_HEIGHT * 2.0
@@ -133,9 +137,9 @@ pub fn show(app: &mut App, ui: &mut Ui) {
     if mobile && (body.height() < 8.0 || body.width() < 16.0) {
         return;
     }
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os = "android", target_arch = "wasm32"))]
     let (touching, touch_y) = touch::navigate(app, ui, body, rect.left());
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
     let (touching, touch_y) = (false, 0.0);
     let pan = app.view_pan.drag(
         ui,
@@ -236,17 +240,19 @@ pub fn show(app: &mut App, ui: &mut Ui) {
             time_ui.painter().rect_filled(
                 Rect::from_min_size(pos2(rect.left(), y), vec2(gutter, row_height)),
                 0,
-                PANEL,
+                panel_color(),
             );
             label(
                 &time_ui,
                 pos2(rect.left() + 14.0, y + row_height * 0.5),
                 text,
-                MUTED,
+                muted_color(),
             );
-            time_ui
-                .painter()
-                .hline(clip.x_range(), y + row_height, Stroke::new(1.0, EDGE));
+            time_ui.painter().hline(
+                clip.x_range(),
+                y + row_height,
+                Stroke::new(1.0, edge_color()),
+            );
         }
         super::time_tracks::show(
             app,
@@ -265,7 +271,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         first_track_y,
     );
     ui.painter()
-        .vline(ruler.left(), rect.y_range(), Stroke::new(1.0, EDGE));
+        .vline(ruler.left(), rect.y_range(), Stroke::new(1.0, edge_color()));
     super::scrollbars::horizontal(
         ui,
         "arrangement-scrollbar",

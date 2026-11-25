@@ -6,8 +6,9 @@ mod track;
 pub use export::save as save_project;
 
 use crate::model::TimeAxis;
+use crate::platform::fs::File;
 use midly::{Format, Timing};
-use std::{fs::File, io::Read, path::Path};
+use std::{io::Read, path::Path};
 
 const MAX_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_TRACKS: usize = 256;
@@ -16,14 +17,14 @@ const MAX_EVENTS: usize = 2_000_000;
 const MAX_NOTES: usize = 200_000;
 const MAX_TEXT: usize = 4096;
 
-#[derive(Clone, Debug, serde::Serialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct MidiFile {
     pub tracks: Vec<MidiTrack>,
     pub time: TimeAxis,
     pub warnings: Vec<String>,
 }
 
-#[derive(Clone, Debug, serde::Serialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct MidiTrack {
     pub name: String,
     /// Zero-based index of the source SMF track.
@@ -34,7 +35,7 @@ pub struct MidiTrack {
     pub notes: Vec<MidiNote>,
 }
 
-#[derive(Clone, Debug, serde::Serialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct MidiNote {
     pub onset: i64,
     pub duration: i64,

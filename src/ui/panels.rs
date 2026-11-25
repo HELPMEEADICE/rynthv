@@ -14,7 +14,7 @@ pub fn show(app: &mut App, ui: &mut Ui, column: Column) {
         super::lanes::parameter_deactivate(app);
         super::phonemes::phoneme_deactivate(app);
     }
-    ui.painter().rect_filled(rect, 4, PANEL);
+    ui.painter().rect_filled(rect, 4, panel_color());
     let header_height = if cfg!(target_os = "android") {
         34.0
     } else {
@@ -32,7 +32,7 @@ pub fn show(app: &mut App, ui: &mut Ui, column: Column) {
         column.icon().paint(
             ui,
             Rect::from_center_size(icon.center(), Vec2::splat(20.0)),
-            MUTED,
+            muted_color(),
         );
         #[cfg(not(target_os = "android"))]
         super::section_title(
@@ -43,8 +43,11 @@ pub fn show(app: &mut App, ui: &mut Ui, column: Column) {
         #[cfg(target_os = "android")]
         ui.label(RichText::new(column.label()).font(section_title_font()));
     });
-    ui.painter()
-        .hline(header.x_range(), header.bottom(), Stroke::new(1.0, EDGE));
+    ui.painter().hline(
+        header.x_range(),
+        header.bottom(),
+        Stroke::new(1.0, edge_color()),
+    );
     let mut content = child(
         ui,
         Rect::from_min_max(pos2(rect.left(), header.bottom()), rect.max),
@@ -76,6 +79,10 @@ pub fn show(app: &mut App, ui: &mut Ui, column: Column) {
                 Column::Editor => {}
             }
         });
-    ui.painter()
-        .rect_stroke(rect, 4, Stroke::new(1.0, BORDER), StrokeKind::Inside);
+    ui.painter().rect_stroke(
+        rect,
+        4,
+        Stroke::new(1.0, border_color()),
+        StrokeKind::Inside,
+    );
 }

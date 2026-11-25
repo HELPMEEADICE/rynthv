@@ -53,9 +53,9 @@ impl Page {
 pub fn show(app: &mut App, ctx: &Context) {
     let id = Id::new("settings-page");
     let mut page = ctx.data_mut(|data| data.get_temp::<Page>(id).unwrap_or_default());
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os = "android", target_arch = "wasm32"))]
     let size = (ctx.content_rect().size() - Vec2::splat(12.0)).min(vec2(800.0, 610.0));
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
     let size = (ctx.content_rect().size() - vec2(40.0, 48.0))
         .min(vec2(800.0, 610.0))
         .max(vec2(240.0, 240.0));
@@ -63,14 +63,19 @@ pub fn show(app: &mut App, ctx: &Context) {
         return;
     }
     let before = app.preferences.clone();
+    let (fill, divider) = if ctx.theme() == Theme::Light {
+        (panel_color(), border_color())
+    } else {
+        (FILL, DIVIDER)
+    };
     let mut close = false;
     let modal = Modal::new(Id::new("settings"))
         .backdrop_color(Color32::from_black_alpha(115))
         .frame(
             Frame::new()
-                .fill(FILL)
+                .fill(fill)
                 .corner_radius(4)
-                .stroke(Stroke::new(1.0, DIVIDER)),
+                .stroke(Stroke::new(1.0, divider)),
         )
         .show(ctx, |ui| {
             let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
@@ -86,7 +91,7 @@ pub fn show(app: &mut App, ctx: &Context) {
             title.spacing_mut().interact_size.y = 30.0;
             title.horizontal(|ui| {
                 let (icon, _) = ui.allocate_exact_size(Vec2::splat(17.0), Sense::hover());
-                Icon::Settings.paint(ui, icon, MUTED);
+                Icon::Settings.paint(ui, icon, muted_color());
                 ui.label(RichText::new("设置").font(section_title_font()));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     close = ui
@@ -103,7 +108,8 @@ pub fn show(app: &mut App, ctx: &Context) {
                 header.bottom(),
                 Stroke::new(1.0, Color32::from_rgb(44, 42, 45)),
             );
-            let compact = cfg!(target_os = "android") && (size.x < 540.0 || short);
+            let compact = cfg!(any(target_os = "android", target_arch = "wasm32"))
+                && (size.x < 540.0 || short);
             let content_rect = if compact {
                 let nav = Rect::from_min_size(
                     header.left_bottom() + vec2(12.0, if short { 2.0 } else { 8.0 }),
@@ -142,7 +148,7 @@ pub fn show(app: &mut App, ctx: &Context) {
                 ui.painter().vline(
                     split,
                     header.bottom() + 8.0..=rect.bottom() - 8.0,
-                    Stroke::new(1.0, DIVIDER),
+                    Stroke::new(1.0, divider),
                 );
                 Rect::from_min_max(
                     pos2(split + 20.0, header.bottom() + 18.0),
@@ -155,8 +161,13 @@ pub fn show(app: &mut App, ctx: &Context) {
             let mut content = child(ui, content_rect, ("settings-content", page));
             content.spacing_mut().item_spacing.y = 8.0;
             content.spacing_mut().interact_size.y = 30.0;
-            content.visuals_mut().widgets.inactive.bg_fill = Color32::from_rgb(75, 73, 77);
-            content.visuals_mut().widgets.inactive.weak_bg_fill = Color32::from_rgb(75, 73, 77);
+            let control = if ctx.theme() == Theme::Light {
+                button_color()
+            } else {
+                Color32::from_rgb(75, 73, 77)
+            };
+            content.visuals_mut().widgets.inactive.bg_fill = control;
+            content.visuals_mut().widgets.inactive.weak_bg_fill = control;
             content.visuals_mut().widgets.inactive.corner_radius = CornerRadius::same(4);
             ScrollArea::vertical()
                 .id_salt(("settings-page-scroll", page))
@@ -192,18 +203,25 @@ pub fn show(app: &mut App, ctx: &Context) {
 fn navigation(ui: &mut Ui, page: Page, selected: bool) -> Response {
     let (rect, response) = ui.allocate_exact_size(vec2(ui.available_width(), 32.0), Sense::click());
     if selected || response.hovered() {
-        ui.painter()
-            .rect_filled(rect, 4, if selected { BUTTON_ACTIVE } else { BUTTON });
+        ui.painter().rect_filled(
+            rect,
+            4,
+            if selected {
+                button_active_color()
+            } else {
+                button_color()
+            },
+        );
     }
     let icon = Rect::from_center_size(rect.left_center() + vec2(19.0, 0.0), Vec2::splat(18.0));
     match page {
-        Page::General => Icon::Settings.paint(ui, icon, MUTED),
-        Page::Editing => Icon::Notes.paint(ui, icon, MUTED),
+        Page::General => Icon::Settings.paint(ui, icon, muted_color()),
+        Page::Editing => Icon::Notes.paint(ui, icon, muted_color()),
         Page::Recording => {
             ui.painter()
-                .circle_stroke(icon.center(), 7.0, Stroke::new(1.0, MUTED));
+                .circle_stroke(icon.center(), 7.0, Stroke::new(1.0, muted_color()));
         }
-        Page::Rendering => Icon::Render.paint(ui, icon, MUTED),
+        Page::Rendering => Icon::Render.paint(ui, icon, muted_color()),
         Page::Audio => widgets::speaker(ui, icon),
         Page::Shortcuts => widgets::keyboard(ui, icon),
     }
@@ -216,7 +234,7 @@ fn navigation(ui: &mut Ui, page: Page, selected: bool) -> Response {
         } else {
             FontId::proportional(12.0)
         },
-        TEXT,
+        text_color(),
     );
     response.widget_info(|| {
         WidgetInfo::selected(WidgetType::SelectableLabel, true, selected, page.label())

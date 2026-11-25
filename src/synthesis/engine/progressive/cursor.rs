@@ -6,14 +6,17 @@ use crate::synthesis::{
     stages::timbre::TimbreOutput,
     voice::{PreparedVoice, Result, VoiceError},
 };
-use std::time::Instant;
+use web_time::Instant;
 
 /// Persistent timbre/vocoder state for one contiguous forward render. It owns
 /// its execution data and borrows only the immutable timbre model network.
 /// A bounded worker owns the vocoder state and shared immutable weights.
 pub struct Cursor<'network, 'tree> {
     timbre: Stream<'network, 'tree>,
+    #[cfg(not(target_arch = "wasm32"))]
     vocoder: pipeline::Pipeline,
+    #[cfg(target_arch = "wasm32")]
+    vocoder: pipeline::Pipeline<'tree>,
     segment: Segment,
     pcm_origin: f64,
     produced_samples: usize,
@@ -63,7 +66,10 @@ impl PreparedRender {
         )?;
         let pcm_origin = phrase.start_seconds + timbre.first_frame() as f64 * FRAME_SECONDS;
         let setup_timbre_ms = started.elapsed().as_secs_f64() * 1000.0;
+        #[cfg(not(target_arch = "wasm32"))]
         let vocoder = pipeline::Pipeline::new(voice.shared_model("vocoder")?)?;
+        #[cfg(target_arch = "wasm32")]
+        let vocoder = pipeline::Pipeline::new(voice.model("vocoder")?)?;
         Ok(Some(Cursor {
             timbre,
             vocoder,
@@ -93,16 +99,19 @@ impl PreparedRender {
         }
         self.acoustic.timings.timbre_ms += std::mem::take(&mut cursor.setup_timbre_ms);
         checkpoint(RenderStage::Vocoder)?;
-        if let Some(output) = cursor.vocoder.poll()? {
-            return self.publish_output(cursor, output);
-        }
-        if !cursor.vocoder.can_submit() {
-            let output = cursor.vocoder.wait()?;
-            checkpoint(RenderStage::Vocoder)?;
-            return output.map_or_else(
-                || Ok(Vec::new()),
-                |output| self.publish_output(cursor, output),
-            );
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            if let Some(output) = cursor.vocoder.poll()? {
+                return self.publish_output(cursor, output);
+            }
+            if !cursor.vocoder.can_submit() {
+                let output = cursor.vocoder.wait()?;
+                checkpoint(RenderStage::Vocoder)?;
+                return output.map_or_else(
+                    || Ok(Vec::new()),
+                    |output| self.publish_output(cursor, output),
+                );
+            }
         }
         if cursor.pending.is_none() {
             checkpoint(RenderStage::Timbre)?;
@@ -149,7 +158,11 @@ impl PreparedRender {
         if drained {
             cursor.pending = None;
         }
-        if let Some(output) = cursor.vocoder.poll()? {
+        #[cfg(not(target_arch = "wasm32"))]
+        let output = cursor.vocoder.poll()?;
+        #[cfg(target_arch = "wasm32")]
+        let output = cursor.vocoder.poll();
+        if let Some(output) = output {
             return self.publish_output(cursor, output);
         }
         Ok(Vec::new())

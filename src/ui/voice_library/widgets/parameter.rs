@@ -69,12 +69,21 @@ fn slider_at(
         Align2::LEFT_TOP,
         label,
         FontId::proportional(12.0),
-        MUTED,
+        muted_color(),
     );
-    painter.hline(bounds.x_range(), center.y, Stroke::new(2.0, EDGE));
-    painter.hline(bounds.left()..=center.x, center.y, Stroke::new(2.0, MUTED));
-    painter.circle(center, 9.5, EDGE, Stroke::NONE);
-    painter.circle(center, 8.5, POPUP_KNOB, Stroke::new(0.7, BUTTON_ACTIVE));
-    painter.circle_filled(center, 3.0, TEXT);
+    painter.hline(bounds.x_range(), center.y, Stroke::new(2.0, edge_color()));
+    painter.hline(
+        bounds.left()..=center.x,
+        center.y,
+        Stroke::new(2.0, muted_color()),
+    );
+    painter.circle(center, 9.5, edge_color(), Stroke::NONE);
+    painter.circle(
+        center,
+        8.5,
+        POPUP_KNOB,
+        Stroke::new(0.7, button_active_color()),
+    );
+    painter.circle_filled(center, 3.0, text_color());
     result
 }

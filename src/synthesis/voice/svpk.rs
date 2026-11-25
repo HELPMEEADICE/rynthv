@@ -1,5 +1,5 @@
+use crate::platform::fs;
 use std::{
-    fs,
     io::{Read, Seek, SeekFrom},
     path::{Path, PathBuf},
 };
@@ -8,7 +8,10 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 use super::{Result, VoiceCatalog, VoiceError, hex, nofs};
-use crate::{platform::config_directory, synthesis::resource_archive};
+use crate::{
+    platform::{config_directory, temporary},
+    synthesis::resource_archive,
+};
 
 const ZIP_OFFSET: u64 = 264;
 const MIB: u64 = 1024 * 1024;
@@ -32,16 +35,27 @@ pub fn is_package(path: &Path) -> bool {
         .is_some_and(|ext| ext.eq_ignore_ascii_case("svpk"))
 }
 
+#[cfg(target_arch = "wasm32")]
+pub fn remove_import(path: &Path) -> Result<()> {
+    let root = root().map_err(VoiceError::new)?;
+    let path = fs::canonicalize(path)?;
+    let valid = path.file_name().is_some_and(|name| name == VOICE)
+        && path.ancestors().nth(3).is_some_and(|parent| parent == root);
+    if !valid {
+        return Err(VoiceError::new("只能移除由 RynthV 导入的 SVPK 声库"));
+    }
+    fs::remove_dir_all(path.parent().expect("managed SVPK has a parent directory"))?;
+    Ok(())
+}
+
 pub fn import(input: &Path, dry_run: bool) -> Result<ImportedVoice> {
     let root = root().map_err(VoiceError::new)?;
     let staging = if dry_run {
-        tempfile::tempdir()?
+        temporary::create(None, ".svpk-")?
     } else {
         let config = root.parent().expect("voice root has a parent");
         fs::create_dir_all(config)?;
-        tempfile::Builder::new()
-            .prefix(".svpk-")
-            .tempdir_in(config)?
+        temporary::create(Some(config), ".svpk-")?
     };
     unpack(input, staging.path())?;
     let mut archive = nofs::NofsArchive::open(&staging.path().join(VOICE))?;
@@ -57,7 +71,7 @@ pub fn import(input: &Path, dry_run: bool) -> Result<ImportedVoice> {
     digest.update(voice.name.as_bytes());
     let id = hex(&digest.finalize()[..16]);
     let destination = root.join(revision.to_string()).join(&id);
-    if destination.try_exists()? {
+    if fs::try_exists(&destination)? {
         return Err(VoiceError::new(format!(
             "声库 {} 的 {revision} 版已导入",
             voice.name

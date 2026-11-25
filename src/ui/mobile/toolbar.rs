@@ -1,11 +1,12 @@
 use super::{Page, current_page, set_page};
+#[cfg(target_os = "android")]
+use crate::ui::time_edit::{self, Target};
 use crate::{
     app::App,
     ui::{
         chrome,
         icons::{Icon, IconButton},
         tempo_input, theme,
-        time_edit::{self, Target},
     },
 };
 use eframe::egui::*;
@@ -13,7 +14,8 @@ use eframe::egui::*;
 pub(super) fn show(app: &mut App, ui: &mut Ui) {
     let width = ui.max_rect().width();
     let height = ui.max_rect().height() - 2.0;
-    ui.painter().rect_filled(ui.max_rect(), 4, theme::PANEL);
+    ui.painter()
+        .rect_filled(ui.max_rect(), 4, theme::panel_color());
     ui.horizontal_centered(|ui| {
         ui.spacing_mut().interact_size.y = height;
         ui.spacing_mut().item_spacing.x = 2.0;
@@ -147,6 +149,7 @@ fn tempo(app: &mut App, ui: &mut Ui) {
     }
 }
 
+#[cfg(target_os = "android")]
 pub(in crate::ui) fn transport_options(app: &mut App, ui: &mut Ui) {
     let position = app.editor.transport.position;
     let time = &app.editor.project.time;

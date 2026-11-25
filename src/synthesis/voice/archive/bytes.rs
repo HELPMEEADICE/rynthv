@@ -1,4 +1,5 @@
-use std::{fs, io, ops::Deref, path::Path};
+use crate::platform::fs;
+use std::{io, ops::Deref, path::Path};
 
 pub(super) enum ArchiveBytes {
     Owned(Vec<u8>),

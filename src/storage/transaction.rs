@@ -1,5 +1,7 @@
+#[cfg(not(target_arch = "wasm32"))]
 use super::{LoadedProject, Project, check_project_size, load, save_locked};
 use sha2::{Digest, Sha256};
+#[cfg(not(target_arch = "wasm32"))]
 use std::{
     fs::{self, File, OpenOptions, TryLockError},
     io::Read,
@@ -16,6 +18,7 @@ impl Revision {
         Self(Sha256::digest(bytes).into())
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn read(path: &Path) -> Result<Option<Self>, String> {
         let mut file = match File::open(path) {
             Ok(file) => file,
@@ -47,11 +50,13 @@ impl Revision {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub struct ProjectFile {
     path: PathBuf,
     _lock: File,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl Drop for ProjectFile {
     fn drop(&mut self) {
         // Release the lock even if a concurrent spawn briefly inherited the
@@ -60,6 +65,7 @@ impl Drop for ProjectFile {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl ProjectFile {
     pub fn lock(path: &Path) -> Result<Self, String> {
         let absolute = std::path::absolute(path).map_err(|error| error.to_string())?;

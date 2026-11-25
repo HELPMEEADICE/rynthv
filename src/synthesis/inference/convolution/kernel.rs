@@ -1,6 +1,7 @@
 //! Four independent frames by eight independent output channels. The reduction
 //! dimension always traverses taps, then inputs; no horizontal sum or FMA.
 
+#[cfg(not(target_arch = "wasm32"))]
 mod parallel;
 
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -9,7 +10,11 @@ mod backend;
 #[cfg(all(target_arch = "x86_64", target_feature = "sse2"))]
 #[path = "kernel/sse2.rs"]
 mod backend;
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+#[path = "kernel/wasm.rs"]
+mod backend;
 #[cfg(not(any(
+    all(target_arch = "wasm32", target_feature = "simd128"),
     all(target_arch = "aarch64", target_feature = "neon"),
     all(target_arch = "x86_64", target_feature = "sse2")
 )))]
@@ -32,6 +37,22 @@ impl PackedWeights {
         bias: Option<&[f32]>,
     ) -> Result<(), ConvolutionError> {
         let cancellation = execution::current();
+        #[cfg(not(target_arch = "wasm32"))]
+        return self.execute_parallel(config, pending, output, bias, cancellation);
+
+        #[cfg(target_arch = "wasm32")]
+        self.execute_frames(config, pending, 0, output, bias, cancellation.as_ref())
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn execute_parallel(
+        &self,
+        config: ConvolutionConfig,
+        pending: &[f32],
+        output: &mut [f32],
+        bias: Option<&[f32]>,
+        cancellation: Option<Cancellation>,
+    ) -> Result<(), ConvolutionError> {
         let macs_per_frame = self
             .input_channels()
             .saturating_mul(self.output_channels())

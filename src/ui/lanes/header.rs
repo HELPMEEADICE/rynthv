@@ -22,7 +22,7 @@ pub(super) fn show(app: &mut App, ui: &mut Ui, lane: &mut Lane) {
 fn contents(app: &mut App, ui: &mut Ui, lane: &mut Lane) {
     ui.spacing_mut().item_spacing.x = 3.0;
     let (rect, drag) = ui.allocate_exact_size(vec2(24.0, 24.0), Sense::drag());
-    Icon::Curve.paint(ui, rect.shrink(5.0), MUTED);
+    Icon::Curve.paint(ui, rect.shrink(5.0), muted_color());
     drag.on_hover_text("拖动以调整参数区域顺序")
         .dnd_set_drag_payload(DragPayload::Lane(lane.id));
     let mut styles = app
@@ -118,7 +118,7 @@ fn contents(app: &mut App, ui: &mut Ui, lane: &mut Lane) {
         },
     );
     ui.add_space(9.0);
-    ui.label(RichText::new("缩放").color(MUTED));
+    ui.label(RichText::new("缩放").color(muted_color()));
     let mut percent = lane.zoom * 100.0;
     let zoom = ui
         .add(
@@ -156,7 +156,7 @@ fn parameter_combo(
             }
             if !styles.is_empty() {
                 ui.separator();
-                ui.label(RichText::new("唱法").color(MUTED));
+                ui.label(RichText::new("唱法").color(muted_color()));
                 for name in styles {
                     ui.selectable_value(target, AutomationTarget::VocalMode(name.clone()), name);
                 }
@@ -185,16 +185,16 @@ fn icon_button(ui: &mut Ui, glyph: Glyph, selected: bool, description: &'static 
             rect,
             3,
             if selected {
-                BUTTON_ACTIVE
+                button_active_color()
             } else {
-                BUTTON_HOVER
+                button_hover_color()
             },
         );
     }
     let color = if ui.is_enabled() {
-        ICON_TOOL
+        icon_tool_color()
     } else {
-        MUTED.gamma_multiply(0.55)
+        muted_color().gamma_multiply(0.55)
     };
     let icon = rect.shrink2(vec2(5.0, 5.0));
     match glyph {

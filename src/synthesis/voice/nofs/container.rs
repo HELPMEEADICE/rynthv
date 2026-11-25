@@ -3,9 +3,9 @@
 //! Index validation checks record references and complete coverage, without
 //! authenticating the hashes or reading private binding values during scans.
 
+use crate::platform::fs::File;
 use std::{
     collections::HashSet,
-    fs::File,
     io::{Read, Seek, SeekFrom},
     ops::Range,
     path::{Path, PathBuf},

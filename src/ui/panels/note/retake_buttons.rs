@@ -55,16 +55,16 @@ fn button(ui: &mut Ui, width: f32, component: RetakeComponent) -> Response {
         rect,
         3,
         if response.is_pointer_button_down_on() {
-            BUTTON_ACTIVE
+            button_active_color()
         } else if hovered {
-            BUTTON_HOVER
+            button_hover_color()
         } else {
-            BORDER
+            border_color()
         },
-        Stroke::new(0.6, BUTTON),
+        Stroke::new(0.6, button_color()),
         StrokeKind::Inside,
     );
-    let ink = if enabled { TEXT } else { MUTED };
+    let ink = if enabled { text_color() } else { muted_color() };
     let center = pos2(rect.center().x, rect.top() + 34.0);
     match component {
         RetakeComponent::Duration | RetakeComponent::Pitch => {

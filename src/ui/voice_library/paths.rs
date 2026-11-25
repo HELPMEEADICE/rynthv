@@ -18,8 +18,7 @@ pub fn settings(app: &mut App, ui: &mut Ui) {
         }
         if ui
             .add_enabled(
-                !app.synthesis.library.is_scanning()
-                    && app.synthesis.library.settings.has_databases(),
+                !app.synthesis.library.is_scanning() && app.synthesis.library.has_databases(),
                 Button::new("重新扫描"),
             )
             .clicked()
@@ -72,6 +71,8 @@ pub fn settings(app: &mut App, ui: &mut Ui) {
         resource_import::dictionaries(app, ui);
     });
     resource_import::status(app, ui);
+    #[cfg(target_arch = "wasm32")]
+    app.browser_storage_panel(ui);
     if let Some(error) = app.synthesis.library.settings_error() {
         error_label(ui, error);
     }

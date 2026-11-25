@@ -15,8 +15,12 @@ resolver = "3"
 default = ["gui", "cli"]
 gui = ["dep:eframe", "dep:egui_extras", "dep:rfd", "dep:cpal", "dep:android-activity", "dep:jni", "dep:log", "dep:memmap2", "wgpu/gles"]
 cli = ["dep:clap", "dep:ctrlc", "dep:rustyline", "dep:shell-words"]
+web = ["dep:eframe", "dep:egui_extras", "dep:futures-channel", "dep:js-sys", "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:web-sys", "wgpu/webgl"]
 # Opt-in CPU timing spans; absent from normal editor builds.
 synth-profile = []
+
+[lib]
+crate-type = ["rlib", "cdylib"]
 
 [[bin]]
 name = "rynthv"
@@ -34,12 +38,7 @@ required-features = ["gui"]
 eframe = { version = "=0.36.2", optional = true, default-features = false, features = ["default_fonts", "wgpu_no_default_features"] }
 egui_extras = { version = "=0.36.2", optional = true, default-features = false, features = ["svg", "file", "image"] }
 image = { version = "=0.25.10", default-features = false, features = ["png"] }
-clap = { version = "4.5", optional = true, default-features = false, features = ["std", "help", "usage", "error-context"] }
-ctrlc = { version = "3.4", optional = true }
-rustyline = { version = "17", optional = true, default-features = false }
-shell-words = { version = "1", optional = true }
 wgpu = { version = "=30.0.1", default-features = false, features = ["std", "wgsl"] }
-pollster = "=0.4.0"
 bytemuck = "=1.25.2"
 serde = { version = "=1.0.229", features = ["derive", "rc"] }
 serde_json = "=1.0.151"
@@ -49,15 +48,32 @@ smallvec = "=1.16.2"
 sha2 = "=0.11.0"
 num-bigint = "=0.5.1"
 xxhash-rust = { version = "=0.8.19", features = ["xxh3", "xxh32"] }
-cpal = { version = "=0.18.2", optional = true }
 symphonia = { version = "=0.6.1", default-features = false, features = ["pcm", "wav", "mp3", "flac", "ogg", "vorbis", "aiff", "aac", "isomp4"] }
-rayon = "=1.12.0"
 blowfish = { version = "=0.10.0", features = ["zeroize"] }
 zeroize = { version = "=1.9.1", features = ["alloc"] }
 midly = { version = "=0.5.3", default-features = false, features = ["std", "strict"] }
 zip = { version = "=9.7.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 sevenz-rust2 = { version = "=0.25.0", default-features = false, features = ["bzip2", "deflate", "ppmd"] }
+web-time = "=1.1.0"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+clap = { version = "4.5", optional = true, default-features = false, features = ["std", "help", "usage", "error-context"] }
+ctrlc = { version = "3.4", optional = true }
+rustyline = { version = "17", optional = true, default-features = false }
+shell-words = { version = "1", optional = true }
+cpal = { version = "=0.18.2", optional = true }
+pollster = "=0.4.0"
+rayon = "=1.12.0"
 tempfile = "=3.27.0"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+futures-channel = { version = "0.3", optional = true }
+js-sys = { version = "=0.3.106", optional = true }
+uuid = { version = "=1.27.0", features = ["js"] }
+wasm-bindgen = { version = "=0.2.129", optional = true }
+wasm-bindgen-futures = { version = "=0.4.79", optional = true }
+web-sys = { version = "=0.3.106", optional = true, features = ["HtmlCanvasElement"] }
+wgpu = { version = "=30.0.1", default-features = false, features = ["webgpu", "fragile-send-sync-non-atomic-wasm"] }
 
 [target.'cfg(windows)'.dependencies]
 eframe = { version = "=0.36.2", optional = true, default-features = false, features = ["accesskit"] }

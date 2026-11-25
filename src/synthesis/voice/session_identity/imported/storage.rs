@@ -1,7 +1,7 @@
 //! Bounded context reads and serialized, atomic updates of the owned store.
 
+use crate::platform::fs::{self, File};
 use std::{
-    fs::{self, File},
     io::{Read, Write},
     path::Path,
 };
@@ -18,6 +18,7 @@ pub(super) fn load_saved(path: &Path) -> Result<Option<Context>> {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(error) => return Err(error.into()),
     };
+    #[cfg(not(target_arch = "wasm32"))]
     location::verify(&file, path)?;
     decode(file).map(Some)
 }
@@ -54,9 +55,12 @@ pub(super) fn save(path: &Path, entry: VoiceContext, overwrite: bool) -> Result<
     // Lock a stable sibling because the destination is atomically replaced.
     // The guard stays alive through the entire read/merge/write transaction.
     let lock_path = path.with_extension("lock");
-    let context_lock = location::open_lock(&lock_path)?;
-    location::verify(&context_lock, &lock_path)?;
-    context_lock.lock()?;
+    let _context_lock = location::open_lock(&lock_path)?;
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        location::verify(&_context_lock, &lock_path)?;
+        _context_lock.lock()?;
+    }
     let mut context = load_saved(path)?.unwrap_or_default();
     if let Some(existing) = context.voices.iter_mut().find(|existing| {
         existing.voice_name == entry.voice_name && existing.model_version == entry.model_version
@@ -79,6 +83,7 @@ pub(super) fn save(path: &Path, entry: VoiceContext, overwrite: bool) -> Result<
     let temporary = directory.join(format!("context-{}.tmp", uuid::Uuid::new_v4()));
     let result = (|| {
         let mut file = location::create_temporary(&temporary)?;
+        #[cfg(not(target_arch = "wasm32"))]
         location::verify(&file, &temporary)?;
         file.write_all(&bytes)?;
         file.sync_all()?;
@@ -114,6 +119,7 @@ fn replace(source: &Path, target: &Path) -> Result<()> {
 fn replace(source: &Path, target: &Path) -> Result<()> {
     fs::rename(source, target)?;
     // Persist the rename as well as the file contents on Unix filesystems.
+    #[cfg(unix)]
     File::open(target.parent().expect("context has a parent directory"))?.sync_all()?;
     Ok(())
 }

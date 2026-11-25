@@ -16,7 +16,7 @@ use crate::synthesis::{
     voice::{PreparedVoice, Result, VoiceError, VoiceFamily},
 };
 use serde::Serialize;
-use std::time::Instant;
+use web_time::Instant;
 
 #[derive(Clone, Debug, Default, Serialize)]
 /// Accumulated stage wall times. Progressive timbre/vocoder execution may

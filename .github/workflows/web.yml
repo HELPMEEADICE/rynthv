@@ -1,0 +1,68 @@
+name: WebAssembly
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    name: Check and package the static site
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Install the repository Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: wasm32-unknown-unknown
+          cache: false
+      - name: Cache Rust builds and wasm-bindgen CLI
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: web-wasm32-bindgen-0.2.129
+          workspaces: . -> target/wasm
+      - name: Check Rust and browser scripts
+        run: |
+          python3 packaging/web/build.py --check
+          for script in packaging/web/*.js; do node --input-type=module --check < "$script"; done
+      - name: Install the locked wasm-bindgen CLI
+        run: |
+          if [ "$(wasm-bindgen --version 2>/dev/null || true)" != "wasm-bindgen 0.2.129" ]; then
+            cargo install --locked wasm-bindgen-cli --version 0.2.129 --bin wasm-bindgen
+          fi
+      - name: Build the release site and deployment ZIP
+        run: python3 packaging/web/build.py
+      - name: Upload the deployment archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: rynthv-web
+          path: dist/rynthv-web.zip
+          if-no-files-found: error
+          compression-level: 0
+
+  release:
+    name: Publish the web ZIP on the GitHub Release
+    if: github.event_name == 'release'
+    needs: web
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download the deployment archive
+        uses: actions/download-artifact@v4
+        with:
+          name: rynthv-web
+          path: dist
+      - name: Upload the release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$RELEASE_TAG" dist/rynthv-web.zip --repo "$GITHUB_REPOSITORY" --clobber

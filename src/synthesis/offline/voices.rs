@@ -1,4 +1,5 @@
 use super::*;
+use crate::platform::fs;
 use crate::synthesis::{
     execution::{self, Cancellation},
     render_cache::{Completion, RenderJob},
@@ -62,6 +63,8 @@ impl Offline {
     ) -> Result<BTreeMap<OwnerId, StageTimings>, String> {
         let mut identities = BTreeMap::new();
         let cancellation = Cancellation::from_flag(Arc::clone(cancelled));
+        #[cfg(target_arch = "wasm32")]
+        self.voices.retain(|voice, _| routes.contains_key(voice));
         for (key, owners) in routes {
             if cancellation.is_cancelled() {
                 return Err("CANCELLED: Render cancelled".into());
@@ -131,7 +134,7 @@ impl Offline {
             let frontend = match &mut resource.frontend {
                 Some(frontend) => frontend,
                 slot => {
-                    let dictionaries = settings.dictionaries.as_deref().filter(|path| path.is_dir())
+                    let dictionaries = settings.dictionaries.as_deref().filter(|path| fs::is_dir(path))
                         .ok_or("DICTIONARY_REQUIRED: Set the clf-data directory with config set --dictionaries")?;
                     slot.insert(
                         LyricFrontend::new(
@@ -165,14 +168,40 @@ impl Offline {
                                 &config.version,
                                 &resource.inventory.database_id,
                             )?;
-                            render_owner(&job, &voice, identity, frontend, network, |stage| {
-                                execution::checkpoint()?;
-                                progress(Progress::Stage {
-                                    group: group_names[&owner].clone(),
-                                    stage,
-                                });
-                                Ok(())
-                            })
+                            render_owner(
+                                &job,
+                                &voice,
+                                identity,
+                                frontend,
+                                network,
+                                #[cfg(target_arch = "wasm32")]
+                                options.preview_seconds,
+                                |step| {
+                                    execution::checkpoint()?;
+                                    match step {
+                                        Step::Stage(stage) => progress(Progress::Stage {
+                                            group: group_names[&owner].clone(),
+                                            stage,
+                                        }),
+                                        #[cfg(target_arch = "wasm32")]
+                                        Step::Pcm(audio) => {
+                                            if let Some(audio) = mixer::preview_chunk(
+                                                audio,
+                                                job.request.coverage,
+                                                &plan.output_controls[&owner],
+                                            )
+                                            .map_err(VoiceError::new)?
+                                            {
+                                                progress(Progress::Pcm {
+                                                    group: group_names[&owner].clone(),
+                                                    audio,
+                                                });
+                                            }
+                                        }
+                                    }
+                                    Ok(())
+                                },
+                            )
                         })();
                         let result = result
                             .map(|completed| {
@@ -206,13 +235,20 @@ impl Offline {
     }
 }
 
+enum Step {
+    Stage(RenderStage),
+    #[cfg(target_arch = "wasm32")]
+    Pcm(RenderedAudio),
+}
+
 fn render_owner(
     job: &RenderJob,
     voice: &PreparedVoice,
     identity: Option<u64>,
     frontend: &LyricFrontend,
     network: &progressive::Network<'_>,
-    mut checkpoint: impl FnMut(RenderStage) -> crate::synthesis::voice::Result<()>,
+    #[cfg(target_arch = "wasm32")] preview_seconds: Option<f64>,
+    mut checkpoint: impl FnMut(Step) -> crate::synthesis::voice::Result<()>,
 ) -> crate::synthesis::voice::Result<super::super::engine::RenderResult> {
     let mut prepared = progressive::prepare(
         voice,
@@ -220,16 +256,32 @@ fn render_owner(
         &job.request.input,
         frontend,
         job.base.as_deref(),
-        &mut checkpoint,
+        |stage| checkpoint(Step::Stage(stage)),
     )?;
     let coverage = job.request.coverage;
     let start_seconds = coverage.sample_start.0 as f64 / f64::from(coverage.sample_rate);
+    #[cfg(target_arch = "wasm32")]
+    let start_seconds = preview_seconds
+        .filter(|seconds| {
+            *seconds >= start_seconds
+                && *seconds < coverage.sample_end.0 as f64 / f64::from(coverage.sample_rate)
+        })
+        .unwrap_or(start_seconds);
     while !prepared.is_complete() {
         let mut cursor = prepared
             .start(network, voice, start_seconds)?
             .ok_or_else(|| VoiceError::new("No inference cursor for pending audio"))?;
         while !cursor.is_finished() {
-            prepared.advance(&mut cursor, 128, &mut checkpoint)?;
+            let chunks =
+                prepared.advance(&mut cursor, 128, |stage| checkpoint(Step::Stage(stage)))?;
+            #[cfg(target_arch = "wasm32")]
+            if preview_seconds.is_some() {
+                for audio in chunks {
+                    checkpoint(Step::Pcm(audio))?;
+                }
+            }
+            #[cfg(not(target_arch = "wasm32"))]
+            drop(chunks);
         }
     }
     prepared.finish()

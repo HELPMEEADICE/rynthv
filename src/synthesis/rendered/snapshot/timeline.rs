@@ -1,6 +1,7 @@
 use super::{VisualFlash, VisualPatch, VisualPiece, VisualSnapshot, intersection, matching_input};
 use crate::synthesis::{plan::OwnerInput, rendered::RenderVisuals};
-use std::{ops::Range, sync::Arc, time::Instant};
+use std::{ops::Range, sync::Arc};
+use web_time::Instant;
 
 /// A progressive display retains old geometry until each replacement interval
 /// is ready. Its partition is in musical time; every piece still owns the tempo

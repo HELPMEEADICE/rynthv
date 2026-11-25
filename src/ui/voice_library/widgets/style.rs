@@ -21,14 +21,18 @@ pub(crate) fn style(
         Align2::LEFT_TOP,
         name,
         FontId::proportional(13.0),
-        MUTED,
+        muted_color(),
     );
     let toggle_rect = Rect::from_center_size(
         pos2(rect.right() - 17.0, rect.top() + 18.0),
         Vec2::splat(24.0),
     );
     let toggle = ui.interact(toggle_rect, id.with("expand"), Sense::click());
-    let color = if toggle.hovered() { TEXT } else { MUTED };
+    let color = if toggle.hovered() {
+        text_color()
+    } else {
+        muted_color()
+    };
     let center = toggle_rect.center();
     ui.painter().line_segment(
         [center - vec2(5.0, 0.0), center + vec2(5.0, 0.0)],
@@ -73,9 +77,15 @@ pub(crate) fn style(
         .zip(enabled_components)
         .zip([20.0, 25.0, 30.0])
     {
-        arc(ui.painter(), center, radius, 1.0, BUTTON);
+        arc(ui.painter(), center, radius, 1.0, button_color());
         if enabled && *value > 0.0 {
-            arc(ui.painter(), center, radius, (*value / 150.0) as f32, MUTED);
+            arc(
+                ui.painter(),
+                center,
+                radius,
+                (*value / 150.0) as f32,
+                muted_color(),
+            );
         }
     }
     dial(
@@ -83,7 +93,7 @@ pub(crate) fn style(
         center,
         16.0,
         numeric::mean(values, &enabled_components),
-        TEXT,
+        text_color(),
     );
     result
 }
@@ -120,14 +130,14 @@ fn components(
             },
             percentage(),
         );
-        arc(ui.painter(), center, 16.0, 1.0, BUTTON);
+        arc(ui.painter(), center, 16.0, 1.0, button_color());
         if enabled[index] && values[index] > 0.0 {
             arc(
                 ui.painter(),
                 center,
                 16.0,
                 (values[index] / 150.0) as f32,
-                MUTED,
+                muted_color(),
             );
         }
         dial(
@@ -135,14 +145,18 @@ fn components(
             center,
             12.0,
             values[index],
-            if enabled[index] { TEXT } else { MUTED },
+            if enabled[index] {
+                text_color()
+            } else {
+                muted_color()
+            },
         );
         ui.painter().text(
             pos2(center.x, rect.top() + 89.0),
             Align2::CENTER_CENTER,
             label,
             FontId::proportional(12.0),
-            MUTED,
+            muted_color(),
         );
         if !enabled[index] {
             ui.interact(
@@ -158,7 +172,12 @@ fn components(
 }
 
 fn dial(painter: &Painter, center: Pos2, radius: f32, value: f64, color: Color32) {
-    painter.circle(center, radius, POPUP_KNOB, Stroke::new(0.8, BUTTON_ACTIVE));
+    painter.circle(
+        center,
+        radius,
+        POPUP_KNOB,
+        Stroke::new(0.8, button_active_color()),
+    );
     let angle = (135.0 + (value / 150.0) as f32 * 270.0).to_radians();
     painter.line_segment(
         [

@@ -53,7 +53,7 @@ impl Picker {
         self
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
     fn pick(self) -> Vec<PathBuf> {
         let mut dialog = rfd::FileDialog::new().set_title(self.title);
         if let Some((label, extensions)) = self.filter {
@@ -67,6 +67,26 @@ impl Picker {
             Selection::Files => dialog.pick_files().unwrap_or_default(),
             Selection::Directory => dialog.pick_folder().into_iter().collect(),
         }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn start(self) -> js_sys::Promise {
+        let kind = match self.selection {
+            Selection::File => 0,
+            Selection::Files => 1,
+            Selection::Directory => 2,
+        };
+        let accept = self
+            .filter
+            .map(|(_, extensions)| {
+                extensions
+                    .iter()
+                    .map(|ext| format!(".{ext}"))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            })
+            .unwrap_or_default();
+        crate::platform::web::documents::pick_files(kind, &accept, self.title)
     }
 
     #[cfg(target_os = "android")]
@@ -109,7 +129,7 @@ impl Picker {
     }
 }
 
-#[cfg(target_os = "android")]
+#[cfg(any(target_os = "android", target_arch = "wasm32"))]
 pub(super) type Completion = Box<dyn FnOnce(&mut App, &Context, Vec<PathBuf>)>;
 
 impl App {
@@ -132,7 +152,7 @@ impl App {
         picker: Picker,
         complete: impl FnOnce(&mut Self, &Context, Vec<PathBuf>) + 'static,
     ) {
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
         {
             let paths = picker.pick();
             if !paths.is_empty() {
@@ -148,6 +168,14 @@ impl App {
                 Ok(()) => self.picker = Some(Box::new(complete)),
                 Err(error) => self.error = Some(error),
             }
+        }
+        #[cfg(target_arch = "wasm32")]
+        if self.browser.picker.is_none() {
+            let promise = picker.start();
+            self.browser.picker = Some((
+                Box::new(complete),
+                super::web::task(_ctx, crate::platform::web::documents::json(promise)),
+            ));
         }
     }
 

@@ -15,7 +15,7 @@ pub(super) enum OperationResult {
         changed: bool,
         feedback: Result<String, String>,
     },
-    Dictionaries(Result<tempfile::TempDir, String>),
+    Dictionaries(Result<crate::platform::temporary::TempDir, String>),
 }
 
 impl VoiceLibrary {

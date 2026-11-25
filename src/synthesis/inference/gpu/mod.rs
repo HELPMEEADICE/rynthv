@@ -1,4 +1,4 @@
-//! Native surface-free WebGPU inference.
+//! Surface-free WebGPU inference, independent of the editor renderer.
 
 mod adapter;
 mod attention;
@@ -14,7 +14,9 @@ mod linear;
 mod timestamps;
 mod validate;
 
-pub use adapter::{AdapterId, AdapterInfo, list_devices};
+#[cfg(not(target_arch = "wasm32"))]
+pub use adapter::list_devices;
+pub use adapter::{AdapterId, AdapterInfo};
 pub(super) use attention::{attention, projected_attention};
 pub(super) use batch::Batch;
 pub(super) use chain::sequence;

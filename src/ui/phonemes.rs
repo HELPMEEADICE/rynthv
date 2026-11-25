@@ -75,7 +75,7 @@ fn focus(app: &mut App, ctx: &Context) {
 
 pub fn show(app: &mut App, ui: &mut Ui) {
     let rect = ui.max_rect();
-    ui.painter().rect_filled(rect, 0, PANEL);
+    ui.painter().rect_filled(rect, 0, panel_color());
     let canvas = Rect::from_min_max(pos2(rect.left() + GUTTER, rect.top()), rect.max);
     if canvas.width() < 4.0 || canvas.height() < 42.0 {
         return;
@@ -85,9 +85,9 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         Align2::CENTER_CENTER,
         "æ",
         FontId::proportional(18.0),
-        TEXT,
+        text_color(),
     );
-    ui.painter().rect_filled(canvas, 0, CANVAS);
+    ui.painter().rect_filled(canvas, 0, canvas_color());
     let response = ui.interact(
         canvas,
         Id::new("phoneme-timing-canvas"),
@@ -141,7 +141,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
             Align2::CENTER_CENTER,
             "音素时值 · 等待当前音符组合成准备结果",
             FontId::proportional(12.0),
-            MUTED,
+            muted_color(),
         );
         return;
     };

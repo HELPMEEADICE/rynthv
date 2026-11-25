@@ -55,7 +55,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
             .add(
                 button(Icon::Loop, "显示循环标记 / 循环播放")
                     .selected(transport.looping)
-                    .background(BACKGROUND),
+                    .background(background_color()),
             )
             .clicked()
         {
@@ -137,7 +137,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
 }
 fn display(ui: &mut Ui, text: &str, width: f32) -> Response {
     let (rect, response) = ui.allocate_exact_size(vec2(width, 28.0), Sense::click());
-    ui.painter().rect_filled(rect, 3, PANEL);
+    ui.painter().rect_filled(rect, 3, panel_color());
     ui.painter().text(
         rect.center(),
         Align2::CENTER_CENTER,

@@ -11,7 +11,7 @@ mod retakes;
 mod scale_guide;
 mod scene;
 mod toolbar;
-#[cfg(target_os = "android")]
+#[cfg(any(target_os = "android", target_arch = "wasm32"))]
 mod touch;
 use crate::model::*;
 pub use canvas::show;

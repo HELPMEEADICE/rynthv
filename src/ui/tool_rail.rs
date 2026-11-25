@@ -12,9 +12,13 @@ pub const WIDTH: f32 = 42.0;
 pub fn show(app: &mut App, ui: &mut Ui) {
     let rect = ui.max_rect();
     // Paint the shell before the inset content applies its smaller clip rectangle.
-    ui.painter().rect_filled(rect, 4, PANEL);
-    ui.painter()
-        .rect_stroke(rect, 4, Stroke::new(1.0, BORDER), StrokeKind::Inside);
+    ui.painter().rect_filled(rect, 4, panel_color());
+    ui.painter().rect_stroke(
+        rect,
+        4,
+        Stroke::new(1.0, border_color()),
+        StrokeKind::Inside,
+    );
 
     let mut content = child(ui, rect.shrink2(vec2(3.0, 5.0)), "rail-content");
     content.spacing_mut().item_spacing.y = 12.0;
@@ -32,7 +36,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
     content.painter().hline(
         separator.x_range(),
         separator.center().y,
-        Stroke::new(1.0, EDGE),
+        Stroke::new(1.0, edge_color()),
     );
     content.add_space(5.0);
     if content.add(button(Icon::Cloud, "管理歌声")).clicked() {

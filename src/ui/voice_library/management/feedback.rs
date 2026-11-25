@@ -18,7 +18,7 @@ pub(super) fn status(
             });
         }
         VoiceState::Loaded(_) if app.synthesis.voice_error(selection).is_none() => {
-            text(ui, RichText::new("已加载").color(GREEN));
+            text(ui, RichText::new("已加载").color(green_color()));
             weak(ui, "编辑音符后自动合成，按空格键试听。");
         }
         _ => {}
@@ -48,16 +48,18 @@ pub(super) fn diagnostics(app: &App, ui: &mut Ui, entry: &VoiceCatalogEntry) {
     weak(ui, "声库目录");
     text(ui, entry.directory.display().to_string());
     if let Some(voice) = app.synthesis.inventory(&entry.selection()) {
+        #[cfg(not(target_arch = "wasm32"))]
+        let file_count = voice.files.len();
+        #[cfg(target_arch = "wasm32")]
+        let file_count = voice.file_count;
         weak(
             ui,
             format!(
                 "{} 个文件 · {} 个资源 · {} 棵模块树 · {} 个张量",
-                voice.files.len(),
-                voice.resource_count,
-                voice.graph_count,
-                voice.tensor_count
+                file_count, voice.resource_count, voice.graph_count, voice.tensor_count
             ),
         );
+        #[cfg(not(target_arch = "wasm32"))]
         if let Some(prepared) = voice.preparation() {
             let mut affine = 0;
             let mut unary = 0;

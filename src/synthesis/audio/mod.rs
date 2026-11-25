@@ -2,12 +2,14 @@
 //!
 //! Sparse preview blocks are published by the synthesis engine. Export keeps
 //! using complete immutable PCM, while the device consumes one live revision.
+#[cfg(any(feature = "gui", target_arch = "wasm32"))]
+pub(crate) mod click;
 pub(crate) mod conversion;
 #[cfg(feature = "gui")]
 pub mod live;
 #[cfg(feature = "gui")]
 pub mod metronome;
-#[cfg(feature = "gui")]
+#[cfg(any(feature = "gui", target_arch = "wasm32"))]
 mod piano;
 #[cfg(feature = "gui")]
 mod playback;
@@ -26,6 +28,9 @@ pub use source::AudioLayer;
 #[cfg(feature = "gui")]
 pub use source::PlaybackSource;
 pub use wav::{WaveFormat, save_wav, save_wav_as, save_wav_policy, write_wav};
+
+#[cfg(target_arch = "wasm32")]
+pub(crate) use piano::audition_pcm;
 
 use std::{fmt, sync::Arc};
 

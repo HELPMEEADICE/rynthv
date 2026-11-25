@@ -1,6 +1,6 @@
 use super::LoopRegion;
 use crate::model::TimeAxis;
-use std::time::Instant;
+use web_time::Instant;
 
 pub struct Transport {
     pub position: i64,

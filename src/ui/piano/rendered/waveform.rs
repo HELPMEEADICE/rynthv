@@ -9,7 +9,7 @@ use crate::{
     ui::{piano::scene::SceneGroup, timeline::x_at},
 };
 use eframe::egui::*;
-use std::time::Instant;
+use web_time::Instant;
 
 pub(super) fn draw(
     app: &App,

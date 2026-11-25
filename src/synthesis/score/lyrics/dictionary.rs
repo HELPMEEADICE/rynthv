@@ -1,10 +1,11 @@
 //! Pronunciation lookup in the installed language dictionaries.
 
+use crate::platform::fs;
 use crate::{
     model::Language,
     synthesis::voice::{Result, VoiceError},
 };
-use std::{collections::HashMap, fs, path::Path};
+use std::{collections::HashMap, path::Path};
 
 pub(super) type Phones = Vec<String>;
 
