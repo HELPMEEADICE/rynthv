@@ -132,6 +132,11 @@ impl Session {
         }
     }
 
+    #[cfg(all(target_os = "android", feature = "gui"))]
+    pub(crate) fn device_lost(&self) -> bool {
+        self.0.device.as_ref().is_some_and(Device::is_lost)
+    }
+
     #[cfg(feature = "synth-profile")]
     pub fn enable_timestamps(&self) {
         self.0.timestamps.store(true, Ordering::Relaxed);
@@ -250,6 +255,14 @@ pub(super) fn has_gpu() -> bool {
             .as_ref()
             .and_then(|session| session.0.device.as_ref())
             .is_some_and(Device::is_available)
+    })
+}
+
+#[cfg(target_os = "android")]
+pub(super) fn gpu_storage_budget() -> Option<u64> {
+    CURRENT.with_borrow(|current| {
+        let device = current.as_ref()?.0.device.as_ref()?;
+        Some(device.storage_budget())
     })
 }
 

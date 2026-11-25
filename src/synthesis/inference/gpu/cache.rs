@@ -7,9 +7,6 @@ use std::{
 };
 use wgpu::{Buffer, BufferUsages, ComputePipeline, ShaderModule, util::DeviceExt};
 
-const WEIGHT_BUDGET: u64 = 384 * 1024 * 1024;
-const BUFFER_BUDGET: u64 = 64 * 1024 * 1024;
-
 #[derive(Default)]
 pub(super) struct Cache {
     weights: HashMap<usize, Weight>,
@@ -19,6 +16,8 @@ pub(super) struct Cache {
     pipelines: HashMap<&'static str, ComputePipeline>,
     buffers: HashMap<(BufferUsages, u64), Vec<Buffer>>,
     buffer_bytes: u64,
+    weight_budget: u64,
+    buffer_budget: u64,
 }
 
 struct Weight {
@@ -28,6 +27,32 @@ struct Weight {
 }
 
 impl Cache {
+    pub(super) fn for_limits(limits: &wgpu::Limits) -> Self {
+        #[cfg(all(target_os = "android", feature = "gui"))]
+        let (weight, buffer) = {
+            let memory = crate::platform::android::memory_bytes();
+            (
+                (memory / 32).clamp(24 << 20, 160 << 20),
+                (memory / 128).clamp(6 << 20, 32 << 20),
+            )
+        };
+        #[cfg(not(all(target_os = "android", feature = "gui")))]
+        let (weight, buffer) = (384 << 20, 64 << 20);
+        let (weight_budget, buffer_budget) = if cfg!(target_os = "android") {
+            (
+                weight.min(limits.max_buffer_size),
+                buffer.min(limits.max_buffer_size),
+            )
+        } else {
+            (weight, buffer)
+        };
+        Self {
+            weight_budget,
+            buffer_budget,
+            ..Self::default()
+        }
+    }
+
     pub(super) fn weight(
         &mut self,
         device: &Device,
@@ -61,8 +86,8 @@ impl Cache {
         activity.weight_upload_host_ms += started.elapsed().as_secs_f64() * 1000.0;
         activity.upload_count += 1;
         activity.upload_bytes += size;
-        if size <= WEIGHT_BUDGET {
-            while size + self.weight_bytes > WEIGHT_BUDGET {
+        if size <= self.weight_budget {
+            while size + self.weight_bytes > self.weight_budget {
                 let oldest = *self
                     .weights
                     .iter()
@@ -156,7 +181,7 @@ impl Cache {
 
     pub(super) fn recycle(&mut self, buffer: Buffer) {
         let size = buffer.size();
-        if self.buffer_bytes + size <= BUFFER_BUDGET {
+        if self.buffer_bytes + size <= self.buffer_budget {
             let buffers = self.buffers.entry((buffer.usage(), size)).or_default();
             if buffers.len() < 8 {
                 buffers.push(buffer);

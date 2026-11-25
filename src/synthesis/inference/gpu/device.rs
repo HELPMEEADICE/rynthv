@@ -1,4 +1,6 @@
 use super::adapter::{AdapterId, AdapterInfo, adapters, limits};
+#[cfg(all(target_os = "android", feature = "gui"))]
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use wgpu::{Adapter, Backends, Features, Limits};
 
@@ -9,6 +11,8 @@ pub(in super::super) struct Device {
     pub(super) limits: Limits,
     info: AdapterInfo,
     error: Arc<OnceLock<String>>,
+    #[cfg(all(target_os = "android", feature = "gui"))]
+    lost: Arc<AtomicBool>,
 }
 
 impl Device {
@@ -42,6 +46,18 @@ impl Device {
 
     pub(in super::super) fn is_available(&self) -> bool {
         self.error.get().is_none()
+    }
+
+    #[cfg(all(target_os = "android", feature = "gui"))]
+    pub(in super::super) fn is_lost(&self) -> bool {
+        self.lost.load(Ordering::Acquire)
+    }
+
+    #[cfg(target_os = "android")]
+    pub(in super::super) fn storage_budget(&self) -> u64 {
+        self.limits
+            .max_storage_buffer_binding_size
+            .min(self.limits.max_buffer_size)
     }
 
     pub(in super::super) fn prune_weights(&self) {
@@ -108,17 +124,26 @@ fn request_device(adapter: Adapter, info: AdapterInfo) -> Result<Device, String>
         let _ = fault.set(format!("WebGPU inference error: {e}"));
     }));
     let fault = Arc::clone(&error);
+    #[cfg(all(target_os = "android", feature = "gui"))]
+    let lost = Arc::new(AtomicBool::new(false));
+    #[cfg(all(target_os = "android", feature = "gui"))]
+    let lost_callback = Arc::clone(&lost);
     raw.set_device_lost_callback(move |reason, message| {
         let _ = fault.set(format!(
             "WebGPU inference device lost ({reason:?}): {message}"
         ));
+        #[cfg(all(target_os = "android", feature = "gui"))]
+        lost_callback.store(true, Ordering::Release);
     });
+    let limits = raw.limits();
     Ok(Device {
-        limits: raw.limits(),
+        cache: Mutex::new(super::cache::Cache::for_limits(&limits)),
+        limits,
         raw,
         queue,
-        cache: Mutex::default(),
         info,
         error,
+        #[cfg(all(target_os = "android", feature = "gui"))]
+        lost,
     })
 }

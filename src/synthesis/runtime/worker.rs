@@ -1,3 +1,5 @@
+#[cfg(target_os = "android")]
+mod mobile;
 mod phonemes;
 mod publication;
 mod runner;

@@ -59,6 +59,18 @@ impl State {
 
 impl Runtime {
     #[cfg(target_os = "android")]
+    pub(super) fn recover_mobile_device(&mut self) {
+        if self.compute.session().is_some_and(Session::device_lost)
+            && self
+                .last_device_recovery
+                .is_none_or(|last| last.elapsed().as_secs() >= 15)
+        {
+            self.last_device_recovery = Some(std::time::Instant::now());
+            self.release_mobile_caches();
+        }
+    }
+
+    #[cfg(target_os = "android")]
     pub(crate) fn release_mobile_caches(&mut self) {
         self.clear_voices();
         self.visuals.clear();

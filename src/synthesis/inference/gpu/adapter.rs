@@ -27,6 +27,8 @@ pub struct AdapterInfo {
     #[serde(flatten)]
     pub id: AdapterId,
     pub device_type: String,
+    pub driver: String,
+    pub driver_info: String,
     pub supports_compute: bool,
     pub unavailable_reason: Option<String>,
     pub max_storage_binding_bytes: u64,
@@ -50,7 +52,7 @@ pub(super) fn adapters() -> (Backends, Vec<(Adapter, AdapterInfo)>) {
     let mut descriptor = wgpu::InstanceDescriptor::new_without_display_handle();
     let supported = if cfg!(windows) {
         Backends::DX12 | Backends::VULKAN
-    } else if cfg!(feature = "gui")
+    } else if cfg!(all(target_os = "linux", feature = "gui"))
         && (std::env::var_os("DISPLAY").is_some() || std::env::var_os("WAYLAND_DISPLAY").is_some())
     {
         Backends::VULKAN | Backends::GL
@@ -136,6 +138,8 @@ fn adapter_info(adapter: &Adapter) -> AdapterInfo {
             pci_bus_id: info.device_pci_bus_id,
         },
         device_type: format!("{:?}", info.device_type),
+        driver: info.driver,
+        driver_info: info.driver_info,
         supports_compute,
         unavailable_reason,
         max_storage_binding_bytes: supported.max_storage_buffer_binding_size,

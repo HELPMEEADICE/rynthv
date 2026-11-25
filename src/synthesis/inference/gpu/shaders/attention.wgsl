@@ -29,14 +29,15 @@ fn attention_scores(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocat
     }
     let head = (index / keys) % heads;
     let key = index % keys;
-    let q = (query * heads + head) * channels;
+    let absolute_query = query + params[3].y;
+    let q = (absolute_query * heads + head) * channels;
     let k = (key * heads + head) * channels + params[1].y;
     var sum = 0.0;
     for (var i = 0u; i < channels; i += 1u) {
         sum += input[q + i] * input[k + i];
     }
     sum *= 1.0 / sqrt(f32(channels));
-    let delta = distance(query, key);
+    let delta = distance(absolute_query, key);
     if ((params[2].y != 0u && input[params[2].x + key] > 0.5) ||
         (params[3].x != 0u && u32(abs(delta)) > params[3].x)) {
         sum = bitcast<f32>(0xd01502f9u);
@@ -119,9 +120,9 @@ fn attention_values(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocat
     }
     if (params[2].z != 0u) {
         for (var key = 0u; key < keys; key += 1u) {
-            let i = position(distance(query, key)) * channels + channel;
+            let i = position(distance(query + params[3].y, key)) * channels + channel;
             sum += scores[score + key] * relative_value[i];
         }
     }
-    output[index] = sum;
+    output[index + params[3].y * heads * channels] = sum;
 }

@@ -51,6 +51,8 @@ pub struct Runtime {
     pub instrumentals: super::instrumental::AudioLibrary,
     pub recording_error: Option<String>,
     compute: compute::State,
+    #[cfg(target_os = "android")]
+    last_device_recovery: Option<std::time::Instant>,
     voices: BTreeMap<VoiceSelection, voices::VoiceSlot>,
     routes: BTreeMap<OwnerId, VoiceSelection>,
     binding_errors: BTreeMap<OwnerId, String>,
@@ -85,6 +87,8 @@ impl Runtime {
         Self {
             library,
             compute,
+            #[cfg(target_os = "android")]
+            last_device_recovery: None,
             context_import: ContextImport::default(),
             planner: Planner::default(),
             stats: CacheStats::default(),
@@ -119,6 +123,8 @@ impl Runtime {
     }
 
     pub fn poll(&mut self) {
+        #[cfg(target_os = "android")]
+        self.recover_mobile_device();
         if self.compute.poll() {
             self.last_revision = None;
         }

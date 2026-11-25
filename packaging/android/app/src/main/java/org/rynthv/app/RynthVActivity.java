@@ -1,6 +1,7 @@
 package org.rynthv.app;
 
 import android.app.AlertDialog;
+import android.app.ActivityManager;
 import android.app.NativeActivity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -132,6 +133,12 @@ public final class RynthVActivity extends NativeActivity {
 
     String rynthvFilesDirectory() {
         return getFilesDir().getAbsolutePath();
+    }
+
+    long rynthvTotalMemory() {
+        ActivityManager.MemoryInfo info = new ActivityManager.MemoryInfo();
+        getSystemService(ActivityManager.class).getMemoryInfo(info);
+        return info.totalMem;
     }
 
     void rynthvFinish() {

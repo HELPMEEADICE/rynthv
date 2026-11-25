@@ -20,6 +20,7 @@ thread_local! {
 }
 static REPAINT: Mutex<Option<Context>> = Mutex::new(None);
 static FILES_DIRECTORY: OnceLock<Result<PathBuf, String>> = OnceLock::new();
+static TOTAL_MEMORY: OnceLock<u64> = OnceLock::new();
 
 pub(crate) fn install_activity(app: AndroidApp) {
     ACTIVITY.set(Some(app));
@@ -28,6 +29,28 @@ pub(crate) fn install_activity(app: AndroidApp) {
             .map(PathBuf::from)
             .ok_or_else(|| "Android 无法定位应用私有目录".into())
     });
+    TOTAL_MEMORY.get_or_init(|| {
+        with_activity(|env, activity| {
+            env.call_method(
+                activity,
+                jni::jni_str!("rynthvTotalMemory"),
+                jni::jni_sig!("()J"),
+                &[],
+            )?
+            .j()
+        })
+        .ok()
+        .and_then(|value| u64::try_from(value).ok())
+        .filter(|&bytes| bytes > 0)
+        .unwrap_or(2 * 1024 * 1024 * 1024)
+    });
+}
+
+pub(crate) fn memory_bytes() -> u64 {
+    TOTAL_MEMORY
+        .get()
+        .copied()
+        .unwrap_or(2 * 1024 * 1024 * 1024)
 }
 
 pub(crate) fn release_activity() {
