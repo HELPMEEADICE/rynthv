@@ -25,7 +25,7 @@ pub use playback::{OutputFormat, PlaybackControl, Player};
 pub use source::AudioLayer;
 #[cfg(feature = "gui")]
 pub use source::PlaybackSource;
-pub use wav::{WaveFormat, save_wav, save_wav_as, save_wav_policy};
+pub use wav::{WaveFormat, save_wav, save_wav_as, save_wav_policy, write_wav};
 
 use std::{fmt, sync::Arc};
 
