@@ -77,7 +77,7 @@ pub(crate) fn read(ctx: &Context, raw: &mut RawInput) {
                                 physical_key: None,
                                 pressed,
                                 repeat: false,
-                                modifiers: raw.modifiers,
+                                modifiers: egui::Modifiers::NONE,
                             });
                         }
                     }
