@@ -52,21 +52,6 @@ impl Batch<'_> {
         self.read_staged(staging, source, first, output, &mut [], None)
     }
 
-    pub(in crate::synthesis::inference::gpu) fn read_checked(
-        &mut self,
-        source: &Buffer,
-        output: &mut [f32],
-        validation_index: &Buffer,
-    ) -> Result<(), MatrixError> {
-        let staging = self.stage_readback(
-            output.len(),
-            0,
-            Some("before the conditional output projection"),
-            0,
-        );
-        self.read_staged(staging, source, 0, output, &mut [], Some(validation_index))
-    }
-
     pub(in crate::synthesis::inference::gpu) fn stage_readback(
         &mut self,
         output_len: usize,
@@ -122,7 +107,9 @@ impl Batch<'_> {
         debug_assert_eq!(history_bytes, history.len() as u64 * 4);
         debug_assert_eq!(validation_label.is_some(), validation_index.is_some());
         let mut encoder = self.encoder.take().unwrap();
-        encoder.copy_buffer_to_buffer(source, first as u64 * 4, &buffer, 0, Some(output_bytes));
+        if output_bytes != 0 {
+            encoder.copy_buffer_to_buffer(source, first as u64 * 4, &buffer, 0, Some(output_bytes));
+        }
         if let Some(validation_index) = validation_index {
             encoder.copy_buffer_to_buffer(validation_index, 0, &buffer, data_bytes, Some(4));
         }

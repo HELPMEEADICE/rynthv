@@ -208,13 +208,13 @@ impl<'network, 'tree> Program<'network, 'tree> {
         self.decoded
             .push(&runtime.execute(layout.decoded_affine, &decoded, final_batch)?)?;
         let (refined, decoded) = align(&mut self.refined_spectral, &mut self.decoded, final_batch)?;
-        let spectral = runtime.execute_conditioned(
+        let spectral = runtime.execute_conditioned_projected(
             layout.spectral_network,
+            layout.spectral_head,
             &refined,
             &decoded,
             final_batch,
         )?;
-        let spectral = runtime.execute(layout.spectral_head, &spectral, final_batch)?;
         self.spectral_auxiliary.push(&spectral)?;
         self.spectral_output.push(&spectral)?;
         let (refined, spectral) = align(
@@ -222,13 +222,13 @@ impl<'network, 'tree> Program<'network, 'tree> {
             &mut self.spectral_auxiliary,
             final_batch,
         )?;
-        let auxiliary = runtime.execute_conditioned(
+        let auxiliary = runtime.execute_conditioned_projected(
             layout.auxiliary_network,
+            layout.auxiliary_head,
             &refined,
             &spectral,
             final_batch,
         )?;
-        let auxiliary = runtime.execute(layout.auxiliary_head, &auxiliary, final_batch)?;
         self.auxiliary_output.push(&auxiliary)?;
         if final_batch
             && (self.spectral_output.len() != self.auxiliary_output.len()

@@ -6,10 +6,14 @@ use super::{
     elementwise::{self, Element},
 };
 use crate::synthesis::{
-    inference::{Sequence, compute, convolution::Convolution, matrix::MatrixError},
+    inference::{
+        Sequence, compute,
+        convolution::{Convolution, ConvolutionStream},
+        matrix::MatrixError,
+    },
     voice::{PreparedModule, PreparedTree, Result, VoiceError},
 };
-use std::ops::Range;
+use std::{collections::HashMap, ops::Range};
 use wgpu::Buffer;
 
 const MAX_SCRATCH_FLOATS: usize = 8 * 1024 * 1024;
@@ -26,6 +30,13 @@ pub(in super::super) struct ConditionalGraph<'a> {
     layers: Vec<Layer<'a>>,
     channels: usize,
     radii: [usize; 2],
+}
+
+pub(in super::super) struct ConditionalProjection<'a> {
+    pub tree: &'a PreparedTree,
+    pub index: usize,
+    pub streams: &'a mut HashMap<usize, ConvolutionStream>,
+    pub flush: bool,
 }
 
 impl<'a> ConditionalGraph<'a> {
@@ -115,7 +126,7 @@ impl<'a> ConditionalGraph<'a> {
         input: &Sequence,
         condition: Option<&Sequence>,
         output_rows: Range<usize>,
-        projection: Option<(&PreparedTree, usize)>,
+        projection: Option<ConditionalProjection<'_>>,
     ) -> Result<Option<(Sequence, bool)>> {
         let frames = input.frames;
         if output_rows.is_empty() {
@@ -145,29 +156,34 @@ impl<'a> ConditionalGraph<'a> {
         lengths.push(capacity);
         let full_output_len = frames * self.channels;
         let stable = output_rows.start * self.channels..output_rows.end * self.channels;
-        let projection = match projection {
-            Some((tree, index)) => {
-                Chain::projection(tree, index, output_rows.len(), self.channels)?
-                    .filter(|chain| chain.capacity <= MAX_SCRATCH_FLOATS)
-            }
+        let head = match &projection {
+            Some(projection) => Chain::projection(
+                projection.tree,
+                projection.index,
+                output_rows.len(),
+                self.channels,
+                projection.streams,
+                projection.flush,
+            )?
+            .filter(|chain| chain.capacity <= MAX_SCRATCH_FLOATS),
             None => None,
         };
-        let channels = projection
-            .as_ref()
-            .map_or(self.channels, |chain| chain.channels);
-        let mut output = Sequence::zeros(output_rows.len(), channels)?;
+        let mut output = Sequence::zeros(
+            head.as_ref()
+                .map_or(output_rows.len(), |chain| chain.frames),
+            head.as_ref().map_or(self.channels, |chain| chain.channels),
+        )?;
+        let mut history = vec![0.0; head.as_ref().map_or(0, |chain| chain.history_len)];
         let ran = compute::accelerate(None, work, 1_048_576, &lengths, |batch| {
             let source = batch.input(&input.values);
             let cond = condition.map(|s| batch.input(&s.values));
-            let chain_capacity = projection
+            let chain_capacity = head
                 .as_ref()
                 .map_or(capacity, |chain| capacity.max(chain.capacity));
             let [projected, residual] = std::array::from_fn(|_| batch.output(chain_capacity));
             let [aux_or_skip, gated, state] = std::array::from_fn(|_| batch.output(capacity));
             let outputs = [batch.output(full_output_len), batch.output(full_output_len)];
-            let projection = projection
-                .as_ref()
-                .map(|chain| (chain, batch.validation_index()));
+            let validation = head.as_ref().map(|_| batch.validation_index());
             let project = |batch: &mut Batch<'_>, op: &Convolution, from: &Buffer, to: &Buffer| {
                 encode_convolution(
                     batch,
@@ -214,12 +230,11 @@ impl<'a> ConditionalGraph<'a> {
                     true,
                     None,
                 )?;
-                // Only published rows enter the pointwise projection. The final
+                // Only published rows enter the output head. The final
                 // skip sum also checks the boundary that used to be read on the CPU.
-                let validation = projection
+                let validation = validation
                     .as_ref()
-                    .filter(|_| index + 1 == self.layers.len())
-                    .map(|(_, validation)| validation);
+                    .filter(|_| index + 1 == self.layers.len());
                 let values = if validation.is_some() {
                     stable.clone()
                 } else {
@@ -236,15 +251,33 @@ impl<'a> ConditionalGraph<'a> {
                 )?;
             }
             let result = &outputs[self.layers.len() % 2];
-            if let Some((projection, validation)) = projection {
-                let result = projection.encode(batch, result, [&projected, &residual])?;
-                batch.read_checked(result, &mut output.values, &validation)
+            if let Some((head, validation)) = head.as_ref().zip(validation.as_ref()) {
+                let label = if head.validates_intermediate() {
+                    "in the conditional stack or its output head"
+                } else {
+                    "before the conditional output projection"
+                };
+                head.read(
+                    batch,
+                    result,
+                    [&projected, &residual],
+                    &mut output.values,
+                    &mut history,
+                    Some((validation, label)),
+                )
             } else {
                 batch.read_from(result, stable.start, &mut output.values)
             }
         })
         .map_err(|e| VoiceError::new(e.to_string()))?;
-        Ok(ran.then_some((output, projection.is_some())))
+        if !ran {
+            return Ok(None);
+        }
+        let projected = head.is_some();
+        if let Some((head, projection)) = head.zip(projection) {
+            head.commit(projection.streams, &[], &history);
+        }
+        Ok(Some((output, projected)))
     }
 }
 

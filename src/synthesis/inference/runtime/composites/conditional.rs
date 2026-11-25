@@ -2,7 +2,11 @@ mod history;
 
 use super::{ModelRuntime, queue::SumQueue};
 use crate::synthesis::{
-    inference::{Sequence, compute, gpu::ConditionalGraph, ops::conditional::ConditionalConfig},
+    inference::{
+        Sequence, compute,
+        gpu::{ConditionalGraph, ConditionalProjection},
+        ops::conditional::ConditionalConfig,
+    },
     voice::{PreparedModule, PreparedTree, Result, VoiceError},
 };
 use history::History;
@@ -89,7 +93,12 @@ impl ConditionalState {
                               condition: Option<&Sequence>,
                               rows: Range<usize>|
              -> Result<Option<Sequence>> {
-                let suffix = pending_projection.map(|index| (tree, index));
+                let suffix = pending_projection.map(|index| ConditionalProjection {
+                    tree,
+                    index,
+                    streams: &mut runtime.convolutions,
+                    flush,
+                });
                 let result = graph.execute(input, condition, rows, suffix)?;
                 Ok(result.map(|(output, projected)| {
                     if projected {

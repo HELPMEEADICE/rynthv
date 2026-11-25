@@ -20,7 +20,7 @@ pub use adapter::{AdapterId, AdapterInfo};
 pub(super) use attention::{attention, projected_attention};
 pub(super) use batch::Batch;
 pub(super) use chain::sequence;
-pub(super) use conditional::ConditionalGraph;
+pub(super) use conditional::{ConditionalGraph, ConditionalProjection};
 pub(super) use convolution::{convolution, transpose};
 pub(super) use device::{Device, open};
 pub(super) use elementwise::{Element, elementwise};
