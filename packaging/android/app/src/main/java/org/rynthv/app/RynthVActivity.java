@@ -289,8 +289,8 @@ public final class RynthVActivity extends NativeActivity {
                 Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".files", shared);
                 Intent send = new Intent(Intent.ACTION_SEND).setType(mime)
                     .putExtra(Intent.EXTRA_STREAM, uri)
-                    .setClipData(ClipData.newRawUri(shared.getName(), uri))
                     .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                send.setClipData(ClipData.newRawUri(shared.getName(), uri));
                 runOnUiThread(() -> startActivity(Intent.createChooser(send, null)));
             } catch (Exception error) {
                 Log.w("RynthV", "Sharing failed", error);

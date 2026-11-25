@@ -58,6 +58,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           key: android-${{ matrix.abi }}-ndk-r28c-full-lto
+          cache-on-failure: true
       - name: Install JDK
         uses: actions/setup-java@v4
         with:
@@ -72,6 +73,7 @@ jobs:
         with:
           cmdline-tools-version: '12266719'
           packages: ''
+          log-accepted-android-sdk-licenses: false
       - name: Install Android SDK packages and configure the linker
         env:
           RUST_TARGET: ${{ matrix.target }}
