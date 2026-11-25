@@ -56,6 +56,24 @@ impl PreparedRender {
         self.pcm.model_samples()
     }
 
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn visible_samples(&self) -> Range<i64> {
+        use crate::synthesis::score::SAMPLE_RATE;
+        let model = self.pcm.model_samples();
+        let phrase = &self.acoustic.prepared.phrase;
+        let offsets = super::components::visible_offsets(
+            model.start as f64 / f64::from(SAMPLE_RATE),
+            (model.end - model.start) as usize,
+            phrase.visible_begin_seconds,
+            phrase.visible_end_seconds,
+        );
+        model.start + offsets.start as i64..model.start + offsets.end as i64
+    }
+
+    pub(crate) fn suppress_pcm_publication(&mut self) {
+        self.pcm.suppress_publication();
+    }
+
     pub fn needs_audio(&self, seconds: f64) -> bool {
         self.pcm.needs(seconds)
     }

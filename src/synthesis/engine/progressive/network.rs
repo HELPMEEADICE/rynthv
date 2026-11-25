@@ -1,4 +1,6 @@
 //! Voice-family dispatch for the shared demand-driven PCM pipeline.
+#[cfg(target_arch = "wasm32")]
+use crate::synthesis::stages::vocoder::VocoderStage;
 use crate::synthesis::{
     engine::{PreparedRenderAcoustics, models, voice_controls::AcousticControls},
     stages::{
@@ -12,7 +14,13 @@ use crate::synthesis::{
 };
 use std::sync::Arc;
 
-pub enum Network<'tree> {
+pub struct Network<'tree> {
+    timbre: Timbre<'tree>,
+    #[cfg(target_arch = "wasm32")]
+    vocoder: std::cell::OnceCell<VocoderStage<'tree>>,
+}
+
+enum Timbre<'tree> {
     Dds(Box<Sv1TimbreNetwork<'tree>>),
     Sv2(Box<TimbreNetwork<'tree>>),
 }
@@ -33,12 +41,27 @@ pub(super) enum Stream<'network, 'tree> {
 impl<'tree> Network<'tree> {
     pub fn prepare(voice: &'tree PreparedVoice) -> Result<Self> {
         let tree = voice.model("timbre")?;
-        match voice.family {
+        let timbre = match voice.family {
             VoiceFamily::Sv1 | VoiceFamily::Sv2Compatible => {
-                Ok(Self::Dds(Box::new(models::dds_timbre(voice)?)))
+                Timbre::Dds(Box::new(models::dds_timbre(voice)?))
             }
-            VoiceFamily::Sv2 => Ok(Self::Sv2(Box::new(TimbreNetwork::prepare(tree)?))),
+            VoiceFamily::Sv2 => Timbre::Sv2(Box::new(TimbreNetwork::prepare(tree)?)),
+        };
+        Ok(Self {
+            timbre,
+            #[cfg(target_arch = "wasm32")]
+            vocoder: std::cell::OnceCell::new(),
+        })
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(super) fn vocoder(&self, voice: &'tree PreparedVoice) -> Result<VocoderStage<'tree>> {
+        if self.vocoder.get().is_none() {
+            let _ = self
+                .vocoder
+                .set(VocoderStage::prepare(voice.model("vocoder")?)?);
         }
+        Ok(self.vocoder.get().expect("prepared vocoder").clone())
     }
 
     pub(super) fn prepare_frames(
@@ -47,8 +70,8 @@ impl<'tree> Network<'tree> {
         voice: &PreparedVoice,
     ) -> Result<PreparedFrames> {
         let prepared = &acoustic.prepared;
-        match self {
-            Self::Dds(network) => {
+        match &self.timbre {
+            Timbre::Dds(network) => {
                 let modulation = acoustic.modulation()?;
                 let controls = AcousticControls::sample(
                     acoustic,
@@ -72,7 +95,7 @@ impl<'tree> Network<'tree> {
                 )?;
                 Ok(PreparedFrames::Dds(Arc::new(frames)))
             }
-            Self::Sv2(network) => {
+            Timbre::Sv2(network) => {
                 let controls = AcousticControls::sample(
                     acoustic,
                     &voice.style_names,
@@ -112,11 +135,11 @@ impl<'tree> Network<'tree> {
             secondary_style_weights: None,
             requested_frame,
         };
-        match (self, frames) {
-            (Self::Dds(network), PreparedFrames::Dds(frames)) => network
+        match (&self.timbre, frames) {
+            (Timbre::Dds(network), PreparedFrames::Dds(frames)) => network
                 .start_prepared(request, Arc::clone(frames))
                 .map(|stream| Stream::Dds(Box::new(stream))),
-            (Self::Sv2(network), PreparedFrames::Sv2 { features, controls }) => network
+            (Timbre::Sv2(network), PreparedFrames::Sv2 { features, controls }) => network
                 .start_prepared(
                     &TimbreRequest {
                         phone_impulses: Some(&impulses),

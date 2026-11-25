@@ -1,11 +1,12 @@
 const SOURCE_RATE = 48_000;
-const BLOCK = 4096;
-const MAX_BLOCKS = 8192;
+const BLOCK = 24_000;
+const MAX_FRAMES = 33_554_432;
 
 class PcmPlayer extends AudioWorkletProcessor {
     constructor() {
         super();
         this.blocks = new Map();
+        this.bufferedFrames = 0;
         this.step = SOURCE_RATE / sampleRate;
         this.position = 0;
         this.playing = false;
@@ -13,12 +14,11 @@ class PcmPlayer extends AudioWorkletProcessor {
         this.loopEnd = 0;
         this.duration = Infinity;
         this.generation = 0;
+        this.transport = 0;
         this.report = 0;
         this.clicks = undefined;
         this.beat = 0;
-        this.schedule = undefined;
-        this.boundary = 0;
-        this.finalMix = false;
+        this.occupied = undefined;
         this.port.onmessage = ({ data }) => this.message(data);
     }
 
@@ -27,24 +27,35 @@ class PcmPlayer extends AudioWorkletProcessor {
             case "reset":
                 this.generation = data.generation;
                 this.blocks.clear();
+                this.bufferedFrames = 0;
                 this.duration = Infinity;
-                this.schedule = undefined;
-                this.finalMix = false;
+                this.occupied = undefined;
                 break;
-            case "pcm":
-                if (data.replace) this.blocks.clear();
-                this.finalMix = data.finalMix || this.finalMix;
-                this.append(data);
+            case "layout":
+                this.occupied = data.occupied;
+                this.duration = data.frames;
                 break;
+            case "block": {
+                const pcm = data.pcm ?? null;
+                const frames = this.bufferedFrames + (pcm?.length ?? 0) / 2
+                    - (this.blocks.get(data.index)?.length ?? 0) / 2;
+                if (frames > MAX_FRAMES) {
+                    this.port.postMessage({ generation: this.generation, error: "预览音频超过浏览器缓冲上限，请导出 WAV 播放。" });
+                    break;
+                }
+                this.bufferedFrames = frames;
+                this.blocks.set(data.index, pcm);
+                break;
+            }
             case "end":
-                this.duration = data.duration * SOURCE_RATE;
+                this.duration = Math.round(data.duration * SOURCE_RATE);
                 break;
             case "transport":
+                this.transport = data.transport;
                 this.playing = data.playing;
                 this.position = Math.max(0, data.seconds * SOURCE_RATE);
                 this.report = 0;
                 this.locateBeat();
-                this.locateBoundary();
                 break;
             case "loop":
                 this.loopStart = data.start * SOURCE_RATE;
@@ -54,32 +65,22 @@ class PcmPlayer extends AudioWorkletProcessor {
                 this.clicks = data;
                 this.locateBeat();
                 break;
-            case "schedule":
-                this.schedule = data;
-                this.locateBoundary();
-                break;
         }
     }
 
-    locateBoundary() {
-        const points = this.schedule?.boundaries;
-        this.boundary = 0;
-        if (!points?.length) return;
-        let end = points.length;
-        while (this.boundary < end) {
-            const mid = (this.boundary + end) >>> 1;
-            if (points[mid] <= this.position) this.boundary = mid + 1;
+    block(index) {
+        const stored = this.blocks.get(index);
+        if (stored !== undefined) return stored;
+        const occupied = this.occupied;
+        if (!occupied) return undefined;
+        let first = 0;
+        let end = occupied.length / 2;
+        while (first < end) {
+            const mid = (first + end) >>> 1;
+            if (occupied[mid * 2 + 1] <= index) first = mid + 1;
             else end = mid;
         }
-    }
-
-    expected(frame) {
-        const schedule = this.schedule;
-        if (this.finalMix || this.duration !== Infinity) return 0;
-        if (!schedule || schedule.waitForMix || !schedule.boundaries.length) return Infinity;
-        while (this.boundary < schedule.boundaries.length && schedule.boundaries[this.boundary] <= frame) this.boundary++;
-        if (this.boundary === schedule.boundaries.length) return Infinity;
-        return this.boundary ? schedule.counts[this.boundary - 1] : 0;
+        return occupied[first * 2] <= index ? undefined : null;
     }
 
     locateBeat() {
@@ -105,75 +106,58 @@ class PcmPlayer extends AudioWorkletProcessor {
         return sound[frame] ?? 0;
     }
 
-    append({ start, pcm, finalMix }) {
-        for (let offset = 0; offset < pcm.length / 2;) {
-            const frame = start + offset;
-            const index = Math.floor(frame / BLOCK);
-            const from = frame % BLOCK;
-            const length = Math.min(BLOCK - from, pcm.length / 2 - offset);
-            let block = this.blocks.get(index);
-            if (!block) {
-                if (this.blocks.size >= MAX_BLOCKS) {
-                    this.port.postMessage({ generation: this.generation, error: "预览音频超过浏览器缓冲上限，请导出 WAV 播放。" });
-                    return;
-                }
-                block = { samples: new Float32Array(BLOCK * 2), ready: new Uint16Array(BLOCK) };
-                this.blocks.set(index, block);
-            }
-            if (finalMix) {
-                block.samples.set(pcm.subarray(offset * 2, (offset + length) * 2), from * 2);
-                block.ready.fill(1, from, from + length);
-            } else {
-                for (let sample = 0; sample < length * 2; sample++) {
-                    block.samples[from * 2 + sample] += pcm[offset * 2 + sample];
-                }
-                for (let frame = from; frame < from + length; frame++) block.ready[frame]++;
-            }
-            offset += length;
-        }
-    }
-
     process(inputs, outputs) {
         const [left, right] = outputs[0];
+        const times = this.clicks?.times;
+        const lastClick = times?.length ? (Math.abs(times[times.length - 1]) + 0.04) * SOURCE_RATE : 0;
+        const end = Math.max(this.duration, lastClick);
         let active = this.playing;
+        let blockIndex = -1;
+        let block;
         if (active) {
             for (let index = 0; index < left.length; index++) {
                 if (this.loopEnd > this.loopStart && this.position >= this.loopEnd) {
                     this.position = this.loopStart + (this.position - this.loopEnd) % (this.loopEnd - this.loopStart);
                     this.locateBeat();
-                    this.locateBoundary();
                 }
-                const times = this.clicks?.times;
-                const lastClick = times?.length ? (Math.abs(times[times.length - 1]) + 0.04) * SOURCE_RATE : 0;
-                if (this.position >= Math.max(this.duration, lastClick) && this.loopEnd <= this.loopStart) {
+                if (this.position >= end && this.loopEnd <= this.loopStart) {
                     active = false;
                     break;
                 }
                 const frame = Math.floor(this.position);
-                const blockIndex = Math.floor(frame / BLOCK);
-                const offset = frame % BLOCK;
-                const block = this.blocks.get(blockIndex);
-                if ((block?.ready[offset] ?? 0) < this.expected(frame)) break;
-                if (!block?.ready[offset]) {
-                    if (this.finalMix && this.duration === Infinity) break;
-                    left[index] = right[index] = this.click();
+                const current = Math.floor(frame / BLOCK);
+                if (current !== blockIndex) {
+                    blockIndex = current;
+                    block = this.block(current);
+                }
+                if (block === undefined && frame < this.duration) break;
+                const click = this.click();
+                if (!block || frame >= this.duration) {
+                    left[index] = right[index] = click;
                     this.position += this.step;
                     continue;
                 }
-                let next = offset + 1;
-                const successor = next < BLOCK ? block : this.blocks.get(blockIndex + 1);
-                next %= BLOCK;
+                const sample = (frame % BLOCK) * 2;
+                const a = block[sample];
+                const b = block[sample + 1];
                 const fraction = this.position - frame;
-                const a = block.samples[offset * 2];
-                const b = block.samples[offset * 2 + 1];
-                const click = this.click();
-                left[index] = a + fraction * ((successor?.samples[next * 2] ?? a) - a) + click;
-                right[index] = b + fraction * ((successor?.samples[next * 2 + 1] ?? b) - b) + click;
+                if (sample + 2 < block.length) {
+                    left[index] = a + fraction * (block[sample + 2] - a) + click;
+                    right[index] = b + fraction * (block[sample + 3] - b) + click;
+                } else {
+                    const next = this.block(current + 1);
+                    const nextLeft = next === null ? 0 : next?.[0] ?? a;
+                    const nextRight = next === null ? 0 : next?.[1] ?? b;
+                    left[index] = a + fraction * (nextLeft - a) + click;
+                    right[index] = b + fraction * (nextRight - b) + click;
+                }
                 this.position += this.step;
             }
         }
         if (this.report++ % 6 === 0) {
-            this.port.postMessage({ generation: this.generation, active, seconds: this.position / SOURCE_RATE });
+            this.port.postMessage({
+                generation: this.generation, transport: this.transport, active, seconds: this.position / SOURCE_RATE,
+            });
         }
         return true;
     }

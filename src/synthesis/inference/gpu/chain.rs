@@ -1,14 +1,16 @@
 use super::{
+    convolution::encode_convolution,
     elementwise::{self, Element},
     linear,
 };
 use crate::synthesis::{
-    inference::{Sequence, UnaryOperator, affine::Affine, compute},
+    inference::{Sequence, UnaryOperator, affine::Affine, compute, convolution::Convolution},
     voice::{PreparedModule, PreparedTree, Result, VoiceError},
 };
 
 enum Step<'a> {
     Affine(&'a Affine),
+    Convolution(&'a Convolution),
     Element(Element<'a>),
 }
 
@@ -25,6 +27,7 @@ pub(in super::super) fn sequence(
     let mut lengths = vec![input.values.len()];
     let mut steps = Vec::new();
     let mut capacity = 0;
+    let mut consumed = 0;
     for &child in children {
         let step = match &tree.node(child)?.module {
             PreparedModule::Affine(op) if op.input_features == channels => {
@@ -37,7 +40,24 @@ pub(in super::super) fn sequence(
                 lengths.push(op.operator().matrix().values().len());
                 Step::Affine(op.operator())
             }
-            PreparedModule::Unary(UnaryOperator::Identity) => break,
+            PreparedModule::Convolution(op)
+                if op.input_features == channels
+                    && op.config.kernel == 1
+                    && op.config.stride == 1
+                    && op.config.padding == 0
+                    && u32::try_from(op.config.dilation).is_ok() =>
+            {
+                channels = op.output_features;
+                let operator = op.operator();
+                let weights = operator.shared_weights().len();
+                work = work.saturating_add(input.frames.saturating_mul(weights));
+                lengths.push(weights);
+                Step::Convolution(operator)
+            }
+            PreparedModule::Unary(UnaryOperator::Identity) => {
+                consumed += 1;
+                continue;
+            }
             PreparedModule::Unary(op) => Step::Element(Element::Unary(*op)),
             PreparedModule::LeakyRelu(op) => Step::Element(Element::LeakyRelu(op.slope())),
             PreparedModule::ChannelAffine(op) if op.channels() == channels => {
@@ -57,6 +77,7 @@ pub(in super::super) fn sequence(
             .ok_or_else(|| VoiceError::new("GPU sequence dimensions overflow"))?;
         capacity = capacity.max(size);
         steps.push((step, size));
+        consumed += 1;
     }
     if steps.len() < 2 || work == 0 {
         return Ok(None);
@@ -71,6 +92,9 @@ pub(in super::super) fn sequence(
             let target = &buffers[index % 2];
             match step {
                 Step::Affine(op) => linear::encode_affine(batch, op, input.frames, source, target)?,
+                Step::Convolution(op) => {
+                    encode_convolution(batch, op, source, target, input.frames, input.frames, 0)?
+                }
                 Step::Element(op) => elementwise::encode(batch, *op, source, target, size, None)?,
             }
             source = target;
@@ -78,5 +102,5 @@ pub(in super::super) fn sequence(
         batch.read(source, &mut output.values)
     })
     .map_err(|e| VoiceError::new(e.to_string()))?;
-    Ok(completed.then_some((steps.len(), output)))
+    Ok(completed.then_some((consumed, output)))
 }

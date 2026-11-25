@@ -3,6 +3,9 @@
 //! The coefficients are stored in tap order, not reversed. Both banks keep
 //! their overlap across calls; `end` supplies the final boundary only once.
 
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+mod wasm;
+
 use std::sync::Arc;
 
 use crate::synthesis::{
@@ -105,11 +108,12 @@ impl AnalysisBank {
                 checkpoint()?;
             }
             let window = &self.pending[frame * BANDS..][..TAPS];
-            for (tap, &sample) in window.iter().enumerate() {
-                for (value, &weight) in target
-                    .iter_mut()
-                    .zip(&self.kernels.0[tap * BANDS..][..BANDS])
-                {
+            let weights = self.kernels.0.as_chunks::<BANDS>().0;
+            #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+            wasm::analysis(window, weights, target);
+            #[cfg(not(all(target_arch = "wasm32", target_feature = "simd128")))]
+            for (&sample, weights) in window.iter().zip(weights) {
+                for (value, &weight) in target.iter_mut().zip(weights) {
                     *value += sample * weight;
                 }
             }
@@ -124,7 +128,10 @@ impl AnalysisBank {
 /// Eight-channel subband frames to full-rate mono PCM by overlap-add.
 #[derive(Clone)]
 pub struct SynthesisBank {
+    #[cfg(not(all(target_arch = "wasm32", target_feature = "simd128")))]
     kernels: Kernels,
+    #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+    kernels: Arc<[[f32; TAPS]; BANDS]>,
     pending: Vec<f32>,
     /// Sample position of the next input impulse relative to `pending[0]`.
     advance: usize,
@@ -137,8 +144,13 @@ impl SynthesisBank {
     pub fn prepare(tree: &PreparedTree, index: usize) -> Result<Self> {
         #[cfg(feature = "synth-profile")]
         let _profile = crate::synthesis::profiling::span("vocoder.filterbank.synthesis.prepare");
+        let kernels = Kernels::prepare(tree, index, SYNTHESIS_TYPE_ID)?;
+        #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+        let kernels = Arc::new(std::array::from_fn(|band| {
+            std::array::from_fn(|tap| kernels.0[tap * BANDS + band])
+        }));
         Ok(Self {
-            kernels: Kernels::prepare(tree, index, SYNTHESIS_TYPE_ID)?,
+            kernels,
             pending: vec![0.0; TAPS - BANDS],
             advance: 0,
             skip: HALF_TAPS,
@@ -176,8 +188,11 @@ impl SynthesisBank {
                 checkpoint()?;
             }
             let start = self.advance + frame * BANDS;
-            for (tap, weights) in self.kernels.0.as_chunks::<BANDS>().0.iter().enumerate() {
-                let target = &mut self.pending[start + tap];
+            let output = &mut self.pending[start..start + TAPS];
+            #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+            wasm::synthesis(input, &self.kernels, output);
+            #[cfg(not(all(target_arch = "wasm32", target_feature = "simd128")))]
+            for (target, weights) in output.iter_mut().zip(self.kernels.0.as_chunks::<BANDS>().0) {
                 for (&value, &weight) in input.iter().zip(weights) {
                     *target += value * weight;
                 }

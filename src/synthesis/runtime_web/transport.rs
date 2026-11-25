@@ -4,7 +4,7 @@ use crate::platform::web::audio;
 #[derive(Default)]
 pub(super) struct State {
     pub(super) seconds: f64,
-    playing: bool,
+    pub(super) playing: bool,
     loop_range: Option<(f64, f64)>,
     metronome: bool,
 }
@@ -26,8 +26,17 @@ impl Runtime {
     }
 
     pub fn sync_transport(&mut self, playing: bool, seconds: f64, seek: bool) {
-        if seek || self.transport.playing != playing {
+        let changed = self.transport.playing != playing;
+        if seek || changed {
             audio::audio_transport(playing, seconds);
+        }
+        if seek
+            || (changed && playing)
+            || (playing
+                && super::super::mixer::block_at(seconds)
+                    != super::super::mixer::block_at(self.transport.seconds))
+        {
+            self.prioritize_preview(seconds, seek || changed);
         }
         self.transport.playing = playing;
         self.transport.seconds = seconds;

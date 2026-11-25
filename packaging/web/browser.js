@@ -1,4 +1,5 @@
 let worker;
+let wasmModule;
 let nextRequest = 1;
 const requests = new Map();
 
@@ -25,17 +26,23 @@ function workerInstance() {
         };
         worker.onerror = event => stopWorker(new Error(event.message || "合成 Worker 已停止"));
         worker.onmessageerror = () => stopWorker(new Error("无法读取合成 Worker 消息"));
+        worker.postMessage({ module: wasmModule });
     }
     return worker;
 }
 
-export function start_request(request, writes, listener) {
+export function set_wasm_module(module) {
+    wasmModule = module;
+    workerInstance();
+}
+
+export function start_request(request, writes, preview, listener) {
     const id = nextRequest++;
     const promise = new Promise((resolve, reject) => {
         try {
             const instance = workerInstance();
             requests.set(id, { resolve, reject, listener });
-            instance.postMessage({ id, request, writes });
+            instance.postMessage({ id, request, writes, preview });
         } catch (error) {
             requests.delete(id);
             reject(error);
@@ -45,6 +52,7 @@ export function start_request(request, writes, listener) {
 }
 
 export function cancel_request(id) { worker?.postMessage({ cancel: id }); }
+export function prioritize_preview(id, seconds) { worker?.postMessage({ demand: id, seconds }); }
 
 export function set_title(title) { document.title = title; }
 

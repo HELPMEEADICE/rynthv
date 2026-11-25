@@ -1,9 +1,7 @@
 //! Mix only completely available timeline blocks. Missing synthesis is never
 //! inferred to be silence, including gaps inside an owner's requested span.
 
-mod spans;
-
-use super::{Controls, native_bound};
+use super::{Controls, intersection, native_bound, spans::ReadySpans};
 use crate::synthesis::{
     audio::{
         LiveAudio, RenderedAudio,
@@ -11,7 +9,6 @@ use crate::synthesis::{
     },
     plan::{OwnerId, RenderPlan},
 };
-use spans::ReadySpans;
 use std::{
     collections::{BTreeMap, BTreeSet},
     ops::Range,
@@ -246,10 +243,6 @@ impl LiveMixer {
         }
         Ok(())
     }
-}
-
-fn intersection(left: &Range<usize>, right: &Range<usize>) -> Range<usize> {
-    left.start.max(right.start)..left.end.min(right.end)
 }
 
 fn frame_at(seconds: f64) -> usize {

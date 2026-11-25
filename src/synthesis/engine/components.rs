@@ -38,14 +38,13 @@ impl PcmComponents {
 
     pub fn publish(&self, begin_seconds: f64, end_seconds: Option<f64>) -> Result<RenderedAudio> {
         let rate = f64::from(SAMPLE_RATE);
-        let first = ((begin_seconds.max(0.0) - self.start_seconds) * rate)
-            .ceil()
-            .clamp(0.0, self.primary.len() as f64) as usize;
-        let end = end_seconds.map_or(self.primary.len(), |end| {
-            ((end - self.start_seconds) * rate)
-                .floor()
-                .clamp(0.0, self.primary.len() as f64) as usize
-        });
+        let range = visible_offsets(
+            self.start_seconds,
+            self.primary.len(),
+            begin_seconds,
+            end_seconds,
+        );
+        let (first, end) = (range.start, range.end);
         if first >= end || self.primary.len() != self.secondary.len() {
             return Err(VoiceError::new(
                 "Rendered components have no visible samples",
@@ -72,4 +71,20 @@ impl PcmComponents {
         std::mem::size_of_val(self.primary.as_ref())
             .saturating_add(std::mem::size_of_val(self.secondary.as_ref()))
     }
+}
+
+pub(super) fn visible_offsets(
+    origin: f64,
+    samples: usize,
+    begin: f64,
+    end: Option<f64>,
+) -> std::ops::Range<usize> {
+    let rate = f64::from(SAMPLE_RATE);
+    let first = ((begin.max(0.0) - origin) * rate)
+        .ceil()
+        .clamp(0.0, samples as f64) as usize;
+    let end = end.map_or(samples, |end| {
+        ((end - origin) * rate).floor().clamp(0.0, samples as f64) as usize
+    });
+    first..end
 }

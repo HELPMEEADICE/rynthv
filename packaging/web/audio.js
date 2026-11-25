@@ -6,11 +6,11 @@ let clock;
 let lastCommand = { kind: "transport", playing: false, seconds: 0 };
 let bounds = { kind: "loop", start: 0, end: 0 };
 let generation = 0;
+let transport = 0;
 let duration;
-let firstFinal = true;
-const queued = [];
+const queued = new Map();
 let queuedFrames = 0;
-let schedule;
+let layout;
 let piano;
 let clicks;
 
@@ -24,11 +24,12 @@ async function resume() {
             output.port.onmessage = ({ data }) => {
                 if (data.generation !== generation) return;
                 if (data.error) error = data.error;
-                else clock = data.active ? data.seconds : undefined;
+                else if (data.transport === transport) clock = data.active ? data.seconds : undefined;
             };
             output.port.postMessage({ kind: "reset", generation });
-            if (schedule) output.port.postMessage(schedule);
-            for (const part of queued.splice(0)) output.port.postMessage(part, [part.pcm.buffer]);
+            if (layout) output.port.postMessage(layout);
+            for (const part of queued.values()) postBlock(part);
+            queued.clear();
             queuedFrames = 0;
             output.port.postMessage(bounds);
             output.port.postMessage(lastCommand);
@@ -50,35 +51,36 @@ export function install_audio(canvas) {
 export function audio_reset() {
     generation++;
     duration = undefined;
-    firstFinal = true;
     clock = undefined;
-    schedule = undefined;
-    queued.length = 0;
+    layout = undefined;
+    queued.clear();
     queuedFrames = 0;
     output?.port.postMessage({ kind: "reset", generation });
 }
 
-export function audio_pcm(seconds, pcm, finalMix) {
-    const replace = finalMix && firstFinal;
-    if (replace) {
-        firstFinal = false;
-        queued.length = 0;
-        queuedFrames = 0;
-    }
-    const part = { kind: "pcm", start: Math.round(seconds * 48_000), pcm, finalMix, replace };
+function postBlock(part) {
+    output.port.postMessage(part, part.pcm ? [part.pcm.buffer] : []);
+}
+
+export function audio_block(index, pcm) {
+    const part = { kind: "block", index, pcm };
     if (output) {
-        output.port.postMessage(part, [pcm.buffer]);
-    } else if (queuedFrames + pcm.length / 2 <= 33_554_432) {
-        queuedFrames += pcm.length / 2;
-        queued.push(part);
+        postBlock(part);
     } else {
-        error = "预览音频超过浏览器缓冲上限，请导出 WAV 播放。";
+        const nextFrames = queuedFrames + (pcm?.length ?? 0) / 2
+            - (queued.get(index)?.pcm?.length ?? 0) / 2;
+        if (nextFrames <= 33_554_432) {
+            queuedFrames = nextFrames;
+            queued.set(index, part);
+        } else {
+            error = "预览音频超过浏览器缓冲上限，请导出 WAV 播放。";
+        }
     }
 }
 
-export function audio_schedule(boundaries, counts, waitForMix) {
-    schedule = { kind: "schedule", boundaries, counts, waitForMix };
-    output?.port.postMessage(schedule);
+export function audio_layout(frames, occupied) {
+    layout = { kind: "layout", frames, occupied };
+    output?.port.postMessage(layout);
 }
 
 export function audio_end(seconds) {
@@ -87,7 +89,7 @@ export function audio_end(seconds) {
 }
 
 export function audio_transport(playing, seconds) {
-    lastCommand = { kind: "transport", playing, seconds };
+    lastCommand = { kind: "transport", playing, seconds, transport: ++transport };
     clock = playing ? seconds : undefined;
     output?.port.postMessage(lastCommand);
 }

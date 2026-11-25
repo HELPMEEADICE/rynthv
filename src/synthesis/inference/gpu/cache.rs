@@ -5,7 +5,7 @@ use std::{
     sync::{Arc, Weak},
 };
 use web_time::Instant;
-use wgpu::{Buffer, BufferUsages, ComputePipeline, ShaderModule, util::DeviceExt};
+use wgpu::{BindGroupLayout, Buffer, BufferUsages, ComputePipeline, ShaderModule, util::DeviceExt};
 
 #[derive(Default)]
 pub(super) struct Cache {
@@ -13,7 +13,7 @@ pub(super) struct Cache {
     weight_bytes: u64,
     clock: u64,
     modules: HashMap<&'static str, ShaderModule>,
-    pipelines: HashMap<&'static str, ComputePipeline>,
+    pipelines: HashMap<&'static str, (ComputePipeline, BindGroupLayout)>,
     buffers: HashMap<(BufferUsages, u64), Vec<Buffer>>,
     buffer_bytes: u64,
     weight_budget: u64,
@@ -71,9 +71,12 @@ impl Cache {
                 activity.peak_weight_cache_bytes.max(self.weight_bytes);
             return weight.buffer.clone();
         }
-        // The weak allocation reserves the address, including after the CPU data
-        // is dropped. Dead entries are discarded when preparing new weights.
-        self.prune_weights();
+        // A weak reference keeps the key's address unique. Sweep dead weights
+        // when their slots are needed instead of scanning on every cache miss.
+        let size = std::mem::size_of_val(source.as_ref()) as u64;
+        if self.weight_bytes.saturating_add(size) > self.weight_budget {
+            self.prune_weights();
+        }
         let started = Instant::now();
         let data = bytemuck::cast_slice(source);
         let buffer = device
@@ -128,7 +131,7 @@ impl Cache {
         device: &Device,
         kernel: Kernel,
         activity: &mut Activity,
-    ) -> ComputePipeline {
+    ) -> (ComputePipeline, BindGroupLayout) {
         if let Some(pipeline) = self.pipelines.get(kernel.entry) {
             activity.pipeline_hits += 1;
             return pipeline.clone();
@@ -157,10 +160,12 @@ impl Cache {
                 },
                 cache: None,
             });
-        self.pipelines.insert(kernel.entry, pipeline.clone());
+        let layout = pipeline.get_bind_group_layout(0);
+        self.pipelines
+            .insert(kernel.entry, (pipeline.clone(), layout.clone()));
         activity.pipeline_misses += 1;
         activity.pipeline_build_ms += started.elapsed().as_secs_f64() * 1000.0;
-        pipeline
+        (pipeline, layout)
     }
 
     pub(super) fn buffer(&mut self, device: &Device, bytes: u64, usage: BufferUsages) -> Buffer {

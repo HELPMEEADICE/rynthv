@@ -1,3 +1,5 @@
+import { set_wasm_module } from "./browser.js";
+
 const status = document.querySelector("#status");
 const canvas = document.querySelector("#editor");
 
@@ -9,8 +11,12 @@ async function start() {
     if (!navigator.storage?.getDirectory || !globalThis.indexedDB) {
         throw new Error("需要浏览器的 OPFS 和 IndexedDB 存储权限。");
     }
-    const { default: init, BrowserEditor } = await import("./rynthv.js");
-    await init();
+    const [module, { default: init, BrowserEditor }] = await Promise.all([
+        WebAssembly.compileStreaming(fetch(new URL("./rynthv_bg.wasm", import.meta.url))),
+        import("./rynthv.js"),
+    ]);
+    set_wasm_module(module);
+    await init({ module_or_path: module });
     const editor = new BrowserEditor();
     await editor.start(canvas);
     status.remove();

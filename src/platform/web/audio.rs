@@ -1,11 +1,11 @@
-use js_sys::{Float32Array, Float64Array, Uint16Array};
+use js_sys::{Float32Array, Float64Array, Uint32Array};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(raw_module = "./audio.js")]
 extern "C" {
     pub fn install_audio(canvas: &web_sys::HtmlCanvasElement);
     pub fn audio_reset();
-    pub fn audio_pcm(seconds: f64, pcm: Float32Array, final_mix: bool);
+    pub fn audio_block(index: usize, pcm: Option<Float32Array>);
     pub fn audio_end(seconds: f64);
     pub fn audio_transport(playing: bool, seconds: f64);
     pub fn audio_loop(start: f64, end: f64);
@@ -13,15 +13,16 @@ extern "C" {
     pub fn audio_error() -> Option<String>;
     fn audio_note(samples: Option<Float32Array>);
     fn audio_clicks(times: Float64Array, strong: Float32Array, weak: Float32Array);
-    fn audio_schedule(boundaries: Float64Array, counts: Uint16Array, wait_for_mix: bool);
+    fn audio_layout(frames: usize, occupied: Uint32Array);
 }
 
-pub fn schedule(boundaries: &[f64], counts: &[u16], wait_for_mix: bool) {
-    audio_schedule(
-        Float64Array::from(boundaries),
-        Uint16Array::from(counts),
-        wait_for_mix,
-    );
+pub fn layout(frames: usize, occupied: &[[usize; 2]]) {
+    let occupied = occupied
+        .iter()
+        .flatten()
+        .map(|&block| block as u32)
+        .collect::<Vec<_>>();
+    audio_layout(frames, Uint32Array::from(occupied.as_slice()));
 }
 
 pub fn metronome(times: &[f64]) {

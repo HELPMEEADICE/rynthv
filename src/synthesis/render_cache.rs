@@ -8,7 +8,7 @@ mod types;
 pub use types::*;
 
 use super::{
-    plan::{OwnerId, OwnerInput, OwnerOutputControls, OwnerRequest, RenderPlan},
+    plan::{OwnerId, OwnerOutputControls, OwnerRequest, RenderPlan},
     rendered::RenderedClip,
 };
 use std::{collections::BTreeMap, sync::Arc};
@@ -61,6 +61,8 @@ impl Owner {
 #[derive(Default)]
 pub struct RenderCache {
     owners: BTreeMap<OwnerId, Owner>,
+    #[cfg(target_arch = "wasm32")]
+    parked: BTreeMap<OwnerId, Arc<CompletedOwner>>,
     generation: u64,
     next_serial: u64,
     publication_revision: u64,
@@ -98,10 +100,13 @@ impl RenderCache {
                     old
                 }
                 old => {
-                    let reused = old
-                        .as_ref()
-                        .and_then(|old| committed_matching(old, &request.input));
                     let committed = old.as_ref().and_then(|old| old.committed.clone());
+                    #[cfg(target_arch = "wasm32")]
+                    let committed = committed.or_else(|| self.parked.remove(&id));
+                    let reused = committed
+                        .as_ref()
+                        .filter(|clip| clip.input == request.input)
+                        .map(|clip| Arc::clone(&clip.clip));
                     if let Some(old) = old {
                         old.cancel();
                         update.withdrawn.insert(id, old.request.coverage);
@@ -128,6 +133,10 @@ impl RenderCache {
             old.cancel();
             update.withdrawn.insert(id, old.request.coverage);
             update.publication_changed |= matches!(old.state, State::Ready);
+            #[cfg(target_arch = "wasm32")]
+            if let Some(committed) = old.committed {
+                self.parked.insert(id, committed);
+            }
         }
         if update.publication_changed {
             self.advance_publication();
@@ -142,6 +151,8 @@ impl RenderCache {
             owner.cancel();
         }
         self.owners.clear();
+        #[cfg(target_arch = "wasm32")]
+        self.parked.clear();
         self.reuse_pending = false;
         self.generation = self
             .generation
@@ -164,9 +175,4 @@ impl Drop for RenderCache {
             owner.cancel();
         }
     }
-}
-
-fn committed_matching(owner: &Owner, input: &OwnerInput) -> Option<Arc<RenderedClip>> {
-    let committed = owner.committed.as_ref()?;
-    (*committed.input == *input).then(|| Arc::clone(&committed.clip))
 }

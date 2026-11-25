@@ -228,7 +228,12 @@ pub(super) fn accelerate(
         }
         return Ok(false);
     }
-    if session.0.requested == Backend::Auto && work < min_auto_work {
+    let use_threshold = session.0.requested == Backend::Auto
+        || (cfg!(target_arch = "wasm32")
+            && session.0.requested == Backend::WebGpu
+            && work < min_auto_work
+            && session.0.activity.lock().unwrap().completed_gpu_submissions > 0);
+    if use_threshold && work < min_auto_work {
         if let Some(operator) = operator {
             session.record_cpu(operator, "below GPU scheduling threshold");
         }

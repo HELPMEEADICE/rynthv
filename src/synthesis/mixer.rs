@@ -4,9 +4,15 @@
 
 #[cfg(feature = "gui")]
 mod live;
+#[cfg(target_arch = "wasm32")]
+mod preview;
 mod recordings;
+#[cfg(any(feature = "gui", target_arch = "wasm32"))]
+mod spans;
 #[cfg(feature = "gui")]
 pub(crate) use live::LiveMixer;
+#[cfg(target_arch = "wasm32")]
+pub(crate) use preview::{PreviewMixer, PreviewSource, block_at};
 #[cfg(feature = "gui")]
 pub(crate) use recordings::RecordingMix;
 pub(crate) use recordings::recordings;
@@ -156,23 +162,28 @@ pub(crate) fn mix_with_recordings(
         let destination = &mut samples[(start - range.start) * 2..(end - range.start) * 2];
         let first = (start - span.output_start) * span.channels;
         let last = (end - span.output_start) * span.channels;
-        for (index, (input, output)) in span.samples[first..last]
-            .chunks_exact(span.channels)
-            .zip(destination.as_chunks_mut::<2>().0)
-            .enumerate()
+        for (input, output) in span.samples[first..last]
+            .chunks(65_536 * span.channels)
+            .zip(destination.chunks_mut(65_536 * 2))
         {
-            if index.is_multiple_of(65_536) {
-                super::execution::checkpoint().map_err(|error| error.to_string())?;
-            }
-            let right = input[span.channels - 1];
-            output[0] = (f64::from(output[0]) + f64::from(input[0]) * span.left) as f32;
-            output[1] = (f64::from(output[1]) + f64::from(right) * span.right) as f32;
+            super::execution::checkpoint().map_err(|error| error.to_string())?;
+            mix_samples(input, span.channels, output, span.left, span.right);
         }
     }
     RenderedAudio::new(NATIVE_SAMPLE_RATE, 0.0, ChannelLayout::Stereo, samples)
         .map(Arc::new)
         .map(Some)
         .map_err(|error| format!("混音输出无效：{error}"))
+}
+
+fn mix_samples(input: &[f32], channels: usize, output: &mut [f32], left: f64, right: f64) {
+    for (input, output) in input
+        .chunks_exact(channels)
+        .zip(output.as_chunks_mut::<2>().0)
+    {
+        output[0] = (f64::from(output[0]) + f64::from(input[0]) * left) as f32;
+        output[1] = (f64::from(output[1]) + f64::from(input[channels - 1]) * right) as f32;
+    }
 }
 
 fn visit_audible_owners<'a>(
@@ -307,38 +318,9 @@ fn native_bound(project_sample: i64, project_rate: u32) -> Result<usize, String>
     usize::try_from(frame).map_err(|_| "音符组覆盖范围超出地址范围".into())
 }
 
-#[cfg(target_arch = "wasm32")]
-pub(crate) fn preview_chunk(
-    audio: RenderedAudio,
-    coverage: super::plan::Coverage,
-    output: &super::plan::OwnerOutputControls,
-) -> Result<Option<RenderedAudio>, String> {
-    let controls = Controls::read(&output.mixer)?;
-    if controls.mute || output.reference_muted {
-        return Ok(None);
-    }
-    let start = native_bound(coverage.sample_start.0, coverage.sample_rate)?;
-    let end = native_bound(coverage.sample_end.0, coverage.sample_rate)?;
-    let origin = (audio.start_seconds() * f64::from(NATIVE_SAMPLE_RATE)).round() as i64;
-    let first = (start as i64 - origin).max(0) as usize;
-    let last = (end as i64 - origin).clamp(0, audio.frames() as i64) as usize;
-    if first >= last {
-        return Ok(None);
-    }
-    let (left, right) = controls.gains(audio.layout());
-    let channels = audio.layout().channels();
-    let samples = audio.samples()[first * channels..last * channels]
-        .chunks_exact(channels)
-        .flat_map(|frame| [frame[0] * left as f32, frame[channels - 1] * right as f32])
-        .collect();
-    RenderedAudio::new(
-        NATIVE_SAMPLE_RATE,
-        (origin + first as i64) as f64 / f64::from(NATIVE_SAMPLE_RATE),
-        ChannelLayout::Stereo,
-        samples,
-    )
-    .map(Some)
-    .map_err(|error| error.to_string())
+#[cfg(any(feature = "gui", target_arch = "wasm32"))]
+fn intersection(left: &Range<usize>, right: &Range<usize>) -> Range<usize> {
+    left.start.max(right.start)..left.end.min(right.end)
 }
 
 impl Controls {

@@ -29,7 +29,11 @@ impl FrameQueue {
         if input.channels != self.channels {
             return Err(VoiceError::new("Vocoder queue channel count changed"));
         }
-        self.values.extend(input.values);
+        if self.values.is_empty() {
+            self.values = input.values.into();
+        } else {
+            self.values.extend(input.values);
+        }
         Ok(())
     }
 
@@ -37,11 +41,12 @@ impl FrameQueue {
         if frames > self.frames() {
             return Err(VoiceError::new("Vocoder queue has insufficient frames"));
         }
-        Sequence::new(
-            frames,
-            self.channels,
-            self.values.drain(..frames * self.channels).collect(),
-        )
+        let values = if frames == self.frames() {
+            std::mem::take(&mut self.values).into()
+        } else {
+            self.values.drain(..frames * self.channels).collect()
+        };
+        Sequence::new(frames, self.channels, values)
     }
 }
 

@@ -18,7 +18,7 @@ use crate::synthesis::{
 use serde::Serialize;
 use web_time::Instant;
 
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Default, Serialize, serde::Deserialize)]
 /// Accumulated stage wall times. Progressive timbre/vocoder execution may
 /// overlap on separate threads, so these fields must not be summed to obtain
 /// render latency; measure the complete call separately.

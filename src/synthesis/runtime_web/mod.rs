@@ -21,7 +21,7 @@ use super::{
 use crate::platform::web::{
     audio,
     client::Pending,
-    protocol::{ComputeDiagnostics, Inventory},
+    protocol::{ComputeDiagnostics, Export, ExportMetrics, Inventory},
 };
 use std::{collections::BTreeMap, path::PathBuf, time::Duration};
 
@@ -51,7 +51,8 @@ pub struct Runtime {
     preview: preview::State,
     transport: transport::State,
     diagnostics: Option<ComputeDiagnostics>,
-    export: Option<Pending<Vec<PathBuf>>>,
+    export: Option<Pending<Export>>,
+    pub export_metrics: Option<ExportMetrics>,
 }
 
 impl Runtime {
@@ -76,6 +77,7 @@ impl Runtime {
             transport: transport::State::default(),
             diagnostics: None,
             export: None,
+            export_metrics: None,
         }
     }
 
@@ -85,7 +87,11 @@ impl Runtime {
         self.poll_inventories();
         self.poll_preview();
         if let Some(result) = self.export.as_ref().and_then(Pending::poll) {
-            self.export_result = Some(result);
+            self.export_result = Some(result.map(|export| {
+                self.export_metrics = Some(export.metrics);
+                self.diagnostics = Some(export.diagnostics);
+                export.paths
+            }));
             self.export = None;
         }
     }
@@ -128,6 +134,7 @@ impl Runtime {
             task.cancel();
         }
         self.export_result = None;
+        self.export_metrics = None;
         audio::audio_transport(false, 0.0);
         audio::audio_loop(0.0, 0.0);
     }
@@ -154,10 +161,12 @@ impl Runtime {
     pub fn status(&self) -> &'static str {
         if self.library.is_scanning() {
             "正在扫描浏览器声库"
-        } else if !self.voice_jobs.is_empty() {
-            "正在加载声库"
         } else if self.stats.running > 0 || self.stats.queued > 0 {
             "正在合成歌声"
+        } else if self.preview.is_pending() {
+            "正在准备预览"
+        } else if !self.voice_jobs.is_empty() {
+            "正在加载声库"
         } else if self.error.is_some() {
             "歌声合成失败 · 查看渲染面板"
         } else if self.preview.duration.is_some() {

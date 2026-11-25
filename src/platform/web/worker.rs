@@ -15,13 +15,15 @@ use crate::synthesis::{offline::Offline, settings::SynthesisSettings};
 use js_sys::{Float32Array, Promise};
 use serde::Serialize;
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
     },
+    time::Duration,
 };
 use wasm_bindgen::prelude::*;
+use web_time::Instant;
 
 #[wasm_bindgen(raw_module = "./worker-bridge.js")]
 extern "C" {
@@ -38,6 +40,8 @@ struct Worker {
 thread_local! {
     static WORKER: RefCell<Worker> = RefCell::default();
     static CANCELLATION: RefCell<Option<Arc<AtomicBool>>> = const { RefCell::new(None) };
+    static DEMAND: Cell<f64> = const { Cell::new(0.0) };
+    static LAST_YIELD: Cell<Option<Instant>> = const { Cell::new(None) };
 }
 
 #[wasm_bindgen]
@@ -49,12 +53,35 @@ pub fn cancel_worker_request() {
     });
 }
 
+#[wasm_bindgen]
+pub fn prioritize_worker_preview(seconds: f64) {
+    if seconds.is_finite() {
+        DEMAND.set(seconds.max(0.0));
+    }
+}
+
+fn preview_demand() -> f64 {
+    DEMAND.get()
+}
+
 #[wasm_bindgen(jspi)]
-pub fn run_worker_request(request: &str) -> Result<String, JsError> {
-    let request: Request = serde_json::from_str(request)?;
+pub fn run_worker_request(request: &str, position: Option<f64>) -> Result<String, JsError> {
+    let mut request: Request = serde_json::from_str(request)?;
+    if let (
+        Request::Preview {
+            position: initial, ..
+        },
+        Some(position),
+    ) = (&mut request, position)
+    {
+        *initial = position;
+    }
     let cancelled = Arc::new(AtomicBool::new(false));
     CANCELLATION.with(|value| value.replace(Some(Arc::clone(&cancelled))));
-    let result = WORKER.with_borrow_mut(|worker| worker.run(request, cancelled));
+    LAST_YIELD.set(Some(Instant::now()));
+    let result = crate::synthesis::execution::with_event_pump(pump_events, || {
+        WORKER.with_borrow_mut(|worker| worker.run(request, cancelled))
+    });
     CANCELLATION.with(|value| value.take());
     result.map_err(|error| JsError::new(&error))
 }
@@ -100,7 +127,8 @@ impl Worker {
                 json(&())
             }
             Request::Preview { project, position } => {
-                self.render(&project, Some(position), cancelled)
+                prioritize_worker_preview(position);
+                self.render(&project, Some(preview_demand), cancelled)
             }
             Request::Export { project } => self.render(&project, None, cancelled),
         }
@@ -128,4 +156,14 @@ fn yield_events() -> Result<(), String> {
     wasm_bindgen_futures::jspi_block_on_promise(&yield_worker())
         .map(drop)
         .map_err(js_error)
+}
+
+fn pump_events() {
+    if LAST_YIELD
+        .get()
+        .is_some_and(|last| last.elapsed() >= Duration::from_millis(16))
+    {
+        let _ = yield_events();
+        LAST_YIELD.set(Some(Instant::now()));
+    }
 }

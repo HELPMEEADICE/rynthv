@@ -1,4 +1,4 @@
-import init, { cancel_worker_request, run_worker_request } from "./rynthv.js";
+import init, { cancel_worker_request, prioritize_worker_preview, run_worker_request } from "./rynthv.js";
 import { setActive } from "./worker-bridge.js";
 
 let ready;
@@ -12,11 +12,11 @@ async function drain() {
     const { id, request, writes } = active;
     setActive(id);
     try {
-        await (ready ??= init());
+        await ready;
         const run = () => {
             if (active.cancelled) throw new Error("CANCELLED");
             active.started = true;
-            return run_worker_request(request);
+            return run_worker_request(request, active.seconds);
         };
         const result = await (navigator.locks
             ? navigator.locks.request("rynthv-resources", { mode: writes ? "exclusive" : "shared" }, run)
@@ -31,6 +31,21 @@ async function drain() {
 }
 
 self.onmessage = ({ data }) => {
+    if (data.module) {
+        ready = init({ module_or_path: data.module });
+        void ready.catch(() => {});
+        return;
+    }
+    if (data.demand !== undefined) {
+        if (active?.id === data.demand) {
+            active.seconds = data.seconds;
+            if (active.started) prioritize_worker_preview(data.seconds);
+        } else {
+            const queued = queue.find(item => item.id === data.demand);
+            if (queued) queued.seconds = data.seconds;
+        }
+        return;
+    }
     if (data.cancel !== undefined) {
         if (active?.id === data.cancel) {
             active.cancelled = true;
@@ -43,10 +58,16 @@ self.onmessage = ({ data }) => {
         }
         return;
     }
-    if (queue.length >= maxPending) {
+    if (queue.length >= maxPending && !data.preview) {
         self.postMessage({ id: data.id, error: "浏览器合成队列已满，请等待当前任务完成。" });
         return;
     }
-    queue.push(data);
+    if (data.preview) {
+        // Keep resource writes ordered while moving previews ahead of queued readers.
+        const index = queue.findLastIndex(item => item.writes || item.preview) + 1;
+        queue.splice(index, 0, data);
+    } else {
+        queue.push(data);
+    }
     void drain();
 };

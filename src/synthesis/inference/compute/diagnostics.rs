@@ -6,6 +6,7 @@ use std::collections::BTreeMap;
 pub struct Activity {
     pub gpu_submissions: u64,
     pub completed_gpu_submissions: u64,
+    pub submit_ms: f64,
     pub gpu_dispatches: BTreeMap<&'static str, u64>,
     pub cpu_operators: BTreeMap<&'static str, BTreeMap<&'static str, u64>>,
     pub upload_count: u64,
@@ -30,6 +31,7 @@ impl Activity {
     pub(super) fn merge(&mut self, other: &Self) {
         self.gpu_submissions += other.gpu_submissions;
         self.completed_gpu_submissions += other.completed_gpu_submissions;
+        self.submit_ms += other.submit_ms;
         if other.gpu_submissions != 0 {
             for (name, count) in &other.gpu_dispatches {
                 *self.gpu_dispatches.entry(name).or_default() += count;

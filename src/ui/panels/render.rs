@@ -85,6 +85,12 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
         }
         #[cfg(target_arch = "wasm32")]
         if let Some(Ok(paths)) = &app.synthesis.export_result {
+            if let Some(metrics) = &app.synthesis.export_metrics {
+                ui.weak(format!(
+                    "Worker {:.0} ms · 渲染 {:.0} ms · 混音 {:.0} ms · WAV 转换和写入 {:.0} ms",
+                    metrics.worker_ms, metrics.render_ms, metrics.mix_ms, metrics.wav_ms,
+                ));
+            }
             for path in paths {
                 if ui
                     .button(format!(

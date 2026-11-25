@@ -7,7 +7,9 @@ use crate::{
         protocol::{Event, Preview, Request, Visuals},
     },
     synthesis::{
+        offline::PreviewMetrics,
         plan::OwnerId,
+        render_cache::CacheStats,
         rendered::{PhonemeSnapshot, RenderVisuals, VisualSnapshot, Waveform},
     },
 };
@@ -29,13 +31,18 @@ pub(super) struct State {
     audio_generation: u64,
     dirty: bool,
     ready_at: Option<Instant>,
+    requested_at: Option<Instant>,
     task: Option<Task>,
+    pub(super) end_to_first_block_ms: Option<f64>,
+    pub(super) metrics: Option<PreviewMetrics>,
 }
 
 struct Task {
     pending: Pending<Preview>,
     current: Rc<Cell<bool>>,
     progress: Rc<RefCell<Option<String>>>,
+    counts: Rc<Cell<Option<CacheStats>>>,
+    first_block_ms: Rc<Cell<Option<f64>>>,
     visuals: Rc<RefCell<Vec<(Visuals, Float32Array)>>>,
 }
 
@@ -50,10 +57,7 @@ impl State {
 
 impl Runtime {
     pub fn sync_project(&mut self, project: &Project, revision: u64) {
-        if self.preview.revision == Some(revision)
-            && self.preview.audio_generation == self.instrumentals.generation
-            && !self.preview.dirty
-        {
+        if self.preview.revision == Some(revision) && !self.preview.dirty {
             return;
         }
         if self.preview.revision != Some(revision) {
@@ -61,8 +65,6 @@ impl Runtime {
         }
         self.preview.revision = Some(revision);
         self.preview.dirty = false;
-        self.instrumentals.reconcile(project, &self.repaint);
-        self.preview.audio_generation = self.instrumentals.generation;
         let mut required = BTreeSet::new();
         let mut identities = BTreeMap::new();
         let mut failures = Vec::new();
@@ -71,9 +73,7 @@ impl Runtime {
                 let owner = OwnerId(reference.id);
                 match self.resolve_voice(track, reference) {
                     Ok(Some(key)) => {
-                        if let Some(inventory) = self.inventory(&key) {
-                            identities.insert(owner, inventory.content_hash.clone());
-                        }
+                        identities.insert(owner, format!("{}:{}", key.revision, key.database_id));
                         if let Some(error) = self.voice_error(&key) {
                             failures.push((owner, error.into()));
                         }
@@ -93,9 +93,6 @@ impl Runtime {
                 false
             }
         });
-        for key in required {
-            self.inventory_request(key);
-        }
         self.planner
             .update(project, revision, |owner| identities.get(&owner).cloned());
         self.visuals
@@ -103,14 +100,12 @@ impl Runtime {
         self.phonemes
             .retain(|owner, _| self.planner.plan().requests.contains_key(owner));
         self.failures = failures;
-        self.recording_error = project
-            .tracks
-            .iter()
-            .filter_map(|track| track.audio_clip())
-            .find_map(|clip| self.instrumentals.error(&clip.path).map(str::to_owned));
+        self.refresh_recording_error();
         self.invalidate_preview();
-        self.preview.ready_at = Some(Instant::now() + Duration::from_millis(180));
-        self.stats.queued = 1;
+        let now = Instant::now();
+        self.preview.requested_at = Some(now);
+        let delay = if self.transport.playing { 24 } else { 90 };
+        self.preview.ready_at = Some(now + Duration::from_millis(delay));
         self.publish_metronome();
     }
 
@@ -121,6 +116,9 @@ impl Runtime {
         }
         self.preview.duration = None;
         self.preview.ready_at = None;
+        self.preview.requested_at = None;
+        self.preview.metrics = None;
+        self.preview.end_to_first_block_ms = None;
         self.stats = Default::default();
         self.error = None;
         self.progress = None;
@@ -128,7 +126,17 @@ impl Runtime {
     }
 
     pub(super) fn poll_preview(&mut self) {
+        if self.preview.audio_generation != self.instrumentals.generation {
+            self.preview.audio_generation = self.instrumentals.generation;
+            self.refresh_recording_error();
+        }
         if let Some(task) = self.preview.task.as_ref() {
+            if let Some(counts) = task.counts.take() {
+                self.stats = counts;
+            }
+            if let Some(first) = task.first_block_ms.take() {
+                self.preview.end_to_first_block_ms = Some(first);
+            }
             if let Some(progress) = task.progress.borrow_mut().take() {
                 self.progress = Some(progress);
             }
@@ -143,14 +151,15 @@ impl Runtime {
                 self.progress = None;
                 match result {
                     Ok(result) => {
-                        self.preview.duration = result.duration;
-                        self.stats.ready = result.rendered + result.reused;
+                        self.preview.duration = result.metrics.duration;
+                        self.error = result.metrics.error.clone();
                         self.stats.current_render_bytes = result.cache_bytes;
                         self.diagnostics = Some(result.diagnostics);
-                        audio::audio_end(result.duration.unwrap_or(0.0));
+                        audio::audio_end(result.metrics.duration.unwrap_or(0.0));
+                        self.preview.metrics = Some(result.metrics);
                     }
                     Err(error) => {
-                        self.stats.failed = 1;
+                        self.stats.queued = 0;
                         self.error = Some(error);
                         audio::audio_end(0.0);
                     }
@@ -161,7 +170,6 @@ impl Runtime {
         if self.preview.dirty
             || self.preview.ready_at.is_none_or(|at| at > Instant::now())
             || self.library.is_scanning()
-            || !self.voice_jobs.is_empty()
             || self.is_exporting()
         {
             return;
@@ -171,7 +179,6 @@ impl Runtime {
         let Some(project) = self.preview.project.as_ref() else {
             return;
         };
-        self.publish_audio_schedule(project);
         let serialized = match serde_json::to_string(project) {
             Ok(project) => project,
             Err(error) => {
@@ -181,8 +188,16 @@ impl Runtime {
         };
         let current = Rc::new(Cell::new(true));
         let progress = Rc::new(RefCell::new(None));
+        let counts = Rc::new(Cell::new(None));
+        let first_block_ms = Rc::new(Cell::new(None));
         let visuals = Rc::new(RefCell::new(Vec::new()));
         let (live, messages, patches) = (current.clone(), progress.clone(), visuals.clone());
+        let (groups, first_block) = (counts.clone(), first_block_ms.clone());
+        let requested_at = self
+            .preview
+            .requested_at
+            .take()
+            .unwrap_or_else(Instant::now);
         let repaint = self.repaint.clone();
         let pending = submit(
             Request::Preview {
@@ -199,10 +214,20 @@ impl Runtime {
                         messages.replace(Some(stage));
                         repaint.wake();
                     }
-                    (Event::Chunk { origin, .. }, Some(pcm)) => {
-                        audio::audio_pcm(origin, pcm, false)
+                    (Event::Counts(counts), _) => {
+                        groups.set(Some(counts));
+                        repaint.wake();
                     }
-                    (Event::Mix { origin }, Some(pcm)) => audio::audio_pcm(origin, pcm, true),
+                    (Event::Layout { frames, occupied }, _) => {
+                        audio::layout(frames, &occupied);
+                    }
+                    (Event::Block { index, first }, pcm) => {
+                        if first {
+                            first_block.set(Some(requested_at.elapsed().as_secs_f64() * 1000.0));
+                            repaint.wake();
+                        }
+                        audio::audio_block(index, pcm);
+                    }
                     (Event::Visuals(visual), Some(pcm)) => {
                         patches.borrow_mut().push((*visual, pcm));
                         repaint.wake();
@@ -211,52 +236,82 @@ impl Runtime {
                 }
             },
         );
-        self.stats.running = 1;
         self.preview.task = Some(Task {
             pending,
             current,
             progress,
+            counts,
+            first_block_ms,
             visuals,
         });
-    }
-
-    fn publish_audio_schedule(&self, project: &Project) {
-        let plan = self.planner.plan();
-        let solo = super::super::mixer::solo_tracks(project).unwrap_or_default();
-        let mut changes = BTreeMap::<i64, i32>::new();
-        for (owner, request) in &plan.requests {
-            let controls = &plan.output_controls[owner];
-            if request.input.voice.model_content_identity.is_none()
-                || controls.reference_muted
-                || controls
-                    .mixer
-                    .get("mute")
-                    .and_then(serde_json::Value::as_bool)
-                    == Some(true)
-                || (!solo.is_empty() && !solo.contains(&controls.track_id))
-            {
-                continue;
-            }
-            let coverage = request.coverage;
-            let frame = |sample: i64| {
-                (sample.max(0) as f64 * 48_000.0 / f64::from(coverage.sample_rate)).ceil() as i64
-            };
-            *changes.entry(frame(coverage.sample_start.0)).or_default() += 1;
-            *changes.entry(frame(coverage.sample_end.0)).or_default() -= 1;
-        }
-        let mut count = 0;
-        let (boundaries, counts): (Vec<_>, Vec<_>) = changes
-            .into_iter()
-            .map(|(frame, delta)| {
-                count += delta;
-                (frame as f64, count.clamp(0, i32::from(u16::MAX)) as u16)
-            })
-            .unzip();
-        let has_recordings = project
+        self.instrumentals.reconcile(project, &self.repaint);
+        let runtime = &*self;
+        let required: BTreeSet<_> = project
             .tracks
             .iter()
-            .any(|track| track.audio_clip().is_some());
-        audio::schedule(&boundaries, &counts, has_recordings);
+            .flat_map(|track| {
+                track.references().filter_map(move |reference| {
+                    runtime.resolve_voice(track, reference).ok().flatten()
+                })
+            })
+            .collect();
+        for key in required {
+            self.inventory_request(key);
+        }
+    }
+
+    pub(super) fn prioritize_preview(&mut self, seconds: f64, immediate: bool) {
+        if let Some(task) = &self.preview.task {
+            task.pending.prioritize(seconds);
+        } else if immediate && self.preview.ready_at.is_some() {
+            self.preview.ready_at = Some(Instant::now());
+            self.repaint.wake();
+        }
+    }
+
+    pub(super) fn refresh_voice_failures(&mut self) {
+        if let Some(project) = &self.preview.project {
+            self.failures = project
+                .tracks
+                .iter()
+                .flat_map(|track| track.references().map(move |reference| (track, reference)))
+                .filter_map(|(track, reference)| {
+                    let error = match self.resolve_voice(track, reference) {
+                        Ok(Some(key)) => self.voice_error(&key).map(str::to_owned),
+                        Ok(None) => None,
+                        Err(error) => Some(error),
+                    };
+                    error.map(|error| (OwnerId(reference.id), error))
+                })
+                .collect();
+        }
+    }
+
+    fn refresh_recording_error(&mut self) {
+        let previous = self.recording_error.take();
+        self.recording_error = self
+            .preview
+            .project
+            .as_ref()
+            .into_iter()
+            .flat_map(|project| project.tracks.iter().filter_map(|track| track.audio_clip()))
+            .find_map(|clip| self.instrumentals.error(&clip.path).map(str::to_owned));
+        if previous.is_some()
+            && self.recording_error.is_none()
+            && self
+                .error
+                .as_deref()
+                .is_some_and(|error| error.starts_with("AUDIO_RESOURCE:"))
+        {
+            self.preview.resync();
+        }
+    }
+
+    pub fn preview_timing(&self) -> (Option<f64>, Option<&PreviewMetrics>) {
+        (
+            self.preview.end_to_first_block_ms,
+            self.preview.metrics.as_ref(),
+        )
     }
 
     fn publish_visuals(&mut self, mut visual: Visuals, peaks: Float32Array) {
@@ -353,6 +408,7 @@ impl Runtime {
             }
         };
         self.export_result = None;
+        self.export_metrics = None;
         self.export = Some(submit(
             Request::Export { project },
             self.repaint.clone(),

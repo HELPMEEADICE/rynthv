@@ -13,8 +13,8 @@ pub fn render_status(app: &mut App, ui: &mut Ui) {
     }
     let stats = app.synthesis.stats;
     ui.label(format!(
-        "已完成 {} 组 · 等待 {} 组 · 失败 {} 组",
-        stats.ready, stats.queued, stats.failed
+        "已完成 {} 组 · 处理中 {} 组 · 等待 {} 组 · 失败 {} 组",
+        stats.ready, stats.running, stats.queued, stats.failed
     ));
     if let Some(error) = &app.synthesis.error {
         ui.colored_label(Color32::from_rgb(218, 142, 126), error);
@@ -49,6 +49,37 @@ pub fn render_status(app: &mut App, ui: &mut Ui) {
     ui.add_space(10.0);
     if let Some(duration) = app.synthesis.audio_duration() {
         ui.label(format!("当前混音 {:.2} 秒 · 48 kHz · 立体声", duration));
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        let (first, metrics) = app.synthesis.preview_timing();
+        if first.is_some() || metrics.is_some() {
+            ui.collapsing("预览耗时", |ui| {
+                if let Some(first) = first {
+                    ui.label(format!("请求至首个就绪 PCM 块 {first:.0} ms"));
+                }
+                if let Some(metrics) = metrics {
+                    if let Some(first) = metrics.first_block_ms {
+                        ui.label(format!("Worker 至首块 {first:.0} ms"));
+                    }
+                    ui.label(format!(
+                        "Worker 完成 {:.0} ms · 区间混音 {:.0} ms",
+                        metrics.worker_ms, metrics.mix_ms
+                    ));
+                    ui.label(format!(
+                        "声库读取 {:.0} ms · 模型准备 {:.0} ms · 伴奏读取 {:.0} ms",
+                        metrics.voice_load_ms, metrics.model_prepare_ms, metrics.recording_ms
+                    ));
+                    ui.label(format!(
+                        "时长 {:.0} ms · 音高 {:.0} ms · 音色 {:.0} ms · 声码器 {:.0} ms",
+                        metrics.stages.duration_ms,
+                        metrics.stages.pitch_ms,
+                        metrics.stages.timbre_ms,
+                        metrics.stages.vocoder_ms
+                    ));
+                }
+            });
+        }
     }
     ui.collapsing("合成计划", |ui| {
         let summary = app.synthesis.planner.summary();

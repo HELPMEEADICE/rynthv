@@ -60,16 +60,20 @@ pub(super) fn settings(app: &mut App, ui: &mut Ui) {
                 .and_then(serde_json::Value::as_u64)
                 .unwrap_or_default()
         };
-        let ms = diagnostics
-            .activity
-            .get("readback_ms")
-            .and_then(serde_json::Value::as_f64)
-            .unwrap_or_default();
+        let milliseconds = |key| {
+            diagnostics
+                .activity
+                .get(key)
+                .and_then(serde_json::Value::as_f64)
+                .unwrap_or_default()
+        };
         ui.weak(format!(
-            "GPU 提交 {}/{} 次 · 回读 {} 次／{ms:.1} ms",
+            "GPU 提交 {}/{} 次／{:.1} ms · 回读 {} 次／{:.1} ms",
             count("completed_gpu_submissions"),
             count("gpu_submissions"),
+            milliseconds("submit_ms"),
             count("readback_count"),
+            milliseconds("readback_ms"),
         ));
         ui.collapsing("算子与缓存诊断", |ui| {
             for key in [

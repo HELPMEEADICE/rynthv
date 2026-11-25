@@ -1,6 +1,6 @@
-use super::{Worker, event, fs, json, yield_events};
+use super::{Worker, event, fs, json, pump_events, yield_events};
 use crate::{
-    platform::web::protocol::{Event, Preview, Visuals},
+    platform::web::protocol::{Event, Export, ExportMetrics, Preview, Visuals},
     synthesis::{
         audio,
         execution::{self, Cancellation},
@@ -11,7 +11,6 @@ use crate::{
 use std::{
     path::PathBuf,
     sync::{Arc, atomic::AtomicBool},
-    time::Duration,
 };
 use web_time::Instant;
 
@@ -19,9 +18,10 @@ impl Worker {
     pub(super) fn render(
         &mut self,
         project: &str,
-        preview: Option<f64>,
+        preview: Option<fn() -> f64>,
         cancelled: Arc<AtomicBool>,
     ) -> Result<String, String> {
+        let started = Instant::now();
         let project = crate::storage::decode_project(project.as_bytes())?.project;
         let settings = self.settings().clone();
         let options = Options {
@@ -32,31 +32,41 @@ impl Worker {
             backend: settings.compute_backend,
             adapter: settings.compute_adapter.clone(),
             cache_bytes: 96 << 20,
-            preview_seconds: preview,
+            preview,
         };
-        let mut last_yield = Instant::now();
         let mut last_progress = String::new();
+        let mut first_worker_block_ms = None;
         let output = self.offline.render(
             &project,
             &settings,
             &options,
             Arc::clone(&cancelled),
             |progress| {
-                if last_yield.elapsed() >= Duration::from_millis(12) {
-                    let _ = yield_events();
-                    last_yield = Instant::now();
-                }
                 let stage = match progress {
+                    Progress::Checkpoint => {
+                        pump_events();
+                        return;
+                    }
                     Progress::VoiceLoaded { .. } => "声库已加载",
                     Progress::Stage { stage, .. } => stage.label(),
-                    Progress::Pcm { group, audio } => {
-                        event(
-                            Event::Chunk {
-                                group,
-                                origin: audio.start_seconds(),
-                            },
-                            Some(audio.samples()),
-                        );
+                    Progress::Phase(stage) => stage,
+                    Progress::Counts(stats) => {
+                        event(Event::Counts(stats), None);
+                        return;
+                    }
+                    Progress::Layout { frames, occupied } => {
+                        event(Event::Layout { frames, occupied }, None);
+                        return;
+                    }
+                    Progress::Block {
+                        index,
+                        samples,
+                        first,
+                    } => {
+                        if first {
+                            first_worker_block_ms = Some(started.elapsed().as_secs_f64() * 1000.0);
+                        }
+                        event(Event::Block { index, first }, samples.as_deref());
                         return;
                     }
                 };
@@ -69,12 +79,15 @@ impl Worker {
                     );
                     last_progress = stage.into();
                 }
+                pump_events();
             },
         )?;
         if preview.is_none() {
             let directory = PathBuf::from("/RynthV/exports").join(uuid::Uuid::new_v4().to_string());
             let request = ExportRequest::with_directory(&project, Some(directory.clone()))?;
             fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
+            let mut mix_ms = 0.0;
+            let mut wav_ms = 0.0;
             let export = execution::scope(
                 Cancellation::from_flag(cancelled),
                 || -> Result<Vec<PathBuf>, String> {
@@ -82,9 +95,14 @@ impl Worker {
                     for target in request.outputs {
                         yield_events()?;
                         execution::checkpoint().map_err(|error| error.to_string())?;
-                        if let Some(pcm) = output.mix_stem(target.track, target.stem)? {
+                        let mixing = Instant::now();
+                        let pcm = output.mix_stem(target.track, target.stem)?;
+                        mix_ms += mixing.elapsed().as_secs_f64() * 1000.0;
+                        if let Some(pcm) = pcm {
+                            let writing = Instant::now();
                             audio::save_wav_policy(&target.path, &pcm, request.format, false)
                                 .map_err(|error| error.to_string())?;
+                            wav_ms += writing.elapsed().as_secs_f64() * 1000.0;
                             paths.push(target.path);
                         }
                     }
@@ -97,10 +115,18 @@ impl Worker {
             if export.is_err() {
                 let _ = fs::remove_dir_all(&directory);
             }
-            return json(&export?);
+            return json(&Export {
+                paths: export?,
+                metrics: ExportMetrics {
+                    render_ms: output.report.elapsed_ms,
+                    mix_ms,
+                    wav_ms,
+                    worker_ms: started.elapsed().as_secs_f64() * 1000.0,
+                },
+                diagnostics: output.report.diagnostics.try_into()?,
+            });
         }
 
-        let mut duration = None;
         for owner in &output.report.owners {
             let data = &owner.owner.visuals;
             let origin = owner.owner.audio.start_seconds();
@@ -118,21 +144,11 @@ impl Worker {
                 Some(&peaks),
             );
         }
-        if let Some(mix) = output.mix(None)? {
-            duration = Some(mix.duration_seconds());
-            for (index, samples) in mix.samples().chunks(65_536 * 2).enumerate() {
-                event(
-                    Event::Mix {
-                        origin: mix.start_seconds() + (index * 65_536) as f64 / 48_000.0,
-                    },
-                    Some(samples),
-                );
-            }
-        }
+        let mut metrics = output.report.preview.expect("preview metrics");
+        metrics.first_block_ms = first_worker_block_ms;
+        metrics.worker_ms = started.elapsed().as_secs_f64() * 1000.0;
         json(&Preview {
-            duration,
-            rendered: output.report.rendered_owners,
-            reused: output.report.reused_owners,
+            metrics,
             cache_bytes: output.report.cache_bytes,
             diagnostics: output.report.diagnostics.try_into()?,
         })

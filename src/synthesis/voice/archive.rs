@@ -128,6 +128,8 @@ impl Archive {
     /// Validates every resource; later reads reuse the once result.
     pub fn verify_all(&self) -> Result<()> {
         for index in 0..self.resources.len() {
+            #[cfg(target_arch = "wasm32")]
+            crate::synthesis::execution::checkpoint()?;
             self.verify(index)?;
         }
         Ok(())

@@ -15,10 +15,17 @@ pub(super) struct Kernel {
     pub source: &'static str,
 }
 
+struct Dispatch {
+    pipeline: wgpu::ComputePipeline,
+    bindings: wgpu::BindGroup,
+    grid: [u32; 2],
+}
+
 pub(in super::super) struct Batch<'a> {
     device: &'a Device,
     encoder: Option<wgpu::CommandEncoder>,
     buffers: Vec<Buffer>,
+    dispatches: Vec<Dispatch>,
     activity: Activity,
     timestamps: Option<Timestamps>,
     scratch_bytes: u64,
@@ -37,6 +44,7 @@ impl<'a> Batch<'a> {
                     }),
             ),
             buffers: Vec::new(),
+            dispatches: Vec::new(),
             activity: Activity::default(),
             timestamps: timestamps.then(|| Timestamps::new(device)).flatten(),
             scratch_bytes: 0,
@@ -80,6 +88,7 @@ impl<'a> Batch<'a> {
         if len_floats == 0 {
             return;
         }
+        self.flush_dispatches();
         self.encoder.as_mut().unwrap().copy_buffer_to_buffer(
             source,
             0,
@@ -124,14 +133,14 @@ impl<'a> Batch<'a> {
         bindings: [Option<&Buffer>; 5],
     ) -> Result<(), MatrixError> {
         checkpoint(self.device)?;
-        let pipeline =
+        let (pipeline, layout) =
             self.device
                 .cache
                 .lock()
                 .unwrap()
                 .pipeline(self.device, kernel, &mut self.activity);
         let params = self.upload(bytemuck::bytes_of(&params), BufferUsages::UNIFORM);
-        let mut entries: Vec<_> = [0, 1, 2, 3, 5]
+        let mut entries: smallvec::SmallVec<[_; 6]> = [0, 1, 2, 3, 5]
             .into_iter()
             .zip(bindings)
             .filter_map(|(binding, buffer)| {
@@ -151,33 +160,61 @@ impl<'a> Batch<'a> {
             .raw
             .create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some(kernel.entry),
-                layout: &pipeline.get_bind_group_layout(0),
+                layout: &layout,
                 entries: &entries,
             });
+        if self.timestamps.is_some() {
+            self.flush_dispatches();
+        }
         let timestamp_writes = self
             .timestamps
             .as_mut()
             .and_then(|timestamps| timestamps.mark(kernel.entry));
-        if timestamp_writes.is_none() {
+        if let Some(timestamp_writes) = timestamp_writes {
+            let mut pass =
+                self.encoder
+                    .as_mut()
+                    .unwrap()
+                    .begin_compute_pass(&wgpu::ComputePassDescriptor {
+                        label: Some(kernel.entry),
+                        timestamp_writes: Some(timestamp_writes),
+                    });
+            pass.set_pipeline(&pipeline);
+            pass.set_bind_group(0, &bind_group, &[]);
+            pass.dispatch_workgroups(grid[0], grid[1], 1);
+        } else {
             self.activity.untimed_dispatches += 1;
+            self.dispatches.push(Dispatch {
+                pipeline,
+                bindings: bind_group,
+                grid,
+            });
         }
-        let mut pass =
-            self.encoder
-                .as_mut()
-                .unwrap()
-                .begin_compute_pass(&wgpu::ComputePassDescriptor {
-                    label: Some(kernel.entry),
-                    timestamp_writes,
-                });
-        pass.set_pipeline(&pipeline);
-        pass.set_bind_group(0, &bind_group, &[]);
-        pass.dispatch_workgroups(grid[0], grid[1], 1);
         *self
             .activity
             .gpu_dispatches
             .entry(kernel.entry)
             .or_default() += 1;
         Ok(())
+    }
+
+    fn flush_dispatches(&mut self) {
+        if self.dispatches.is_empty() {
+            return;
+        }
+        let mut pass =
+            self.encoder
+                .as_mut()
+                .unwrap()
+                .begin_compute_pass(&wgpu::ComputePassDescriptor {
+                    label: Some("RynthV inference"),
+                    timestamp_writes: None,
+                });
+        for dispatch in self.dispatches.drain(..) {
+            pass.set_pipeline(&dispatch.pipeline);
+            pass.set_bind_group(0, &dispatch.bindings, &[]);
+            pass.dispatch_workgroups(dispatch.grid[0], dispatch.grid[1], 1);
+        }
     }
 
     pub(super) fn read(&mut self, source: &Buffer, output: &mut [f32]) -> Result<(), MatrixError> {
@@ -191,6 +228,7 @@ impl<'a> Batch<'a> {
         output: &mut [f32],
     ) -> Result<(), MatrixError> {
         checkpoint(self.device)?;
+        self.flush_dispatches();
         let bytes = output.len() as u64 * 4;
         let mut encoder = self.encoder.take().unwrap();
         let offset = bytes.next_multiple_of(8);
@@ -215,12 +253,15 @@ impl<'a> Batch<'a> {
                 .unwrap()
                 .resolve(&mut encoder, &resolved, &staging, offset);
         }
-        let started = Instant::now();
-        let submission = self.device.queue.submit([encoder.finish()]);
+        let encoded = encoder.finish();
+        let submitting = Instant::now();
+        let submission = self.device.queue.submit([encoded]);
+        self.activity.submit_ms += submitting.elapsed().as_secs_f64() * 1000.0;
         self.activity.gpu_submissions += 1;
         self.activity.readback_count += 1;
         self.activity.readback_bytes += mapped_bytes;
         let slice = staging.slice(..mapped_bytes);
+        let started = Instant::now();
         map_read(self.device, &slice, submission)?
             .map_err(|e| MatrixError::Compute(format!("WebGPU readback: {e}")))?;
         let read = (|| {

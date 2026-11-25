@@ -4,7 +4,7 @@ use super::{Input, Output};
 use crate::synthesis::{
     inference::Sequence,
     stages::vocoder::{VocoderStage, VocoderStream, VoiceControl},
-    voice::{PreparedTree, Result},
+    voice::Result,
 };
 use web_time::Instant;
 
@@ -15,9 +15,9 @@ pub(in super::super) struct Pipeline<'tree> {
 }
 
 impl<'tree> Pipeline<'tree> {
-    pub fn new(tree: &'tree PreparedTree) -> Result<Self> {
+    pub fn new(prepare: impl FnOnce() -> Result<VocoderStage<'tree>>) -> Result<Self> {
         let start = Instant::now();
-        let stream = VocoderStage::prepare(tree)?.into_stream()?;
+        let stream = prepare()?.into_stream()?;
         Ok(Self {
             stream: Some(stream),
             output: None,

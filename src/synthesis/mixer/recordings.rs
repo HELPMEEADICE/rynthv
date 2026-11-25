@@ -37,7 +37,8 @@ pub(crate) fn recordings<'a, 'track>(
             continue;
         }
         let start = (clip.onset_seconds * sample_rate).round() as usize;
-        let requested_end = (clip.end_seconds() * sample_rate).ceil() as usize;
+        let requested_end =
+            start.saturating_add((clip.duration_seconds * sample_rate).round() as usize);
         let available = asset(&clip.path);
         if let Some(Ok(asset)) = available {
             let source_start = (clip.source_offset_seconds * sample_rate).round() as usize;

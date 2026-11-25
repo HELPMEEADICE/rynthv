@@ -56,6 +56,14 @@ pub fn current() -> Option<Cancellation> {
 }
 
 pub fn checkpoint() -> Result<()> {
+    #[cfg(target_arch = "wasm32")]
+    if let Some(pump) = EVENT_PUMP.get() {
+        let ticks = PUMP_TICKS.get();
+        PUMP_TICKS.set(ticks.wrapping_add(1));
+        if ticks.is_multiple_of(16) {
+            pump();
+        }
+    }
     let cancelled = CURRENT.with(|current| {
         current
             .borrow()
@@ -67,6 +75,20 @@ pub fn checkpoint() -> Result<()> {
     } else {
         Ok(())
     }
+}
+
+#[cfg(target_arch = "wasm32")]
+thread_local! {
+    static EVENT_PUMP: std::cell::Cell<Option<fn()>> = const { std::cell::Cell::new(None) };
+    static PUMP_TICKS: std::cell::Cell<u8> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn with_event_pump<T>(pump: fn(), run: impl FnOnce() -> T) -> T {
+    let previous = EVENT_PUMP.replace(Some(pump));
+    let result = run();
+    EVENT_PUMP.set(previous);
+    result
 }
 
 /// Restore the caller's scope on both normal return and unwinding.

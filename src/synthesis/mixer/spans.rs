@@ -1,7 +1,7 @@
 //! Ordered, nonoverlapping views into immutable owner PCM. Splitting a view
 //! adjusts its source offset; replacing a seam never copies whole owner audio.
 
-use super::{Controls, LIVE_CHANNELS, LIVE_SAMPLE_RATE, RenderedAudio, intersection};
+use super::{Controls, NATIVE_SAMPLE_RATE, RenderedAudio, intersection, mix_samples};
 use std::{collections::BTreeMap, ops::Range, sync::Arc};
 
 #[derive(Clone)]
@@ -22,13 +22,13 @@ impl ReadySpans {
         audio: Arc<RenderedAudio>,
         coverage: &Range<usize>,
     ) -> Result<Range<usize>, String> {
-        if audio.sample_rate() != LIVE_SAMPLE_RATE {
+        if audio.sample_rate() != NATIVE_SAMPLE_RATE {
             return Err(format!(
                 "实时混音要求 48000 Hz PCM，收到 {} Hz",
                 audio.sample_rate()
             ));
         }
-        let origin = (audio.start_seconds() * f64::from(LIVE_SAMPLE_RATE)).round();
+        let origin = (audio.start_seconds() * f64::from(NATIVE_SAMPLE_RATE)).round();
         if !origin.is_finite() || origin < 0.0 || origin >= isize::MAX as f64 {
             return Err("PCM 开始位置超出地址范围".into());
         }
@@ -148,15 +148,8 @@ impl ReadySpans {
             let (left, right) = controls.gains(audio.layout());
             let input =
                 &audio.samples()[source_start * channels..(source_start + frames) * channels];
-            let destination =
-                &mut output[output_start * LIVE_CHANNELS..(output_start + frames) * LIVE_CHANNELS];
-            for (input, output) in input
-                .chunks_exact(channels)
-                .zip(destination.as_chunks_mut::<2>().0)
-            {
-                output[0] = (f64::from(output[0]) + f64::from(input[0]) * left) as f32;
-                output[1] = (f64::from(output[1]) + f64::from(input[channels - 1]) * right) as f32;
-            }
+            let destination = &mut output[output_start * 2..(output_start + frames) * 2];
+            mix_samples(input, channels, destination, left, right);
         }
     }
 }

@@ -2,82 +2,166 @@ use super::*;
 use crate::platform::fs;
 use crate::synthesis::{
     execution::{self, Cancellation},
+    plan::RenderPlan,
     render_cache::{Completion, RenderJob},
     rendered::RenderedClip,
     score::{self, LyricFrontend},
     voice::{PreparedVoice, VoiceError, session_identity},
 };
+use std::cell::OnceCell;
 
 pub(super) struct VoiceResources {
     pub(super) inventory: VoiceInventory,
-    frontend: Option<LyricFrontend>,
+    frontend: OnceCell<LyricFrontend>,
+}
+
+pub(super) struct VoiceProgram<'a> {
+    pub(super) voice: Arc<PreparedVoice>,
+    pub(super) identity: Option<u64>,
+    resource: &'a VoiceResources,
+    frontend: &'a LyricFrontend,
+}
+
+impl VoiceResources {
+    pub(super) fn program(&self, settings: &SynthesisSettings) -> Result<VoiceProgram<'_>, String> {
+        let config = self
+            .inventory
+            .configuration
+            .as_ref()
+            .ok_or("VOICE_RESOURCE: Voice has no configuration")?;
+        let voice = self
+            .inventory
+            .prepare()
+            .map_err(|error| format!("VOICE_RESOURCE: {error}"))?;
+        let identity = if voice.family.requires_identity() {
+            Some(
+                session_identity::saved_identity(&config.name, voice.family.model_version())
+                    .map_err(|error| format!("MODEL_CONTEXT_REQUIRED: {error}"))?,
+            )
+        } else {
+            None
+        };
+        if self.frontend.get().is_none() {
+            let dictionaries = settings.dictionaries.as_deref().filter(|path| fs::is_dir(path))
+                .ok_or("DICTIONARY_REQUIRED: Set the clf-data directory with config set --dictionaries")?;
+            let frontend = LyricFrontend::new(
+                dictionaries,
+                &config.default_language,
+                &config.supported_languages,
+            )
+            .map_err(|error| format!("DICTIONARY_RESOURCE: {error}"))?;
+            let _ = self.frontend.set(frontend);
+        }
+        Ok(VoiceProgram {
+            voice,
+            identity,
+            resource: self,
+            frontend: self.frontend.get().expect("prepared frontend"),
+        })
+    }
+}
+
+impl VoiceProgram<'_> {
+    pub(super) fn prepare(
+        &self,
+        job: &RenderJob,
+        checkpoint: impl FnMut(RenderStage) -> crate::synthesis::voice::Result<()>,
+    ) -> crate::synthesis::voice::Result<progressive::PreparedRender> {
+        let inventory = &self.resource.inventory;
+        let config = inventory
+            .configuration
+            .as_ref()
+            .expect("validated voice configuration");
+        score::validate_voice(
+            &job.request.input,
+            &config.name,
+            &config.version,
+            &inventory.database_id,
+        )?;
+        progressive::prepare(
+            &self.voice,
+            self.identity,
+            &job.request.input,
+            self.frontend,
+            job.base.as_deref(),
+            checkpoint,
+        )
+    }
+}
+
+pub(super) fn voice_resource<'a>(
+    library: &LibraryScan,
+    key: &VoiceSelection,
+    slot: &'a OnceCell<VoiceResources>,
+) -> Result<(&'a VoiceResources, Option<f64>), String> {
+    if let Some(resource) = slot.get() {
+        return Ok((resource, None));
+    }
+    let started = Instant::now();
+    let entry = library
+        .catalog
+        .entry(key)
+        .filter(|entry| entry.availability.is_loadable())
+        .ok_or_else(|| {
+            format!(
+                "VOICE_NOT_FOUND: {} revision {}",
+                key.database_id, key.revision
+            )
+        })?;
+    let inventory = VoiceInventory::load_with_flat(&entry.directory, &library.flat_registry)
+        .map_err(|error| format!("VOICE_RESOURCE: {}: {error}", entry.directory.display()))?;
+    let _ = slot.set(VoiceResources {
+        inventory,
+        frontend: OnceCell::new(),
+    });
+    Ok((
+        slot.get().expect("loaded voice"),
+        Some(started.elapsed().as_secs_f64() * 1000.0),
+    ))
 }
 
 impl Offline {
     pub(super) fn load_voice(
         &mut self,
         key: &VoiceSelection,
-    ) -> Result<(&mut VoiceResources, Option<f64>), String> {
-        use std::collections::btree_map::Entry;
-        match self.voices.entry(key.clone()) {
-            Entry::Occupied(cached) => Ok((cached.into_mut(), None)),
-            Entry::Vacant(slot) => {
-                let started = Instant::now();
-                let library = self.library.as_ref().expect("scanned library");
-                let entry = library
-                    .catalog
-                    .entry(key)
-                    .filter(|entry| entry.availability.is_loadable())
-                    .ok_or_else(|| {
-                        format!(
-                            "VOICE_NOT_FOUND: {} revision {}",
-                            key.database_id, key.revision
-                        )
-                    })?;
-                let inventory =
-                    VoiceInventory::load_with_flat(&entry.directory, &library.flat_registry)
-                        .map_err(|error| {
-                            format!("VOICE_RESOURCE: {}: {error}", entry.directory.display())
-                        })?;
-                Ok((
-                    slot.insert(VoiceResources {
-                        inventory,
-                        frontend: None,
-                    }),
-                    Some(started.elapsed().as_secs_f64() * 1000.0),
-                ))
-            }
-        }
+    ) -> Result<(&VoiceResources, Option<f64>), String> {
+        let slot = self.voices.entry(key.clone()).or_default();
+        voice_resource(self.library.as_ref().expect("scanned library"), key, slot)
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub(super) fn render_owners(
+    pub(super) fn prepare_owners(
         &mut self,
         project: &Project,
-        settings: &SynthesisSettings,
         options: &Options,
         routes: &BTreeMap<VoiceSelection, Vec<OwnerId>>,
-        group_names: &BTreeMap<OwnerId, String>,
-        cancelled: &Arc<AtomicBool>,
+        cancelled: &AtomicBool,
         progress: &mut impl FnMut(Progress),
-    ) -> Result<BTreeMap<OwnerId, StageTimings>, String> {
+    ) -> Result<RenderPlan, String> {
         let mut identities = BTreeMap::new();
-        let cancellation = Cancellation::from_flag(Arc::clone(cancelled));
-        #[cfg(target_arch = "wasm32")]
-        self.voices.retain(|voice, _| routes.contains_key(voice));
         for (key, owners) in routes {
-            if cancellation.is_cancelled() {
+            if cancelled.load(Ordering::Acquire) {
                 return Err("CANCELLED: Render cancelled".into());
             }
-            let (voice, time) = self.load_voice(key)?;
-            if let Some(elapsed_ms) = time {
-                progress(Progress::VoiceLoaded {
-                    voice: key.clone(),
-                    elapsed_ms,
-                });
-            }
+            #[cfg(target_arch = "wasm32")]
+            let identity = {
+                // Browser resources are managed and their replacement invalidates this session.
+                // Bind the plan before opening any voice so only demanded voices load first.
+                self.voices.entry(key.clone()).or_default();
+                format!("{}:{}", key.revision, key.database_id)
+            };
+            #[cfg(not(target_arch = "wasm32"))]
+            let identity = {
+                let (voice, time) = self.load_voice(key)?;
+                if let Some(elapsed_ms) = time {
+                    progress(Progress::VoiceLoaded {
+                        voice: key.clone(),
+                        elapsed_ms,
+                    });
+                }
+                voice.inventory.content_hash.clone()
+            };
             for owner in owners {
-                identities.insert(*owner, voice.inventory.content_hash.clone());
+                identities.insert(*owner, identity.clone());
             }
         }
         self.revision = self.revision.wrapping_add(1);
@@ -96,116 +180,104 @@ impl Offline {
                 .take_diagnostics();
         }
         self.cache.reconcile(&plan);
+        for &owner in identities.keys() {
+            self.cache.retry_failed(owner);
+        }
+        self.cache.reuse_queued();
+        #[cfg(target_arch = "wasm32")]
+        progress(Progress::Counts(self.cache.counts()));
+        Ok(plan)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn render_owners(
+        &mut self,
+        project: &Project,
+        settings: &SynthesisSettings,
+        options: &Options,
+        routes: &BTreeMap<VoiceSelection, Vec<OwnerId>>,
+        group_names: &BTreeMap<OwnerId, String>,
+        cancelled: &Arc<AtomicBool>,
+        progress: &mut impl FnMut(Progress),
+    ) -> Result<BTreeMap<OwnerId, StageTimings>, String> {
+        self.prepare_owners(project, options, routes, cancelled, progress)?;
         if routes.is_empty() {
             return Ok(BTreeMap::new());
         }
-        let compute = &self.compute.as_ref().expect("render compute").2;
+        let compute = self.compute.as_ref().expect("render compute").2.clone();
         compute
             .check()
             .map_err(|error| format!("COMPUTE_UNAVAILABLE: {error}"))?;
+        let cancellation = Cancellation::from_flag(Arc::clone(cancelled));
         let mut timings = BTreeMap::new();
-        for (key, owners) in routes {
-            let resource = self.voices.get_mut(key).expect("loaded voice");
-            let config = resource
-                .inventory
-                .configuration
-                .as_ref()
-                .ok_or("VOICE_RESOURCE: Voice has no configuration")?;
-            let voice = resource
-                .inventory
-                .prepare()
-                .map_err(|error| format!("VOICE_RESOURCE: {error}"))?;
-            let identity = if voice.family.requires_identity() {
-                Some(
-                    session_identity::saved_identity(&config.name, voice.family.model_version())
-                        .map_err(|error| format!("MODEL_CONTEXT_REQUIRED: {error}"))?,
-                )
-            } else {
-                None
-            };
-            let frontend = match &mut resource.frontend {
-                Some(frontend) => frontend,
-                slot => {
-                    let dictionaries = settings.dictionaries.as_deref().filter(|path| fs::is_dir(path))
-                        .ok_or("DICTIONARY_REQUIRED: Set the clf-data directory with config set --dictionaries")?;
-                    slot.insert(
-                        LyricFrontend::new(
-                            dictionaries,
-                            &config.default_language,
-                            &config.supported_languages,
-                        )
-                        .map_err(|error| format!("DICTIONARY_RESOURCE: {error}"))?,
-                    )
-                }
-            };
-            compute.scope(|| {
-                execution::scope(cancellation.clone(), || {
-                    let mut network = None;
+        let library = self.library.as_ref().expect("scanned library");
+        let cache = &mut self.cache;
+        compute.scope(|| {
+            execution::scope(cancellation.clone(), || {
+                for (key, owners) in routes {
+                    let program = OnceCell::new();
+                    let network = OnceCell::new();
                     for &owner in owners {
                         execution::checkpoint()
                             .map_err(|_| "CANCELLED: Render cancelled".to_owned())?;
-                        self.cache.retry_failed(owner);
-                        self.cache.reuse_queued();
-                        let Some(job) = self.cache.take_owner(owner) else {
+                        cache.reuse_queued();
+                        let Some(job) = cache.take_owner(owner) else {
                             continue;
                         };
-                        let result = (|| {
-                            let network = match &mut network {
-                                Some(network) => network,
-                                slot => slot.insert(progressive::Network::prepare(&voice)?),
-                            };
-                            score::validate_voice(
-                                &job.request.input,
-                                &config.name,
-                                &config.version,
-                                &resource.inventory.database_id,
-                            )?;
+                        #[cfg(target_arch = "wasm32")]
+                        let partial = self
+                            .partial
+                            .remove(&owner)
+                            .filter(|work| {
+                                work.request.input == job.request.input
+                                    && work.request.coverage == job.request.coverage
+                            })
+                            .map(|work| work.prepared);
+                        let result = (|| -> Result<_, String> {
+                            if program.get().is_none() {
+                                let (resource, elapsed) =
+                                    voice_resource(library, key, &self.voices[key])?;
+                                if let Some(elapsed_ms) = elapsed {
+                                    progress(Progress::VoiceLoaded {
+                                        voice: key.clone(),
+                                        elapsed_ms,
+                                    });
+                                }
+                                let _ = program.set(resource.program(settings)?);
+                            }
+                            let program = program.get().expect("prepared voice program");
+                            if network.get().is_none() {
+                                let _ = network.set(
+                                    progressive::Network::prepare(&program.voice)
+                                        .map_err(|error| error.to_string())?,
+                                );
+                            }
+                            let network = network.get().expect("prepared network");
                             render_owner(
                                 &job,
-                                &voice,
-                                identity,
-                                frontend,
+                                program,
                                 network,
                                 #[cfg(target_arch = "wasm32")]
-                                options.preview_seconds,
-                                |step| {
-                                    execution::checkpoint()?;
-                                    match step {
-                                        Step::Stage(stage) => progress(Progress::Stage {
-                                            group: group_names[&owner].clone(),
-                                            stage,
-                                        }),
-                                        #[cfg(target_arch = "wasm32")]
-                                        Step::Pcm(audio) => {
-                                            if let Some(audio) = mixer::preview_chunk(
-                                                audio,
-                                                job.request.coverage,
-                                                &plan.output_controls[&owner],
-                                            )
-                                            .map_err(VoiceError::new)?
-                                            {
-                                                progress(Progress::Pcm {
-                                                    group: group_names[&owner].clone(),
-                                                    audio,
-                                                });
-                                            }
-                                        }
-                                    }
-                                    Ok(())
+                                partial,
+                                |stage| {
+                                    progress(Progress::Stage {
+                                        group: group_names[&owner].clone(),
+                                        stage,
+                                    });
+                                    execution::checkpoint()
                                 },
                             )
+                            .map_err(|error| error.to_string())
                         })();
-                        let result = result
-                            .map(|completed| {
-                                timings.insert(owner, completed.timings);
-                                Arc::new(RenderedClip {
-                                    audio: Arc::new(completed.audio),
-                                    visuals: Arc::new(completed.visuals),
-                                    state: Arc::new(completed.state),
-                                })
+                        let result = result.map(|completed| {
+                            timings.insert(owner, completed.timings);
+                            Arc::new(RenderedClip {
+                                audio: Arc::new(completed.audio),
+                                visuals: Arc::new(completed.visuals),
+                                state: Arc::new(completed.state),
                             })
-                            .map_err(|error: VoiceError| error.to_string());
-                        let completion = self.cache.finish(&job, result);
+                        });
+                        let completion = cache.finish(&job, result);
                         if cancellation.is_cancelled() {
                             return Err("CANCELLED: Render cancelled".to_owned());
                         }
@@ -216,10 +288,10 @@ impl Offline {
                             ));
                         }
                     }
-                    Ok(())
-                })
-            })?;
-        }
+                }
+                Ok(())
+            })
+        })?;
         compute
             .check()
             .map_err(|error| format!("COMPUTE_UNAVAILABLE: {error}"))?;
@@ -227,53 +299,29 @@ impl Offline {
     }
 }
 
-enum Step {
-    Stage(RenderStage),
-    #[cfg(target_arch = "wasm32")]
-    Pcm(RenderedAudio),
-}
-
-fn render_owner(
+fn render_owner<'tree>(
     job: &RenderJob,
-    voice: &PreparedVoice,
-    identity: Option<u64>,
-    frontend: &LyricFrontend,
-    network: &progressive::Network<'_>,
-    #[cfg(target_arch = "wasm32")] preview_seconds: Option<f64>,
-    mut checkpoint: impl FnMut(Step) -> crate::synthesis::voice::Result<()>,
+    program: &'tree VoiceProgram<'tree>,
+    network: &progressive::Network<'tree>,
+    #[cfg(target_arch = "wasm32")] partial: Option<progressive::PreparedRender>,
+    mut checkpoint: impl FnMut(RenderStage) -> crate::synthesis::voice::Result<()>,
 ) -> crate::synthesis::voice::Result<super::super::engine::RenderResult> {
-    let mut prepared = progressive::prepare(
-        voice,
-        identity,
-        &job.request.input,
-        frontend,
-        job.base.as_deref(),
-        |stage| checkpoint(Step::Stage(stage)),
-    )?;
+    #[cfg(target_arch = "wasm32")]
+    let mut prepared = match partial {
+        Some(prepared) => prepared,
+        None => program.prepare(job, &mut checkpoint)?,
+    };
+    #[cfg(not(target_arch = "wasm32"))]
+    let mut prepared = program.prepare(job, &mut checkpoint)?;
+    prepared.suppress_pcm_publication();
     let coverage = job.request.coverage;
     let start_seconds = coverage.sample_start.0 as f64 / f64::from(coverage.sample_rate);
-    #[cfg(target_arch = "wasm32")]
-    let start_seconds = preview_seconds
-        .filter(|seconds| {
-            *seconds >= start_seconds
-                && *seconds < coverage.sample_end.0 as f64 / f64::from(coverage.sample_rate)
-        })
-        .unwrap_or(start_seconds);
     while !prepared.is_complete() {
         let mut cursor = prepared
-            .start(network, voice, start_seconds)?
+            .start(network, &program.voice, start_seconds)?
             .ok_or_else(|| VoiceError::new("No inference cursor for pending audio"))?;
         while !cursor.is_finished() {
-            let chunks =
-                prepared.advance(&mut cursor, 128, |stage| checkpoint(Step::Stage(stage)))?;
-            #[cfg(target_arch = "wasm32")]
-            if preview_seconds.is_some() {
-                for audio in chunks {
-                    checkpoint(Step::Pcm(audio))?;
-                }
-            }
-            #[cfg(not(target_arch = "wasm32"))]
-            drop(chunks);
+            prepared.advance(&mut cursor, 128, &mut checkpoint)?;
         }
     }
     prepared.finish()

@@ -1,5 +1,7 @@
 use crate::synthesis::{
     inference::compute::{AdapterInfo, Diagnostics, Status},
+    offline::PreviewMetrics,
+    render_cache::CacheStats,
     rendered::{PitchTrack, RenderedPhonemeTrack},
     settings::{SynthesisSettings, VoiceSelection},
     voice::{VoiceCatalog, VoiceConfiguration},
@@ -82,11 +84,24 @@ pub struct Visuals {
 
 #[derive(Serialize, Deserialize)]
 pub struct Preview {
-    pub duration: Option<f64>,
-    pub rendered: usize,
-    pub reused: usize,
+    pub metrics: PreviewMetrics,
     pub cache_bytes: usize,
     pub diagnostics: ComputeDiagnostics,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Export {
+    pub paths: Vec<PathBuf>,
+    pub metrics: ExportMetrics,
+    pub diagnostics: ComputeDiagnostics,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ExportMetrics {
+    pub render_ms: f64,
+    pub mix_ms: f64,
+    pub wav_ms: f64,
+    pub worker_ms: f64,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -115,12 +130,14 @@ pub enum Event {
     Progress {
         stage: String,
     },
-    Chunk {
-        group: String,
-        origin: f64,
+    Counts(CacheStats),
+    Layout {
+        frames: usize,
+        occupied: Vec<[usize; 2]>,
     },
-    Mix {
-        origin: f64,
+    Block {
+        index: usize,
+        first: bool,
     },
     Visuals(Box<Visuals>),
     Audio {

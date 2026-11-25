@@ -1,3 +1,5 @@
+#[cfg(target_arch = "wasm32")]
+use super::super::audio::RenderedAudio;
 use super::super::rendered::VisualSnapshot;
 use super::{
     CacheStats, Completion, OwnerId, PublishedOwner, RenderCache, RenderJob, RenderedClip, State,
@@ -109,11 +111,27 @@ impl RenderCache {
     }
 
     pub fn stats(&self) -> CacheStats {
+        let mut stats = self.counts();
+        let mut seen = BTreeSet::new();
+        let completed = self
+            .owners
+            .values()
+            .filter_map(|owner| owner.committed.as_ref());
+        #[cfg(target_arch = "wasm32")]
+        let completed = completed.chain(self.parked.values());
+        for completed in completed {
+            if seen.insert(Arc::as_ptr(&completed.clip)) {
+                stats.current_render_bytes += completed.clip.memory_bytes();
+            }
+        }
+        stats
+    }
+
+    pub(crate) fn counts(&self) -> CacheStats {
         let mut stats = CacheStats {
             discarded_completions: self.discarded,
             ..CacheStats::default()
         };
-        let mut seen = BTreeSet::new();
         for owner in self.owners.values() {
             match &owner.state {
                 State::Queued => stats.queued += 1,
@@ -121,12 +139,87 @@ impl RenderCache {
                 State::Failed(_) => stats.failed += 1,
                 State::Ready => stats.ready += 1,
             }
-            if let Some(completed) = &owner.committed
-                && seen.insert(Arc::as_ptr(&completed.clip))
-            {
-                stats.current_render_bytes += completed.clip.memory_bytes();
-            }
         }
         stats
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn retain_near(&mut self, budget: usize, seconds: f64) {
+        let mut order = self
+            .owners
+            .iter()
+            .filter_map(|(&id, owner)| {
+                owner.committed.as_ref()?;
+                let coverage = owner.request.coverage;
+                let frame = (seconds * f64::from(coverage.sample_rate)) as i64;
+                let distance = if frame < coverage.sample_start.0 {
+                    coverage.sample_start.0.abs_diff(frame)
+                } else {
+                    frame.saturating_sub(coverage.sample_end.0).max(0) as u64
+                };
+                Some((distance, id))
+            })
+            .collect::<Vec<_>>();
+        order.sort_unstable();
+        let mut retained = BTreeSet::new();
+        let mut bytes = 0usize;
+        for (_, id) in order {
+            let owner = self.owners.get_mut(&id).expect("retained owner");
+            let clip = &owner.committed.as_ref().expect("committed owner").clip;
+            if retained.contains(&Arc::as_ptr(clip)) {
+                continue;
+            }
+            let size = clip.memory_bytes();
+            if bytes.saturating_add(size) <= budget {
+                retained.insert(Arc::as_ptr(clip));
+                bytes += size;
+            } else {
+                owner.committed = None;
+                if matches!(owner.state, State::Ready) {
+                    owner.state = State::Queued;
+                }
+            }
+        }
+        self.parked.retain(|_, owner| {
+            let clip = &owner.clip;
+            if retained.contains(&Arc::as_ptr(clip)) {
+                return true;
+            }
+            let size = clip.memory_bytes();
+            if bytes.saturating_add(size) > budget {
+                return false;
+            }
+            retained.insert(Arc::as_ptr(clip));
+            bytes += size;
+            true
+        });
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn discard_removed(&mut self, present: &BTreeSet<OwnerId>) {
+        self.parked.retain(|id, _| present.contains(id));
+        self.owners.retain(|id, owner| {
+            let retain = present.contains(id);
+            if !retain {
+                owner.cancel();
+            }
+            retain
+        });
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn requeue_running(&mut self) {
+        for owner in self.owners.values_mut() {
+            if matches!(owner.state, State::Running(_)) {
+                owner.cancel();
+                owner.state = State::Queued;
+                self.reuse_pending = true;
+            }
+        }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn published(&self, id: OwnerId) -> Option<Arc<RenderedAudio>> {
+        Some(Arc::clone(&self.owners.get(&id)?.ready()?.clip.audio))
     }
 }

@@ -69,7 +69,7 @@ impl PreparedRender {
         #[cfg(not(target_arch = "wasm32"))]
         let vocoder = pipeline::Pipeline::new(voice.shared_model("vocoder")?)?;
         #[cfg(target_arch = "wasm32")]
-        let vocoder = pipeline::Pipeline::new(voice.model("vocoder")?)?;
+        let vocoder = pipeline::Pipeline::new(|| network.vocoder(voice))?;
         Ok(Some(Cursor {
             timbre,
             vocoder,
@@ -98,9 +98,9 @@ impl PreparedRender {
             return Err(VoiceError::new("Progressive frame budget must be positive"));
         }
         self.acoustic.timings.timbre_ms += std::mem::take(&mut cursor.setup_timbre_ms);
-        checkpoint(RenderStage::Vocoder)?;
         #[cfg(not(target_arch = "wasm32"))]
         {
+            checkpoint(RenderStage::Vocoder)?;
             if let Some(output) = cursor.vocoder.poll()? {
                 return self.publish_output(cursor, output);
             }

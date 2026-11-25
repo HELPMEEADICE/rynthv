@@ -1,4 +1,6 @@
 //! Project rendering without a window, a display surface, or a playback device.
+#[cfg(target_arch = "wasm32")]
+mod preview;
 mod voices;
 
 pub use super::mixer::VocalStem;
@@ -15,6 +17,8 @@ use super::{
     voice::VoiceInventory,
 };
 use crate::model::{Project, Track};
+#[cfg(target_arch = "wasm32")]
+pub(crate) use preview::PreviewMetrics;
 use std::{
     collections::{BTreeMap, BTreeSet},
     ops::Range,
@@ -30,7 +34,7 @@ use web_time::Instant;
 pub struct Offline {
     library: Option<LibraryScan>,
     settings: Option<SynthesisSettings>,
-    voices: BTreeMap<VoiceSelection, VoiceResources>,
+    voices: BTreeMap<VoiceSelection, std::cell::OnceCell<VoiceResources>>,
     compute: Option<(Backend, Option<AdapterId>, Session)>,
     planner: Planner,
     cache: RenderCache,
@@ -39,7 +43,9 @@ pub struct Offline {
     note_ids: BTreeMap<String, u64>,
     revision: u64,
     #[cfg(target_arch = "wasm32")]
-    recordings: BTreeMap<std::path::PathBuf, Arc<AudioAsset>>,
+    recordings: preview::RecordingCache,
+    #[cfg(target_arch = "wasm32")]
+    partial: BTreeMap<OwnerId, preview::Partial>,
 }
 
 pub struct Options {
@@ -49,10 +55,10 @@ pub struct Options {
     pub vocals_only: bool,
     pub backend: Backend,
     pub adapter: Option<AdapterId>,
-    /// Drop acoustic cache at this soft limit between requests.
+    /// Soft budget for completed acoustic data retained between requests.
     pub cache_bytes: usize,
     #[cfg(target_arch = "wasm32")]
-    pub preview_seconds: Option<f64>,
+    pub preview: Option<fn() -> f64>,
 }
 
 pub enum Progress {
@@ -65,10 +71,22 @@ pub enum Progress {
         stage: RenderStage,
     },
     #[cfg(target_arch = "wasm32")]
-    Pcm {
-        group: String,
-        audio: RenderedAudio,
+    Counts(super::render_cache::CacheStats),
+    #[cfg(target_arch = "wasm32")]
+    Layout {
+        frames: usize,
+        occupied: Vec<[usize; 2]>,
     },
+    #[cfg(target_arch = "wasm32")]
+    Block {
+        index: usize,
+        samples: Option<Vec<f32>>,
+        first: bool,
+    },
+    #[cfg(target_arch = "wasm32")]
+    Phase(&'static str),
+    #[cfg(target_arch = "wasm32")]
+    Checkpoint,
 }
 
 pub struct Report {
@@ -78,6 +96,8 @@ pub struct Report {
     pub reused_owners: usize,
     pub cache_bytes: usize,
     pub elapsed_ms: f64,
+    #[cfg(target_arch = "wasm32")]
+    pub preview: Option<PreviewMetrics>,
 }
 
 pub struct OwnerReport {
@@ -132,6 +152,8 @@ impl Offline {
         }) {
             self.compute = Some((backend, adapter.cloned(), Session::new(backend, adapter)));
             self.cache.reset();
+            #[cfg(target_arch = "wasm32")]
+            self.partial.clear();
         }
         &self.compute.as_ref().expect("prepared compute session").2
     }
@@ -142,23 +164,7 @@ impl Offline {
         path: &std::path::Path,
         cancelled: &AtomicBool,
     ) -> Result<Arc<AudioAsset>, String> {
-        if let Some(recording) = self.recordings.get(path) {
-            return Ok(recording.clone());
-        }
-        let asset = Arc::new(
-            AudioAsset::read_with_waveforms(path, cancelled)
-                .map_err(|error| format!("AUDIO_RESOURCE: {}: {error}", path.display()))?,
-        );
-        let stored: usize = self
-            .recordings
-            .values()
-            .map(|asset| std::mem::size_of_val(asset.audio.samples()))
-            .sum();
-        if stored.saturating_add(std::mem::size_of_val(asset.audio.samples())) > 192 << 20 {
-            self.recordings.clear();
-        }
-        self.recordings.insert(path.to_owned(), Arc::clone(&asset));
-        Ok(asset)
+        self.recordings.load(path, cancelled)
     }
 
     pub fn refresh(&mut self) {
@@ -169,6 +175,8 @@ impl Offline {
         }
         self.cache.reset();
         self.planner.reset();
+        #[cfg(target_arch = "wasm32")]
+        self.partial.clear();
     }
 
     pub fn library(&mut self, settings: &SynthesisSettings) -> &LibraryScan {
@@ -209,9 +217,12 @@ impl Offline {
                 && (solo.is_empty() || solo.contains(&track.id))
                 && track.mixer.get("mute").and_then(serde_json::Value::as_bool) == Some(false)
         };
-        if self.project != project.uuid {
+        let project_changed = self.project != project.uuid;
+        if project_changed {
             self.cache.reset();
             self.planner.reset();
+            #[cfg(target_arch = "wasm32")]
+            self.partial.clear();
             self.owner_ids.clear();
             self.note_ids.clear();
             self.project.clone_from(&project.uuid);
@@ -262,13 +273,17 @@ impl Offline {
                 }
             }
         }
-        self.owner_ids.retain(|uuid, _| {
-            project
-                .tracks
-                .iter()
-                .flat_map(Track::references)
-                .any(|reference| &reference.uuid == uuid)
-        });
+        let current_owners: BTreeSet<_> = project
+            .tracks
+            .iter()
+            .flat_map(Track::references)
+            .map(|reference| &reference.uuid)
+            .collect();
+        self.owner_ids
+            .retain(|uuid, _| current_owners.contains(uuid));
+        #[cfg(target_arch = "wasm32")]
+        self.cache
+            .discard_removed(&self.owner_ids.values().copied().collect());
         self.library(settings);
         let library = self.library.as_ref().expect("scanned library");
         let mut preview = Planner::default();
@@ -300,7 +315,7 @@ impl Offline {
                         )
                     })?;
                 #[cfg(target_arch = "wasm32")]
-                if options.preview_seconds.is_some() && key.is_none() {
+                if options.preview.is_some() && key.is_none() {
                     continue;
                 }
                 let key = key.ok_or_else(|| {
@@ -314,15 +329,13 @@ impl Offline {
                 routes.entry(key).or_default().push(owner);
             }
         }
-        let timings = self.render_owners(
-            &vocal,
-            settings,
-            options,
-            &routes,
-            &group_names,
-            &cancelled,
-            &mut progress,
-        )?;
+        #[cfg(target_arch = "wasm32")]
+        if project_changed {
+            self.voices.retain(|key, _| routes.contains_key(key));
+            if let Some((_, _, compute)) = &self.compute {
+                compute.prune_weights();
+            }
+        }
         let accompaniment: Vec<_> = project
             .tracks
             .iter()
@@ -337,9 +350,46 @@ impl Offline {
                     })
             })
             .collect();
-        let mut assets = BTreeMap::new();
-        for clip in accompaniment.iter().filter_map(|track| track.audio_clip()) {
-            if !assets.contains_key(&clip.path) {
+        #[cfg(target_arch = "wasm32")]
+        let mut metrics = None;
+        #[cfg(target_arch = "wasm32")]
+        let previewing = options.preview.is_some();
+        #[cfg(not(target_arch = "wasm32"))]
+        let previewing = false;
+        let (timings, recordings) = if previewing {
+            #[cfg(target_arch = "wasm32")]
+            {
+                let rendered = self.render_preview(
+                    &vocal,
+                    settings,
+                    options,
+                    &routes,
+                    &group_names,
+                    &cancelled,
+                    &solo,
+                    &accompaniment,
+                    &mut progress,
+                )?;
+                metrics = Some(rendered.1);
+                (rendered.0, Vec::new())
+            }
+            #[cfg(not(target_arch = "wasm32"))]
+            unreachable!();
+        } else {
+            let timings = self.render_owners(
+                &vocal,
+                settings,
+                options,
+                &routes,
+                &group_names,
+                &cancelled,
+                &mut progress,
+            )?;
+            let mut assets = BTreeMap::new();
+            for clip in accompaniment.iter().filter_map(|track| track.audio_clip()) {
+                if assets.contains_key(&clip.path) {
+                    continue;
+                }
                 #[cfg(not(target_arch = "wasm32"))]
                 let asset = AudioAsset::read_for_mix(&clip.path, &cancelled)
                     .map_err(|error| format!("AUDIO_RESOURCE: {}: {error}", clip.path.display()))?;
@@ -347,20 +397,15 @@ impl Offline {
                 let asset = self.recording(&clip.path, &cancelled)?;
                 assets.insert(clip.path.clone(), asset);
             }
-        }
-        #[cfg(target_arch = "wasm32")]
-        self.recordings.retain(|path, _| {
-            project
-                .tracks
-                .iter()
-                .any(|track| track.audio_clip().is_some_and(|clip| &clip.path == path))
-        });
-        let recordings = mixer::recordings(accompaniment, &solo, |path| {
-            let asset = assets.get(path)?;
-            #[cfg(target_arch = "wasm32")]
-            let asset = asset.as_ref();
-            Some(Ok(asset))
-        })?;
+            let recordings = mixer::recordings(accompaniment, &solo, |path| {
+                let asset = assets.get(path)?;
+                #[cfg(target_arch = "wasm32")]
+                let asset = asset.as_ref();
+                Some(Ok(asset))
+            })?
+            .layers;
+            (timings, recordings)
+        };
         let owners = self.cache.snapshot();
         let stats = self.cache.stats();
         let rendered_owners = timings.len();
@@ -407,8 +452,16 @@ impl Offline {
             self.cache.reset();
             return Err("WebGPU 未完成任何模型算子。请检查设备限制，或选择 Auto／CPU。".into());
         }
+        #[cfg(not(target_arch = "wasm32"))]
         if stats.current_render_bytes > options.cache_bytes {
             self.cache.reset();
+        }
+        #[cfg(target_arch = "wasm32")]
+        if stats.current_render_bytes > options.cache_bytes {
+            self.cache.retain_near(
+                options.cache_bytes,
+                options.preview.map_or(0.0, |demand| demand()),
+            );
         }
         Ok(Output {
             report: Report {
@@ -418,9 +471,11 @@ impl Offline {
                 reused_owners: stats.ready.saturating_sub(rendered_owners),
                 cache_bytes: self.cache.stats().current_render_bytes,
                 elapsed_ms: started.elapsed().as_secs_f64() * 1000.0,
+                #[cfg(target_arch = "wasm32")]
+                preview: metrics,
             },
             solo,
-            recordings: recordings.layers,
+            recordings,
             owners,
             range: range.map(|range| {
                 (range.start * 48_000.0).ceil() as usize..(range.end * 48_000.0).ceil() as usize

@@ -54,6 +54,8 @@ pub(super) fn decode(path: &Path, cancelled: &AtomicBool) -> Result<RenderedAudi
     let mut spec = None;
     let mut samples = Vec::<f32>::new();
     while let Some(packet) = format.next_packet().map_err(|e| e.to_string())? {
+        #[cfg(target_arch = "wasm32")]
+        crate::synthesis::execution::checkpoint().map_err(|error| error.to_string())?;
         if cancelled.load(Ordering::Relaxed) {
             return Err("音频加载已取消".into());
         }

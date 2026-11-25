@@ -10,8 +10,9 @@ use wasm_bindgen_futures::{JsFuture, spawn_local};
 
 #[wasm_bindgen(raw_module = "./browser.js")]
 extern "C" {
-    fn start_request(request: &str, writes: bool, listener: &Function) -> Array;
+    fn start_request(request: &str, writes: bool, preview: bool, listener: &Function) -> Array;
     fn cancel_request(id: u32);
+    fn prioritize_preview(id: u32, seconds: f64);
 }
 
 pub struct Pending<T> {
@@ -32,6 +33,10 @@ impl<T> Pending<T> {
         cancel_request(self.id);
     }
 
+    pub fn prioritize(&self, seconds: f64) {
+        prioritize_preview(self.id, seconds);
+    }
+
     pub fn into_receiver(self) -> Receiver<Result<T, String>> {
         self.receiver
     }
@@ -50,6 +55,7 @@ pub fn submit<T: DeserializeOwned + 'static>(
             | Request::RemoveVoice { .. }
             | Request::Context { .. }
     );
+    let preview = matches!(&request, Request::Preview { .. });
     let request = serde_json::to_string(&request).expect("serializable worker request");
     let listener =
         Closure::<dyn FnMut(String, Option<Float32Array>)>::new(move |message: String, pcm| {
@@ -57,7 +63,7 @@ pub fn submit<T: DeserializeOwned + 'static>(
                 event(message, pcm);
             }
         });
-    let response = start_request(&request, writes, listener.as_ref().unchecked_ref());
+    let response = start_request(&request, writes, preview, listener.as_ref().unchecked_ref());
     let id = response.get(0).as_f64().expect("worker request id") as u32;
     let promise = response.get(1).unchecked_into::<Promise>();
     let (sender, receiver) = mpsc::channel();

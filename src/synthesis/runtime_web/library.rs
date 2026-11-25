@@ -209,6 +209,7 @@ impl Runtime {
     }
 
     pub(super) fn poll_inventories(&mut self) {
+        let mut changed = false;
         self.voice_jobs.retain(|selection, pending| {
             let Some(result) = pending.poll() else {
                 return true;
@@ -220,9 +221,12 @@ impl Runtime {
                     Err(error) => VoiceState::Failed(error),
                 },
             );
-            self.preview.resync();
+            changed = true;
             false
         });
+        if changed {
+            self.refresh_voice_failures();
+        }
     }
 
     pub(super) fn clear_inventories(&mut self) {

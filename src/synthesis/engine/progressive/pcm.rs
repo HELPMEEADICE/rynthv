@@ -25,10 +25,21 @@ pub struct PcmStore {
     first_block: i64,
     ready: Vec<bool>,
     samples: [Vec<f32>; 2],
+    publish: bool,
 }
 
 impl PcmStore {
     pub fn new(start_seconds: f64, total_samples: usize) -> Result<Self> {
+        Self::with_samples(start_seconds, total_samples, || {
+            std::array::from_fn(|_| vec![0.0; total_samples])
+        })
+    }
+
+    fn with_samples(
+        start_seconds: f64,
+        total_samples: usize,
+        samples: impl FnOnce() -> [Vec<f32>; 2],
+    ) -> Result<Self> {
         let clock = Clock::new(start_seconds, total_samples)?;
         let first_block = clock.origin.div_euclid(BLOCK);
         let last_block = (clock.end - 1).div_euclid(BLOCK);
@@ -38,7 +49,8 @@ impl PcmStore {
             clock,
             first_block,
             ready: vec![false; count],
-            samples: std::array::from_fn(|_| vec![0.0; total_samples]),
+            samples: samples(),
+            publish: true,
         })
     }
 
@@ -47,8 +59,9 @@ impl PcmStore {
         if base.primary.len() != base.secondary.len() || dirty.start >= dirty.end {
             return Err(VoiceError::new("Invalid progressive PCM baseline"));
         }
-        let mut store = Self::new(base.start_seconds, base.primary.len())?;
-        store.samples = [base.primary.to_vec(), base.secondary.to_vec()];
+        let mut store = Self::with_samples(base.start_seconds, base.primary.len(), || {
+            [base.primary.to_vec(), base.secondary.to_vec()]
+        })?;
         store.ready.fill(true);
         for (index, ready) in store.ready.iter_mut().enumerate() {
             let block = store.first_block + index as i64;
@@ -61,6 +74,10 @@ impl PcmStore {
 
     pub fn is_complete(&self) -> bool {
         self.ready.iter().all(|ready| *ready)
+    }
+
+    pub fn suppress_publication(&mut self) {
+        self.publish = false;
     }
 
     pub fn model_samples(&self) -> Range<i64> {
@@ -155,7 +172,11 @@ impl PcmStore {
             output[destination.clone()].copy_from_slice(input);
         }
         self.mark_ready(range.clone())?;
-        self.audio(range)
+        if self.publish {
+            self.audio(range)
+        } else {
+            Ok(None)
+        }
     }
 
     fn audio(&self, range: Range<i64>) -> Result<Option<RenderedAudio>> {

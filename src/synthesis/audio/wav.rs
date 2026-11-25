@@ -100,43 +100,50 @@ fn encode(writer: &mut impl Write, audio: &RenderedAudio, depth: u16) -> Result<
     }
     write(b"data")?;
     write(&data_bytes.to_le_bytes())?;
-    let mut chunk = [0u8; 4096];
-    let mut cursor = 0usize;
-    let sample_bytes = usize::from(depth / 8);
-    for &sample in audio.samples() {
-        if cursor + sample_bytes > chunk.len() {
-            crate::synthesis::execution::checkpoint().map_err(|error| error.to_string())?;
-            write(&chunk[..cursor])?;
-            cursor = 0;
-        }
-        match depth {
-            16 => {
-                let encoded = ((f64::from(sample) * 32768.0)
-                    .round()
-                    .clamp(-32768.0, 32767.0) as i16)
-                    .to_le_bytes();
-                chunk[cursor..cursor + 2].copy_from_slice(&encoded);
-                cursor += 2;
-            }
-            24 => {
-                let encoded = ((f64::from(sample) * 8388608.0)
-                    .round()
-                    .clamp(-8388608.0, 8388607.0) as i32)
-                    .to_le_bytes();
-                chunk[cursor..cursor + 3].copy_from_slice(&encoded[..3]);
-                cursor += 3;
-            }
-            _ => {
-                chunk[cursor..cursor + 4].copy_from_slice(&sample.to_le_bytes());
-                cursor += 4;
+    match depth {
+        16 => write_converted(audio.samples(), &mut write, |sample| {
+            ((f64::from(sample) * 32768.0)
+                .round()
+                .clamp(-32768.0, 32767.0) as i16)
+                .to_le_bytes()
+        })?,
+        24 => write_converted(audio.samples(), &mut write, |sample| {
+            let [low, mid, high, _] = ((f64::from(sample) * 8388608.0)
+                .round()
+                .clamp(-8388608.0, 8388607.0) as i32)
+                .to_le_bytes();
+            [low, mid, high]
+        })?,
+        #[cfg(target_endian = "little")]
+        32 => {
+            for samples in audio.samples().chunks(16_384) {
+                crate::synthesis::execution::checkpoint().map_err(|error| error.to_string())?;
+                write(bytemuck::cast_slice(samples))?;
             }
         }
-    }
-    if cursor > 0 {
-        write(&chunk[..cursor])?;
+        #[cfg(target_endian = "big")]
+        32 => write_converted(audio.samples(), &mut write, f32::to_le_bytes)?,
+        _ => return Err("不支持的导出位深".into()),
     }
     if padding != 0 {
         write(&[0])?;
     }
     crate::synthesis::execution::checkpoint().map_err(|error| error.to_string())
+}
+
+fn write_converted<const N: usize>(
+    samples: &[f32],
+    write: &mut impl FnMut(&[u8]) -> Result<(), String>,
+    convert: impl Fn(f32) -> [u8; N],
+) -> Result<(), String> {
+    let mut buffer = [0_u8; 65_536];
+    let (frames, _) = buffer.as_chunks_mut::<N>();
+    for samples in samples.chunks(frames.len()) {
+        crate::synthesis::execution::checkpoint().map_err(|error| error.to_string())?;
+        for (target, &sample) in frames.iter_mut().zip(samples) {
+            *target = convert(sample);
+        }
+        write(bytemuck::cast_slice(&frames[..samples.len()]))?;
+    }
+    Ok(())
 }
