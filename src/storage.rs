@@ -31,10 +31,20 @@ pub fn load(path: &Path) -> Result<LoadedProject, String> {
     file.take(MAX_PROJECT_BYTES + 1)
         .read_to_end(&mut bytes)
         .map_err(|e| e.to_string())?;
+    let base = std::path::absolute(path).map_err(|e| e.to_string())?;
+    let parent = base
+        .parent()
+        .ok_or_else(|| format!("路径 {} 缺少父目录", path.display()))?;
+    let mut loaded = decode_project(&bytes)?;
+    resolve_project_paths(&mut loaded.project, parent);
+    Ok(loaded)
+}
+
+pub fn decode_project(bytes: &[u8]) -> Result<LoadedProject, String> {
     check_project_size(bytes.len() as u64)?;
     let mut project: Project =
-        serde_json::from_slice(&bytes).map_err(|e| format!("SVP 解析失败：{e}"))?;
-    let revision = Revision::of(&bytes);
+        serde_json::from_slice(bytes).map_err(|e| format!("SVP 解析失败：{e}"))?;
+    let revision = Revision::of(bytes);
     let imported = match project.version {
         SVP_VERSION => false,
         svp_v153::VERSION => true,
@@ -51,10 +61,16 @@ pub fn load(path: &Path) -> Result<LoadedProject, String> {
         svp_v153::import(&mut project)?;
     }
     validate_content(&project)?;
-    let base = std::path::absolute(path).map_err(|e| e.to_string())?;
-    let parent = base
-        .parent()
-        .ok_or_else(|| format!("路径 {} 缺少父目录", path.display()))?;
+    project.tracks.sort_by_key(|t| t.disp_order);
+    sort_notes(&mut project);
+    Ok(LoadedProject {
+        project,
+        imported,
+        revision,
+    })
+}
+
+pub fn resolve_project_paths(project: &mut Project, parent: &Path) {
     if let Some(destination) = project.render_config.get_mut("destination")
         && let Some(directory) = destination
             .as_str()
@@ -73,7 +89,9 @@ pub fn load(path: &Path) -> Result<LoadedProject, String> {
             clip.path = resolve_relative_clip(parent, &clip.path);
         }
     }
-    project.tracks.sort_by_key(|t| t.disp_order);
+}
+
+fn sort_notes(project: &mut Project) {
     for group in project
         .library
         .iter_mut()
@@ -81,11 +99,6 @@ pub fn load(path: &Path) -> Result<LoadedProject, String> {
     {
         group.notes.sort_by_key(|n| n.onset);
     }
-    Ok(LoadedProject {
-        project,
-        imported,
-        revision,
-    })
 }
 
 pub fn save(path: &Path, project: &Project) -> Result<(), String> {
@@ -116,17 +129,20 @@ fn save_locked(path: &Path, project: &Project, overwrite: bool) -> Result<(), St
             clip.path = relative;
         }
     }
-    for group in ordered
-        .library
-        .iter_mut()
-        .chain(ordered.tracks.iter_mut().map(|t| &mut t.main_group))
-    {
-        group.notes.sort_by_key(|n| n.onset);
-    }
-    atomic_write_policy(path, overwrite, |writer| {
-        serde_json::to_writer_pretty(ProjectWriter::new(writer), &ordered)
-            .map_err(|error| error.to_string())
-    })
+    sort_notes(&mut ordered);
+    atomic_write_policy(path, overwrite, |writer| write_ordered(writer, &ordered))
+}
+
+pub fn write_project(writer: impl Write, project: &Project) -> Result<(), String> {
+    validate(project)?;
+    let mut ordered = project.clone();
+    sort_notes(&mut ordered);
+    write_ordered(writer, &ordered)
+}
+
+fn write_ordered(writer: impl Write, project: &Project) -> Result<(), String> {
+    serde_json::to_writer_pretty(ProjectWriter::new(writer), project)
+        .map_err(|error| error.to_string())
 }
 
 pub fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), String> {
