@@ -78,7 +78,7 @@ jobs:
           CLANG_NAME: ${{ matrix.clang }}
         run: |
           set -euo pipefail
-          sdkmanager --install "platforms;android-37" "build-tools;$ANDROID_BUILD_TOOLS" "ndk;$ANDROID_NDK_VERSION"
+          sdkmanager --install "platforms;android-36" "build-tools;$ANDROID_BUILD_TOOLS" "ndk;$ANDROID_NDK_VERSION"
           ndk_bin="$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/bin"
           cargo_target="${RUST_TARGET^^}"
           cargo_target="${cargo_target//-/_}"
@@ -163,7 +163,7 @@ jobs:
           if [[ "$ANDROID_SIGNING_MODE" == test ]]; then application+=.test; fi
           grep -F "package: name='$application' versionCode='$ANDROID_VERSION_CODE' versionName='$ANDROID_VERSION_NAME'" <<< "$manifest"
           grep -Fx "sdkVersion:'26'" <<< "$manifest"
-          grep -Fx "targetSdkVersion:'37'" <<< "$manifest"
+          grep -Fx "targetSdkVersion:'36'" <<< "$manifest"
           grep -F "launchable-activity: name='org.rynthv.app.RynthVActivity'" <<< "$manifest"
           grep -Fx "native-code: '$ANDROID_ABI'" <<< "$manifest"
           if grep -F 'android.permission.MANAGE_EXTERNAL_STORAGE' <<< "$manifest"; then exit 1; fi
