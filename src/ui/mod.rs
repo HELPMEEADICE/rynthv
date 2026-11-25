@@ -1,6 +1,7 @@
 pub mod arrangement;
 pub mod arrangement_tracks;
 pub mod chrome;
+mod dialog;
 pub mod fill_lyrics;
 pub mod group_edit;
 pub mod group_geometry;

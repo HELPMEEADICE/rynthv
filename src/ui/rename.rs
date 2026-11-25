@@ -36,7 +36,11 @@ pub fn show(app: &mut App, ctx: &Context) {
             Target::Track(_) => "重命名音轨",
             Target::Group(_) => "重命名音符组",
         });
-        let response = ui.add(TextEdit::singleline(&mut rename.text).desired_width(260.0));
+        #[cfg(target_os = "android")]
+        let width = super::dialog::width(ctx, 260.0);
+        #[cfg(not(target_os = "android"))]
+        let width = 260.0;
+        let response = ui.add(TextEdit::singleline(&mut rename.text).desired_width(width));
         if rename.focus {
             response.request_focus();
             rename.focus = false;
