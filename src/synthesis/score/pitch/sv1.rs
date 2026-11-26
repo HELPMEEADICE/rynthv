@@ -1,3 +1,4 @@
+use crate::tr;
 use crate::{
     model::{Automation, NoteMode, Sv1Pitch},
     synthesis::{
@@ -6,7 +7,6 @@ use crate::{
     },
 };
 use std::{f64::consts, sync::Arc};
-use crate::{tr};
 
 #[derive(Clone, Debug)]
 pub(super) struct Pitch {

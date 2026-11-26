@@ -67,7 +67,8 @@ pub fn show(app: &mut App, ctx: &Context) {
                 );
                 ui.add_space(4.0);
                 ui.label(
-                    RichText::new(tr!("用空格隔开字词。\n每个音符对应一个字词。")).color(muted_color()),
+                    RichText::new(tr!("用空格隔开字词。\n每个音符对应一个字词。"))
+                        .color(muted_color()),
                 );
                 let input_id = Id::new("fill-lyrics-text");
                 if edit.focus {
@@ -109,7 +110,9 @@ pub fn show(app: &mut App, ctx: &Context) {
                     });
                 ui.checkbox(&mut edit.repeat, tr!("循环填入"));
                 ui.checkbox(&mut edit.by_character, tr!("逐字填入"))
-                    .on_hover_text(tr!("拆分汉字、假名和韩文音节；拼音、罗马字及英文按空格分词。"));
+                    .on_hover_text(tr!(
+                        "拆分汉字、假名和韩文音节；拼音、罗马字及英文按空格分词。"
+                    ));
                 words = split_lyrics(&edit.text, edit.by_character);
                 let notes = edit.selection.len();
                 let hint = if words.is_empty() {
@@ -128,7 +131,9 @@ pub fn show(app: &mut App, ctx: &Context) {
                     trf!("{} 个字词 · 填入 {} 个音符", words.len(), notes)
                 };
                 ui.label(RichText::new(hint).size(11.0).color(muted_color()))
-                    .on_hover_text(tr!("更改歌词时会清除对应音符的自定义音素，以便重新生成发音。"));
+                    .on_hover_text(tr!(
+                        "更改歌词时会清除对应音符的自定义音素，以便重新生成发音。"
+                    ));
                 ui.add_space(8.0);
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     let size = vec2(((width - 8.0) / 2.0).clamp(1.0, 106.0), 34.0);

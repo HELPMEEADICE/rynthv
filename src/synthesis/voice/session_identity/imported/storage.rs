@@ -1,7 +1,7 @@
 //! Bounded context reads and serialized, atomic updates of the owned store.
 
 use crate::platform::fs::{self, File};
-use crate::{tr};
+use crate::tr;
 use std::{
     io::{Read, Write},
     path::Path,
@@ -33,9 +33,9 @@ pub(super) fn load_source(path: &Path) -> Result<Context> {
 fn decode(file: File) -> Result<Context> {
     let metadata = file.metadata()?;
     if !metadata.is_file() || metadata.len() > MAX_CONTEXT_BYTES {
-        return Err(VoiceError::new(
-            tr!("模型上下文必须是大小不超过 1 MiB 的 JSON 文件。"),
-        ));
+        return Err(VoiceError::new(tr!(
+            "模型上下文必须是大小不超过 1 MiB 的 JSON 文件。"
+        )));
     }
     let mut bytes = Zeroizing::new(Vec::new());
     file.take(MAX_CONTEXT_BYTES + 1).read_to_end(&mut bytes)?;
@@ -44,8 +44,8 @@ fn decode(file: File) -> Result<Context> {
     }
     // serde diagnostics may include a source value. Never expose them because
     // this document contains model conditions, not public project metadata.
-    let context: Context =
-        serde_json::from_slice(&bytes).map_err(|_| VoiceError::new(tr!("模型上下文文件格式无效。")))?;
+    let context: Context = serde_json::from_slice(&bytes)
+        .map_err(|_| VoiceError::new(tr!("模型上下文文件格式无效。")))?;
     super::validate(&context)?;
     Ok(context)
 }
@@ -76,7 +76,8 @@ pub(super) fn save(path: &Path, entry: VoiceContext, overwrite: bool) -> Result<
         context.voices.push(entry);
     }
     let bytes = Zeroizing::new(
-        serde_json::to_vec_pretty(&context).map_err(|_| VoiceError::new(tr!("无法编码模型上下文。")))?,
+        serde_json::to_vec_pretty(&context)
+            .map_err(|_| VoiceError::new(tr!("无法编码模型上下文。")))?,
     );
     if bytes.len() as u64 > MAX_CONTEXT_BYTES {
         return Err(VoiceError::new(tr!("模型上下文文件超过 1 MiB 大小限制。")));

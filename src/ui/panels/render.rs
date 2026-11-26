@@ -227,7 +227,11 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
             &app.editor.project.render_config,
             "bitDepth",
             tr!("位深度"),
-            &[(16, tr!("16 位")), (24, tr!("24 位")), (32, tr!("32 位浮点"))],
+            &[
+                (16, tr!("16 位")),
+                (24, tr!("24 位")),
+                (32, tr!("32 位浮点")),
+            ],
         ) {
             pending_config.push((key, value.into()));
         }
@@ -324,10 +328,7 @@ fn confirm_overwrite(request: &ExportRequest) -> bool {
     existing.is_empty()
         || rfd::MessageDialog::new()
             .set_title(tr!("覆盖音频文件"))
-            .set_description(trf!(
-                "以下文件已存在，是否覆盖？\n{}",
-                existing.join("\n")
-            ))
+            .set_description(trf!("以下文件已存在，是否覆盖？\n{}", existing.join("\n")))
             .set_buttons(rfd::MessageButtons::YesNo)
             .show()
             == rfd::MessageDialogResult::Yes

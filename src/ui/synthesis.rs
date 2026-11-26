@@ -34,7 +34,8 @@ pub fn render_status(app: &mut App, ui: &mut Ui) {
             }
         });
     }
-    if (stats.failed > 0 || app.synthesis.error.is_some()) && ui.button(tr!("重试合成")).clicked() {
+    if (stats.failed > 0 || app.synthesis.error.is_some()) && ui.button(tr!("重试合成")).clicked()
+    {
         app.synthesis.retry();
     }
     if let Some(error) = &app.synthesis.recording_error {
@@ -98,6 +99,8 @@ pub fn render_status(app: &mut App, ui: &mut Ui) {
             summary.changed_owners,
             summary.unchanged_owners
         ));
-        ui.weak(tr!("优先准备播放位置的音频，其余部分在后台继续合成；无改动区段复用已有结果。"));
+        ui.weak(tr!(
+            "优先准备播放位置的音频，其余部分在后台继续合成；无改动区段复用已有结果。"
+        ));
     });
 }

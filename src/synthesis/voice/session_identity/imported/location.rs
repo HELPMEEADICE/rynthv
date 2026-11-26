@@ -1,11 +1,13 @@
 //! Prevent explicit imports from being saved to a packaged host's private copy.
 
 use crate::platform::fs::{File, OpenOptions};
-use crate::{tr};
 use std::{io, path::Path};
 
 #[cfg(not(target_arch = "wasm32"))]
-use crate::synthesis::voice::{Result, VoiceError};
+use crate::{
+    synthesis::voice::{Result, VoiceError},
+    tr,
+};
 
 pub(super) fn open_read(path: &Path) -> io::Result<File> {
     #[cfg(target_arch = "wasm32")]
@@ -72,9 +74,9 @@ pub(super) fn verify(file: &File, expected: &Path) -> Result<()> {
     let actual = normalize(&String::from_utf16_lossy(&buffer[..length as usize]));
     let expected = normalize(&expected.to_string_lossy());
     if !actual.eq_ignore_ascii_case(&expected) {
-        return Err(VoiceError::new(
-            tr!("模型上下文路径被宿主程序重定向。请从桌面启动 RynthV 后执行导入。"),
-        ));
+        return Err(VoiceError::new(tr!(
+            "模型上下文路径被宿主程序重定向。请从桌面启动 RynthV 后执行导入。"
+        )));
     }
     Ok(())
 }
@@ -95,9 +97,9 @@ pub(super) fn verify(file: &File, expected: &Path) -> Result<()> {
 
     let metadata = file.metadata()?;
     if !metadata.is_file() || metadata.nlink() != 1 {
-        return Err(VoiceError::new(
-            tr!("模型上下文必须是普通文件，不能使用硬链接。"),
-        ));
+        return Err(VoiceError::new(tr!(
+            "模型上下文必须是普通文件，不能使用硬链接。"
+        )));
     }
     let expected = std::path::absolute(expected)?;
     let parent = expected
@@ -111,7 +113,9 @@ pub(super) fn verify(file: &File, expected: &Path) -> Result<()> {
     let expected = parent.canonicalize()?.join(filename);
     let actual = std::fs::read_link(format!("/proc/self/fd/{}", file.as_raw_fd()))?;
     if actual != expected {
-        return Err(VoiceError::new(tr!("模型上下文的实际路径与预期路径不一致。")));
+        return Err(VoiceError::new(tr!(
+            "模型上下文的实际路径与预期路径不一致。"
+        )));
     }
     Ok(())
 }
@@ -123,7 +127,7 @@ pub(super) fn verify(file: &File, expected: &Path) -> Result<()> {
     target_arch = "wasm32"
 )))]
 pub(super) fn verify(_file: &File, _expected: &Path) -> Result<()> {
-    Err(VoiceError::new(
-        tr!("模型上下文导入当前仅支持 Windows 和 Linux。"),
-    ))
+    Err(VoiceError::new(tr!(
+        "模型上下文导入当前仅支持 Windows 和 Linux。"
+    )))
 }

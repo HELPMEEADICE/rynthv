@@ -1,6 +1,6 @@
 use crate::i18n::Locale;
 use eframe::egui::FontData;
-use std::{Path, process::Command};
+use std::{path::Path, process::Command};
 
 const INSTALL_HINT: &str = "Install fontconfig and a CJK sans-serif font (for example fonts-noto-cjk), then restart RynthV.";
 

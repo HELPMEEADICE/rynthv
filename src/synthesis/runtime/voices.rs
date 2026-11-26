@@ -5,12 +5,12 @@ use crate::synthesis::{
     render_cache::{CacheStats, PublishedOwner},
     settings::VoiceSelection,
 };
+use crate::{tr, trf};
 use std::{
     collections::BTreeSet,
     sync::{Arc, mpsc::TryRecvError},
     time::Duration,
 };
-use crate::{tr, trf};
 
 pub(super) struct VoiceSlot {
     pub state: VoiceState,

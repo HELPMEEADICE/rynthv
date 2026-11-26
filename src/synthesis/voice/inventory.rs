@@ -1,5 +1,5 @@
 use crate::platform::fs;
-use crate::{tr};
+use crate::tr;
 mod flat;
 mod inspect;
 mod nofs;
@@ -194,9 +194,9 @@ impl VoiceInventory {
         let nofs_files = super::nofs::paths(directory)?;
         if !nofs_files.is_empty() {
             if nofs_files.len() != 1 {
-                return Err(VoiceError::new(
-                    tr!("SV1 目录包含多个声库文件，请从声库列表选择明确版本"),
-                ));
+                return Err(VoiceError::new(tr!(
+                    "SV1 目录包含多个声库文件，请从声库列表选择明确版本"
+                )));
             }
             let has_dnni = fs::read_dir(directory)?.try_fold(false, |found, entry| {
                 let path = entry?.path();
@@ -209,9 +209,9 @@ impl VoiceInventory {
                 )
             })?;
             if has_dnni {
-                return Err(VoiceError::new(
-                    tr!("目录同时包含 SV1 与 SV2 模型，请选择明确的声库文件或版本目录"),
-                ));
+                return Err(VoiceError::new(tr!(
+                    "目录同时包含 SV1 与 SV2 模型，请选择明确的声库文件或版本目录"
+                )));
             }
             return nofs::load(&nofs_files[0]);
         }

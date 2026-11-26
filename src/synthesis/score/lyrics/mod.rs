@@ -9,6 +9,7 @@ use crate::{
         voice::{Result, VoiceError},
     },
 };
+use crate::{tr, trf};
 use dictionary::Dictionary;
 use mandarin::MandarinLexicon;
 use std::{
@@ -16,7 +17,6 @@ use std::{
     path::{Path, PathBuf},
     sync::OnceLock,
 };
-use crate::{tr, trf};
 
 /// Immutable resource dictionaries are loaded on first use of a language, not
 /// on each edit and not all at application startup. They never cache rendered audio.
@@ -79,7 +79,10 @@ impl LyricFrontend {
             Lexicon::Dictionary(dictionary) => dictionary.resolve(lyrics),
         }?;
         if result.is_empty() || result.iter().any(Vec::is_empty) {
-            return Err(VoiceError::new(trf!("{}歌词没有可合成的音素", language.label())));
+            return Err(VoiceError::new(trf!(
+                "{}歌词没有可合成的音素",
+                language.label()
+            )));
         }
         Ok(result)
     }

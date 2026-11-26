@@ -1,4 +1,5 @@
 use super::{Runtime, voices::VoiceSlot, worker};
+use crate::tr;
 use crate::{
     model::{GroupRef, Project, Track},
     synthesis::{
@@ -7,7 +8,6 @@ use crate::{
     },
 };
 use std::collections::{BTreeMap, BTreeSet};
-use crate::{tr};
 
 impl Runtime {
     pub fn resolve_voice(

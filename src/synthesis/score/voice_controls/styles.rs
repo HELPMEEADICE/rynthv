@@ -32,7 +32,11 @@ impl PreparedVoiceControls {
         let mut configured = false;
         for name in fixed.chain(curves) {
             if !names.contains(name) {
-                return Err(VoiceError::new(trf!("当前声库不支持唱法 {} 的{}参数。", name, component.label())));
+                return Err(VoiceError::new(trf!(
+                    "当前声库不支持唱法 {} 的{}参数。",
+                    name,
+                    component.label()
+                )));
             }
             configured = true;
         }

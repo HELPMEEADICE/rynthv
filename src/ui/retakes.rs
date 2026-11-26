@@ -222,8 +222,7 @@ pub fn selector(app: &mut App, ui: &mut Ui, selection: &RetakeSelection) {
             .show_ui(ui, |ui| choices(app, ui, selection))
             .response
             .on_hover_text(trf!("切换所选 {} 个音符的采样", selection.note_count));
-        for (direction, text, tip) in
-            [(-1, "‹", tr!("上一个采样")), (1, "›", tr!("下一个采样"))]
+        for (direction, text, tip) in [(-1, "‹", tr!("上一个采样")), (1, "›", tr!("下一个采样"))]
         {
             let adjacent = selection.adjacent_id(direction);
             if ui

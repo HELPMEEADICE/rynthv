@@ -32,7 +32,11 @@ pub fn saved_identity(voice_name: &str, model_version: u8) -> Result<u64> {
     if let Some(identity) = imported::read(voice_name, model_version)? {
         return Ok(identity);
     }
-    Err(VoiceError::new(trf!("未找到声库 {0}（模型版本 {1}）已导入的模型上下文。请先导入此声库的模型上下文。", voice_name, model_version)))
+    Err(VoiceError::new(trf!(
+        "未找到声库 {0}（模型版本 {1}）已导入的模型上下文。请先导入此声库的模型上下文。",
+        voice_name,
+        model_version
+    )))
 }
 
 /// Explicitly stores a condition derived from a selected session file or a
@@ -98,9 +102,9 @@ pub fn parse_identity(text: &str) -> Result<u64> {
             _ => byte.is_ascii_digit(),
         })
     {
-        return Err(VoiceError::new(
-            tr!("模型 identity 必须是完整的无符号 64 位整数，支持十进制或 0x 开头的十六进制。"),
-        ));
+        return Err(VoiceError::new(tr!(
+            "模型 identity 必须是完整的无符号 64 位整数，支持十进制或 0x 开头的十六进制。"
+        )));
     }
     u64::from_str_radix(digits, radix)
         .map_err(|_| VoiceError::new(tr!("模型 identity 超出无符号 64 位整数范围。")))

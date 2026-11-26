@@ -316,18 +316,27 @@ fn interaction(
             }
         }
         #[cfg(target_os = "android")]
-        if ui.add_enabled(selected, Button::new(tr!("编辑歌词"))).clicked() {
+        if ui
+            .add_enabled(selected, Button::new(tr!("编辑歌词")))
+            .clicked()
+        {
             app.edit_lyric();
             ui.close();
         }
         if ui
-            .add_enabled(selected, Button::new(tr!("填入歌词…")).shortcut_text("Ctrl+L"))
+            .add_enabled(
+                selected,
+                Button::new(tr!("填入歌词…")).shortcut_text("Ctrl+L"),
+            )
             .clicked()
         {
             crate::ui::fill_lyrics::open(app);
             ui.close();
         }
-        if ui.add_enabled(selected, Button::new(tr!("静音音符"))).clicked() {
+        if ui
+            .add_enabled(selected, Button::new(tr!("静音音符")))
+            .clicked()
+        {
             app.editor.mute_selected();
             ui.close();
         }

@@ -6,8 +6,7 @@ use super::{
 use crate::{
     app::App,
     synthesis::{runtime::VoiceState, voice::VoiceCatalogEntry},
-    tr,
-    trf,
+    tr, trf,
     ui::{child, theme::*},
 };
 use eframe::egui::*;
@@ -192,7 +191,15 @@ fn badge(ui: &Ui, app: &App, entry: &VoiceCatalogEntry, current: bool, rect: Rec
             VoiceState::Loaded(_) if app.synthesis.voice_error(&key).is_some() => {
                 (tr!("待配置"), Color32::from_rgb(219, 167, 101), false)
             }
-            VoiceState::Loaded(_) => (if current { tr!("当前音轨") } else { tr!("已加载") }, ACCENT, true),
+            VoiceState::Loaded(_) => (
+                if current {
+                    tr!("当前音轨")
+                } else {
+                    tr!("已加载")
+                },
+                ACCENT,
+                true,
+            ),
             VoiceState::Loading => (tr!("正在加载"), muted_color(), false),
             VoiceState::Failed(_) => (tr!("加载失败"), Color32::from_rgb(218, 142, 126), false),
             VoiceState::Unloaded => (tr!("未加载"), muted_color(), false),

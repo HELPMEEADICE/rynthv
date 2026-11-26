@@ -1,6 +1,6 @@
 use super::{AudioError, ChannelLayout, RenderedAudio, conversion};
+use crate::tr;
 use std::{io::Write, path::Path};
-use crate::{tr};
 
 #[derive(Clone, Copy)]
 pub struct WaveFormat {

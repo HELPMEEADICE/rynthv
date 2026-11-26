@@ -7,8 +7,7 @@ use crate::{
         settings::VoiceSelection,
         voice::{VoiceAvailability, VoiceCatalogEntry, VoiceFamily},
     },
-    tr,
-    trf,
+    tr, trf,
     ui::{icons::Icon, theme::*},
 };
 use eframe::egui::*;
@@ -112,7 +111,10 @@ pub fn popup(app: &mut App, anchor: &Response) {
                 );
             }
             if entries.is_empty() && !app.synthesis.library.is_scanning() {
-                weak(ui, tr!("没有可选歌声，请在“管理歌声”中设置 databases 目录。"));
+                weak(
+                    ui,
+                    tr!("没有可选歌声，请在“管理歌声”中设置 databases 目录。"),
+                );
             }
             let selected = app.voice_selection();
             let mut choose = None;

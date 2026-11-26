@@ -5,8 +5,8 @@ use super::{
     mixer::{self, VocalStem},
 };
 use crate::synthesis::audio;
-use std::{sync::mpsc, thread};
 use crate::{tr, trf};
+use std::{sync::mpsc, thread};
 
 impl Runtime {
     pub fn export_ready(&self, revision: u64) -> bool {
@@ -86,11 +86,18 @@ impl Runtime {
                         )? {
                             outputs.push(output);
                         } else if output.stem != VocalStem::Aspiration {
-                            return Err(trf!("{} 没有可导出的音频，请检查音轨是否为空、静音或被独奏排除", output.path.display()));
+                            return Err(trf!(
+                                "{} 没有可导出的音频，请检查音轨是否为空、静音或被独奏排除",
+                                output.path.display()
+                            ));
                         }
                     }
                     std::fs::create_dir_all(&request.directory).map_err(|error| {
-                        trf!("无法创建导出文件夹 {}：{}", request.directory.display(), error)
+                        trf!(
+                            "无法创建导出文件夹 {}：{}",
+                            request.directory.display(),
+                            error
+                        )
                     })?;
                     let mut written = Vec::with_capacity(outputs.len());
                     for output in outputs {
@@ -103,7 +110,10 @@ impl Runtime {
                             None,
                         )?
                         .ok_or_else(|| {
-                            trf!("{} 没有可导出的音频，请检查音轨是否为空、静音或被独奏排除", output.path.display())
+                            trf!(
+                                "{} 没有可导出的音频，请检查音轨是否为空、静音或被独奏排除",
+                                output.path.display()
+                            )
                         })?;
                         audio::save_wav_as(&output.path, &audio, request.format)
                             .map_err(|e| trf!("{}（此前已完成 {} 个文件）", e, written.len()))?;

@@ -1,4 +1,6 @@
-use crate::{i18n::Locale, tr, trf};
+use crate::i18n::Locale;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::{tr, trf};
 use eframe::egui::Context;
 use serde::{Deserialize, Serialize};
 #[cfg(not(target_arch = "wasm32"))]
@@ -40,8 +42,8 @@ impl Preferences {
             }
             Err(error) => return Err(trf!("无法读取界面设置：{}", error)),
         };
-        let value: Self = serde_json::from_slice(&bytes)
-            .map_err(|error| trf!("无法读取界面设置：{}", error))?;
+        let value: Self =
+            serde_json::from_slice(&bytes).map_err(|error| trf!("无法读取界面设置：{}", error))?;
         if !value.valid() {
             return Err(tr!("界面缩放必须为 75% 至 200%").into());
         }

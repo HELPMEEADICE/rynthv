@@ -1,5 +1,5 @@
+use crate::tr;
 use std::collections::BTreeMap;
-use crate::{tr};
 
 use serde::Serialize;
 
@@ -114,12 +114,14 @@ impl VoiceConfiguration {
 
     pub(super) fn from_nofs(mut fields: BTreeMap<String, String>) -> Result<Self> {
         if take(&mut fields, ".type")? != "mu" {
-            return Err(VoiceError::new(
-                tr!("暂不支持该 SV1 声库类型，仅支持 DDS AI 声库"),
-            ));
+            return Err(VoiceError::new(tr!(
+                "暂不支持该 SV1 声库类型，仅支持 DDS AI 声库"
+            )));
         }
         if take(&mut fields, "f0model-configs")? != "_ _ _ _ _ _ _ _" {
-            return Err(VoiceError::new(tr!("暂不支持该 SV1 声库的自定义 F0 模型配置")));
+            return Err(VoiceError::new(tr!(
+                "暂不支持该 SV1 声库的自定义 F0 模型配置"
+            )));
         }
         let name = take(&mut fields, ".name")?;
         let version = take(&mut fields, ".version")?;

@@ -131,8 +131,9 @@ pub(super) fn show(app: &mut App, ui: &mut Ui, viewport_height: f32) {
             ui.weak(tr!("字词"));
             field(ui, &mut state.word);
             ui.weak(tr!("音素"));
-            field(ui, &mut state.phones)
-                .on_hover_text(tr!("以空格分隔音素；只覆盖与词典语言相同的音符，手动填写的音素优先"));
+            field(ui, &mut state.phones).on_hover_text(tr!(
+                "以空格分隔音素；只覆盖与词典语言相同的音符，手动填写的音素优先"
+            ));
             pair(ui, |ui, width| {
                 if ui
                     .add_enabled(

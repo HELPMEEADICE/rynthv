@@ -88,7 +88,12 @@ impl VoiceCatalog {
             return Err(trf!("存在多个同名歌声 {0}，请为音轨重新选择歌手", name));
         }
         if let VoiceAvailability::Unsupported(reason) = &entry.availability {
-            return Err(trf!("歌声 {0}（版本 {1}）不可用：{2}", entry.display_name, entry.revision, reason));
+            return Err(trf!(
+                "歌声 {0}（版本 {1}）不可用：{2}",
+                entry.display_name,
+                entry.revision,
+                reason
+            ));
         }
         Ok(Some(entry.selection()))
     }

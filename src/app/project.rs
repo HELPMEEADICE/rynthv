@@ -1,7 +1,7 @@
 use super::App;
+use crate::{editor::Editor, model::*, ui};
 #[cfg(not(target_arch = "wasm32"))]
-use crate::storage;
-use crate::{editor::Editor, model::*, tr, ui};
+use crate::{storage, tr};
 #[cfg(not(target_arch = "wasm32"))]
 use eframe::egui::Context;
 #[cfg(not(target_arch = "wasm32"))]

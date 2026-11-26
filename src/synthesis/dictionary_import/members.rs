@@ -2,7 +2,8 @@ use std::collections::BTreeMap;
 
 use crate::{
     model::Language,
-    synthesis::voice::{Result, VoiceError}, tr, trf,
+    synthesis::voice::{Result, VoiceError},
+    tr, trf,
 };
 
 pub(super) struct Member {
@@ -62,7 +63,10 @@ pub(super) fn select(members: &[Member]) -> Result<BTreeMap<String, &Member>> {
     let mut selected = BTreeMap::new();
     for (name, member) in files {
         if !member.regular || selected.insert(name, member).is_some() {
-            return Err(VoiceError::new(trf!("压缩包中的词典条目无效或重名：{0}", member.name)));
+            return Err(VoiceError::new(trf!(
+                "压缩包中的词典条目无效或重名：{0}",
+                member.name
+            )));
         }
     }
     Ok(selected)

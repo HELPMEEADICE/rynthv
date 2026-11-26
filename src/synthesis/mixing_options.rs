@@ -1,18 +1,26 @@
 //! Validate mixer and export features before publishing or writing audio.
 
 use crate::model::Extra;
-use serde_json::Value;
 use crate::{tr, trf};
+use serde_json::Value;
 
 pub(super) fn validate_project_mixer(value: Option<&Value>) -> Result<(), String> {
     let Some(value) = value else {
         return Ok(());
     };
-    let object = value.as_object().ok_or(tr!("工程 projectMixer 必须为对象"))?;
+    let object = value
+        .as_object()
+        .ok_or(tr!("工程 projectMixer 必须为对象"))?;
     for (key, value) in object {
         match key.as_str() {
             "linkRoomSettings" if value.is_boolean() => {}
-            _ => return Err(trf!("暂不支持工程混音设置 projectMixer.{} = {}", key, value)),
+            _ => {
+                return Err(trf!(
+                    "暂不支持工程混音设置 projectMixer.{} = {}",
+                    key,
+                    value
+                ));
+            }
         }
     }
     Ok(())

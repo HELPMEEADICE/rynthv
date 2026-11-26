@@ -11,16 +11,14 @@ mod voice;
 pub(crate) mod web;
 pub use midi::{MidiImport, MidiImportMode, MidiImportPhase};
 
-#[cfg(not(target_arch = "wasm32"))]
-use crate::storage;
 use crate::{
     editor::Editor,
     model::*,
-    synthesis,
-    tr,
-    trf,
+    synthesis, tr,
     ui::{self, state::ViewState},
 };
+#[cfg(not(target_arch = "wasm32"))]
+use crate::{storage, trf};
 use eframe::egui::*;
 use std::{path::PathBuf, time::Duration};
 use web_time::Instant;

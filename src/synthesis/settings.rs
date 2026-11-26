@@ -5,12 +5,12 @@ use super::{
     voice::{flat::FlatModelRegistry, svpk},
 };
 use crate::platform::fs;
+use crate::{tr, trf};
 use serde::{Deserialize, Serialize};
 use std::{
     io::Write,
     path::{Path, PathBuf},
 };
-use crate::{tr, trf};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -124,14 +124,22 @@ impl SynthesisSettings {
         match (directories.next(), directories.next()) {
             (Some(directory), None) => Ok(directory),
             (None, _) => {
-                let mut message = trf!("声库 {}/{} 不在已配置的声库目录中。", selected.database_id, selected.revision);
+                let mut message = trf!(
+                    "声库 {}/{} 不在已配置的声库目录中。",
+                    selected.database_id,
+                    selected.revision
+                );
                 if let Some(error) = scan.error {
                     message.push('\n');
                     message.push_str(&error);
                 }
                 Err(message)
             }
-            (Some(_), Some(_)) => Err(trf!("声库 {}/{} 对应多个文件，请检查声库目录配置。", selected.database_id, selected.revision)),
+            (Some(_), Some(_)) => Err(trf!(
+                "声库 {}/{} 对应多个文件，请检查声库目录配置。",
+                selected.database_id,
+                selected.revision
+            )),
         }
     }
 }

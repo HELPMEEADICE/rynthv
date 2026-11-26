@@ -1,11 +1,12 @@
 #[cfg(not(target_arch = "wasm32"))]
 use super::adapter::adapters;
 use super::adapter::{AdapterId, AdapterInfo, limits};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::trf;
 #[cfg(all(target_os = "android", feature = "gui"))]
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use wgpu::{Adapter, Backends, Features, Limits};
-use crate::{trf};
 
 pub(in super::super) struct Device {
     pub(super) raw: wgpu::Device,

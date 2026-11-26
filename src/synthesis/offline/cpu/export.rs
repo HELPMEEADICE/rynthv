@@ -2,12 +2,12 @@ use super::{
     super::{voices::voice_path, *},
     JobEvent, Update,
 };
+use crate::tr;
 use crate::{
     platform::web::cpu::wait_packets,
     synthesis::{plan::RenderPlan, render_cache::Completion},
 };
 use std::collections::VecDeque;
-use crate::{tr};
 
 impl Offline {
     pub(in crate::synthesis::offline) fn render_cpu_owners(
@@ -46,7 +46,9 @@ impl Offline {
                         pending.pop_front();
                         continue;
                     }
-                    let job = cache.take_owner(owner).ok_or(tr!("无法调度待导出的音符组"))?;
+                    let job = cache
+                        .take_owner(owner)
+                        .ok_or(tr!("无法调度待导出的音符组"))?;
                     let path = voice_path(library, key)?;
                     let slot = pool.start(job, path, settings, false, None)?;
                     order.push_back((slot, key, owner));

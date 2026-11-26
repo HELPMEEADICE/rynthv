@@ -6,6 +6,7 @@ use crate::synthesis::{
     settings::{SynthesisSettings, VoiceSelection},
     voice::{VoiceCatalog, VoiceCatalogEntry, flat::FlatModelRegistry},
 };
+use crate::{tr, trf};
 use std::{
     path::{Path, PathBuf},
     sync::{
@@ -14,7 +15,6 @@ use std::{
     },
     thread,
 };
-use crate::{tr, trf};
 
 pub struct VoiceLibrary {
     pub settings: SynthesisSettings,

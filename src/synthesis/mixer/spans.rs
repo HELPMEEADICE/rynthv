@@ -2,8 +2,8 @@
 //! adjusts its source offset; replacing a seam never copies whole owner audio.
 
 use super::{Controls, NATIVE_SAMPLE_RATE, RenderedAudio, intersection, mix_samples};
-use std::{collections::BTreeMap, ops::Range, sync::Arc};
 use crate::{tr, trf};
+use std::{collections::BTreeMap, ops::Range, sync::Arc};
 
 #[derive(Clone)]
 struct Span {
@@ -24,7 +24,10 @@ impl ReadySpans {
         coverage: &Range<usize>,
     ) -> Result<Range<usize>, String> {
         if audio.sample_rate() != NATIVE_SAMPLE_RATE {
-            return Err(trf!("实时混音要求 48000 Hz PCM，收到 {} Hz", audio.sample_rate()));
+            return Err(trf!(
+                "实时混音要求 48000 Hz PCM，收到 {} Hz",
+                audio.sample_rate()
+            ));
         }
         let origin = (audio.start_seconds() * f64::from(NATIVE_SAMPLE_RATE)).round();
         if !origin.is_finite() || origin < 0.0 || origin >= isize::MAX as f64 {

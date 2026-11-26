@@ -30,9 +30,9 @@ pub(super) fn validate_owner(input: &OwnerInput, family: VoiceFamily) -> Result<
     }
     for control in &input.pitch_controls {
         if matches!(control, PitchControl::Point(_)) && family != VoiceFamily::Sv2 {
-            return Err(VoiceError::new(
-                tr!("音高控制点仅支持二代歌声；当前歌声请改用手绘音高曲线。"),
-            ));
+            return Err(VoiceError::new(tr!(
+                "音高控制点仅支持二代歌声；当前歌声请改用手绘音高曲线。"
+            )));
         }
         let extra = match control {
             PitchControl::Curve(curve) if curve.valid() => &curve.extra,
@@ -87,7 +87,10 @@ pub(super) fn validate_owner(input: &OwnerInput, family: VoiceFamily) -> Result<
         })
         .unwrap_or("");
     if !dictionary.is_empty() && input.voice.dictionary.is_none() {
-        return Err(VoiceError::new(trf!("工程中找不到发音词典：{}", dictionary)));
+        return Err(VoiceError::new(trf!(
+            "工程中找不到发音词典：{}",
+            dictionary
+        )));
     }
     if !input.voice.track_options.is_empty() || !input.project_options.is_empty() {
         return unsupported("additional track/project synthesis options");
@@ -216,7 +219,12 @@ fn validate_phone_set(value: Option<&Value>, language: Language) -> Result<()> {
     match value {
         None => Ok(()),
         Some(Value::String(id)) if id.is_empty() || id == language.phoneme_alphabet() => Ok(()),
-        Some(value) => Err(VoiceError::new(trf!("{}的音素集应为 {}，当前为 {}", language.label(), language.phoneme_alphabet(), value))),
+        Some(value) => Err(VoiceError::new(trf!(
+            "{}的音素集应为 {}，当前为 {}",
+            language.label(),
+            language.phoneme_alphabet(),
+            value
+        ))),
     }
 }
 

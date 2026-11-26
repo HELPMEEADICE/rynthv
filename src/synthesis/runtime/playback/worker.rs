@@ -1,5 +1,6 @@
 use super::{Command, Snapshot, Transport};
 use crate::synthesis::audio::{LoopControl, PianoControl, Player};
+use crate::trf;
 use std::{
     sync::{
         Arc, Mutex,
@@ -8,7 +9,6 @@ use std::{
     },
     time::Duration,
 };
-use crate::{trf};
 
 pub(super) fn run(
     rx: Receiver<Command>,

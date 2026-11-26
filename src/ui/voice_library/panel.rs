@@ -87,7 +87,9 @@ fn status(app: &mut App, ui: &mut Ui) {
         });
     } else if failed {
         if ui
-            .button(RichText::new(tr!("加载异常 · 管理歌声…")).color(Color32::from_rgb(218, 142, 126)))
+            .button(
+                RichText::new(tr!("加载异常 · 管理歌声…")).color(Color32::from_rgb(218, 142, 126)),
+            )
             .clicked()
         {
             app.voice_manager = true;

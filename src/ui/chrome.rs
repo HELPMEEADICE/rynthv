@@ -183,7 +183,10 @@ fn other_menus(app: &mut App, ui: &mut Ui) {
         #[cfg(target_os = "android")]
         {
             let mut show = !app.view.arrangement_collapsed;
-            if ui.checkbox(&mut show, tr!("空间充足时同时显示编排")).changed() {
+            if ui
+                .checkbox(&mut show, tr!("空间充足时同时显示编排"))
+                .changed()
+            {
                 app.view.arrangement_collapsed = !show;
             }
         }

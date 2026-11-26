@@ -9,12 +9,12 @@ use crate::synthesis::{
     },
     plan::{OwnerId, RenderPlan},
 };
+use crate::{tr, trf};
 use std::{
     collections::{BTreeMap, BTreeSet},
     ops::Range,
     sync::Arc,
 };
-use crate::{tr, trf};
 
 struct Owner {
     coverage: Range<usize>,
@@ -47,7 +47,10 @@ impl LiveMixer {
             let controls = Controls::read(&output.mixer)
                 .map_err(|error| trf!("音轨 {}：{}", output.track_id, error))?;
             if controls.solo != solo_tracks.contains(&output.track_id) {
-                return Err(trf!("音轨 {} 的独奏状态与项目混音快照不一致", output.track_id));
+                return Err(trf!(
+                    "音轨 {} 的独奏状态与项目混音快照不一致",
+                    output.track_id
+                ));
             }
             if coverage.is_empty()
                 || output.reference_muted
@@ -146,7 +149,8 @@ impl LiveMixer {
         if model.end < model.start {
             return Err(trf!("音符组 {} 的模型采样范围无效", id.0));
         }
-        let start = usize::try_from(model.start.max(0)).map_err(|_| tr!("模型开始位置超出地址范围"))?;
+        let start =
+            usize::try_from(model.start.max(0)).map_err(|_| tr!("模型开始位置超出地址范围"))?;
         let end = usize::try_from(model.end.max(0)).map_err(|_| tr!("模型结束位置超出地址范围"))?;
         let before = owner.coverage.start..owner.coverage.end.min(start);
         let after = owner.coverage.start.max(end)..owner.coverage.end;
@@ -208,7 +212,9 @@ impl LiveMixer {
         let mut active = BTreeMap::<OwnerId, &Owner>::new();
         for index in first_block..end_block {
             let start = index * LIVE_BLOCK_FRAMES;
-            let frames = source.block_frames(index).ok_or(tr!("混音块超出项目范围"))?;
+            let frames = source
+                .block_frames(index)
+                .ok_or(tr!("混音块超出项目范围"))?;
             let range = start..start + frames;
             active.retain(|_, owner| owner.coverage.end > range.start);
             while let Some((id, owner)) =

@@ -1,12 +1,12 @@
 //! Pronunciation lookup in the installed language dictionaries.
 
 use crate::platform::fs;
+use crate::trf;
 use crate::{
     model::Language,
     synthesis::voice::{Result, VoiceError},
 };
 use std::{collections::HashMap, path::Path};
-use crate::{trf};
 
 pub(super) type Phones = Vec<String>;
 
@@ -74,7 +74,10 @@ impl PhoneTable {
     pub(super) fn get(&self, key: &str) -> Result<Phones> {
         let alternatives = self.entries.get(key).ok_or_else(|| unknown(key))?;
         if alternatives.len() != 1 {
-            return Err(VoiceError::new(trf!("{} 有多个词典读音，请填写显式音素", format!("{:?}", key))));
+            return Err(VoiceError::new(trf!(
+                "{} 有多个词典读音，请填写显式音素",
+                format!("{:?}", key)
+            )));
         }
         Ok(alternatives[0].clone())
     }
@@ -259,7 +262,10 @@ impl WordReadings {
             .ok_or_else(|| unknown(rest))?;
             let readings = &self.entries[&rest[..end]];
             if readings.len() != 1 {
-                return Err(VoiceError::new(trf!("{} 有多个读音，请使用注音或显式音素", format!("{:?}", &rest[..end]))));
+                return Err(VoiceError::new(trf!(
+                    "{} 有多个读音，请使用注音或显式音素",
+                    format!("{:?}", &rest[..end])
+                )));
             }
             result.extend(readings[0].split_whitespace().map(str::to_owned));
             rest = &rest[end..];
@@ -274,5 +280,8 @@ pub(super) fn read(path: &Path) -> Result<String> {
 }
 
 pub(super) fn unknown(text: &str) -> VoiceError {
-    VoiceError::new(trf!("词典未覆盖歌词 {}，请使用对应语言的注音或显式音素", format!("{:?}", text)))
+    VoiceError::new(trf!(
+        "词典未覆盖歌词 {}，请使用对应语言的注音或显式音素",
+        format!("{:?}", text)
+    ))
 }

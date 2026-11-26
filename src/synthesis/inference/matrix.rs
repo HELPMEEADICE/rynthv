@@ -1,7 +1,7 @@
 //! Prepared dense weights for CPU float execution.
 
+use crate::tr;
 use std::{fmt, sync::Arc};
-use crate::{tr};
 
 /// Structural errors are reported before an operator writes its output.
 #[derive(Clone, Debug, PartialEq, Eq)]

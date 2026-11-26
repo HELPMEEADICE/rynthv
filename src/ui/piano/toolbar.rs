@@ -41,7 +41,11 @@ fn overlays(app: &mut App, ui: &mut Ui, height: f32) {
     for (icon, label, active) in [
         (Icon::Pitch, tr!("显示音高曲线"), &mut app.show_pitch),
         (Icon::Waveform, tr!("显示渲染波形"), &mut app.show_waveform),
-        (Icon::Retake, tr!("显示 AI 重录小部件"), &mut app.show_retakes),
+        (
+            Icon::Retake,
+            tr!("显示 AI 重录小部件"),
+            &mut app.show_retakes,
+        ),
     ] {
         if ui
             .add(
@@ -204,7 +208,10 @@ pub fn toolbar(app: &mut App, ui: &mut Ui) {
         } else {
             ui.menu_button(tr!("工具"), |ui| {
                 for (_, label, tool) in TOOLS {
-                    if ui.selectable_label(tool == app.piano_tool, tr!(label)).clicked() {
+                    if ui
+                        .selectable_label(tool == app.piano_tool, tr!(label))
+                        .clicked()
+                    {
                         select(app, tool);
                         ui.close();
                     }

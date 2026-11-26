@@ -119,8 +119,8 @@ pub(super) fn directory_menu(app: &mut App, ui: &mut Ui) {
 
 fn choose_flat_databases(app: &mut App, ctx: &Context) {
     let current = app.synthesis.library.settings.flat_voice_directory().ok();
-    let picker =
-        Picker::new(Selection::Directory, tr!("选择 Flat 声库目录")).starting_at(current.as_deref());
+    let picker = Picker::new(Selection::Directory, tr!("选择 Flat 声库目录"))
+        .starting_at(current.as_deref());
     app.pick_one(ctx, picker, |app, _, path| {
         app.synthesis.set_flat_databases(path)
     });
@@ -135,8 +135,8 @@ fn choose_flat_models(app: &mut App, ctx: &Context) {
 }
 
 pub(super) fn choose_dictionaries(app: &mut App, ctx: &Context) {
-    let picker =
-        Picker::new(Selection::Directory, tr!("选择词典目录")).starting_at(app.synthesis.dictionaries());
+    let picker = Picker::new(Selection::Directory, tr!("选择词典目录"))
+        .starting_at(app.synthesis.dictionaries());
     app.pick_one(ctx, picker, |app, _, path| {
         app.synthesis.set_dictionaries(path)
     });

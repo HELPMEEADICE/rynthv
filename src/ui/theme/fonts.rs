@@ -1,4 +1,7 @@
-use crate::{i18n::Locale, tr};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::i18n::Locale;
+#[cfg(target_os = "windows")]
+use crate::tr;
 use eframe::egui::{Context, FontData, FontDefinitions, FontFamily};
 #[cfg(not(target_arch = "wasm32"))]
 use std::path::Path;
@@ -15,10 +18,7 @@ pub fn install(ctx: &Context, locale: Locale) -> Result<(), String> {
 }
 
 #[cfg(target_arch = "wasm32")]
-pub fn install_web(
-    ctx: &Context,
-    font: Result<Vec<u8>, String>,
-) -> Result<(), String> {
+pub fn install_web(ctx: &Context, font: Result<Vec<u8>, String>) -> Result<(), String> {
     let mut fonts = FontDefinitions::default();
     let result = font.map(|bytes| {
         let font = std::sync::Arc::new(FontData::from_owned(bytes));
@@ -107,8 +107,8 @@ fn system_font(locale: Locale, bold: bool) -> Result<FontData, String> {
         Locale::TraditionalChinese => &["msjh.ttc", "msyl.ttc", "msyh.ttc"],
         Locale::SimplifiedChinese | Locale::English => &["msyh.ttc", "msjh.ttc"],
     };
-    let path = first_available(candidates, bold)
-        .ok_or(tr!("无法加载界面字体：系统中缺少中文字体"))?;
+    let path =
+        first_available(candidates, bold).ok_or(tr!("无法加载界面字体：系统中缺少中文字体"))?;
     read_font(&path, 0)
 }
 

@@ -1,9 +1,9 @@
-use crate::{tr, trf};
 use super::{
     VoiceAvailability, VoiceCatalog, VoiceCatalogEntry, metadata::MetadataIndex, resource,
 };
 use crate::platform::fs;
 use crate::synthesis::voice::{Result, VoiceFamily, format::FormatContext};
+use crate::{tr, trf};
 use std::path::Path;
 
 pub(super) fn scan(
@@ -35,7 +35,11 @@ pub(super) fn scan(
         let is_dir = match revision.file_type() {
             Ok(kind) => kind.is_dir(),
             Err(error) => {
-                catalog.warnings.push(trf!("无法读取声库版本 {0}：{1}", revision.path().display(), error));
+                catalog.warnings.push(trf!(
+                    "无法读取声库版本 {0}：{1}",
+                    revision.path().display(),
+                    error
+                ));
                 continue;
             }
         };
@@ -71,8 +75,9 @@ pub(super) fn scan(
                 entry.family = Some(family);
                 let missing = configuration.models.missing(configuration.model_version);
                 if configuration.version != version.to_string() {
-                    entry.availability =
-                        VoiceAvailability::Unsupported(tr!("声库配置版本与目录版本不一致").to_owned());
+                    entry.availability = VoiceAvailability::Unsupported(
+                        tr!("声库配置版本与目录版本不一致").to_owned(),
+                    );
                 } else if !missing.is_empty() {
                     entry.availability = VoiceAvailability::Unsupported(trf!(
                         "缺少本地{0}模型，当前安装内容无法在本机合成",

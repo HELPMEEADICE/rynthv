@@ -5,7 +5,8 @@ mod shortcuts;
 mod widgets;
 
 use crate::{
-    app::App, tr,
+    app::App,
+    tr,
     ui::{
         child,
         icons::{Icon, IconButton},

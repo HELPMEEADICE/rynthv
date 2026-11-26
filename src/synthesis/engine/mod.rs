@@ -20,8 +20,8 @@ pub use incremental::synthesize_owner;
 pub use prepared::{OwnerSynthesis, PreparedAcoustics, PreparedModelFeatures};
 pub use render::{RenderResult, synthesize};
 
+use crate::tr;
 use serde::Serialize;
-use crate::{tr};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[cfg_attr(target_arch = "wasm32", derive(serde::Deserialize))]

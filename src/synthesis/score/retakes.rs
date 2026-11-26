@@ -1,3 +1,4 @@
+use crate::tr;
 use crate::{
     model::{RetakeSeeds, TakeSet},
     synthesis::{
@@ -6,7 +7,6 @@ use crate::{
     },
 };
 use serde_json::Value;
-use crate::{tr};
 
 pub(super) fn validate(value: &Value, family: VoiceFamily) -> Result<()> {
     let takes = TakeSet::from_value(value).map_err(VoiceError::new)?;
@@ -16,18 +16,18 @@ pub(super) fn validate(value: &Value, family: VoiceFamily) -> Result<()> {
 pub(super) fn validate_instance(value: &Value) -> Result<()> {
     let takes = TakeSet::from_value(value).map_err(VoiceError::new)?;
     if takes.active().seeds() != RetakeSeeds::default() {
-        return Err(VoiceError::new(
-            tr!("暂不支持音符组实例的重录采样，请使用音符重录。"),
-        ));
+        return Err(VoiceError::new(tr!(
+            "暂不支持音符组实例的重录采样，请使用音符重录。"
+        )));
     }
     Ok(())
 }
 
 pub(super) fn validate_seeds(seeds: RetakeSeeds, family: VoiceFamily) -> Result<()> {
     if family != VoiceFamily::Sv2 && seeds.duration != 0 {
-        return Err(VoiceError::new(
-            tr!("时值重录仅支持二代歌声；当前歌声可使用音高和音色重录。"),
-        ));
+        return Err(VoiceError::new(tr!(
+            "时值重录仅支持二代歌声；当前歌声可使用音高和音色重录。"
+        )));
     }
     Ok(())
 }

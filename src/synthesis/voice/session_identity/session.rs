@@ -1,5 +1,7 @@
-use crate::{tr, trf};
 use super::{Result, VoiceError};
+use crate::tr;
+#[cfg(all(windows, target_arch = "x86_64"))]
+use crate::trf;
 use std::path::{Path, PathBuf};
 
 pub const fn supports_session_import() -> bool {
@@ -12,18 +14,18 @@ pub fn import_session_context(voice_name: &str, model_version: u8, path: &Path) 
     super::validate_voice_name(voice_name)?;
     super::model_suffix(model_version)?;
     if path.as_os_str().is_empty() {
-        return Err(VoiceError::new(
-            tr!("请先选择 Synthesizer V Studio 2 的本地会话文件。"),
-        ));
+        return Err(VoiceError::new(tr!(
+            "请先选择 Synthesizer V Studio 2 的本地会话文件。"
+        )));
     }
     #[cfg(all(windows, target_arch = "x86_64"))]
     {
         let field = super::persisted::read_session_field(path)
             .map_err(|error| VoiceError::new(trf!("无法从所选会话文件读取模型上下文：{0}", error)))?
             .ok_or_else(|| {
-                VoiceError::new(
-                    tr!("所选会话文件未保存可用的模型上下文，请选择“从原版获取”、上下文文件或手动输入。"),
-                )
+                VoiceError::new(tr!(
+                    "所选会话文件未保存可用的模型上下文，请选择“从原版获取”、上下文文件或手动输入。"
+                ))
             })?;
         let field = zeroize::Zeroizing::new(field);
         let identity = super::derive_local_identity(&field, voice_name, model_version)?;
@@ -32,8 +34,8 @@ pub fn import_session_context(voice_name: &str, model_version: u8, path: &Path) 
     }
     #[cfg(not(all(windows, target_arch = "x86_64")))]
     {
-        Err(VoiceError::new(
-            tr!("本地会话文件导入仅支持 Windows x64；当前平台可导入上下文文件或手动输入。"),
-        ))
+        Err(VoiceError::new(tr!(
+            "本地会话文件导入仅支持 Windows x64；当前平台可导入上下文文件或手动输入。"
+        )))
     }
 }

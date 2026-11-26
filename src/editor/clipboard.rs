@@ -85,7 +85,10 @@ impl Editor {
         let Some(clipboard) = self.capture_note_selection()? else {
             return Ok(0);
         };
-        let offset = self.active_ref().ok_or(tr!("请先选择音符组。"))?.blick_offset;
+        let offset = self
+            .active_ref()
+            .ok_or(tr!("请先选择音符组。"))?
+            .blick_offset;
         let at = self
             .notes()
             .iter()

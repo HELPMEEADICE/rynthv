@@ -6,7 +6,7 @@ use super::{
     *,
 };
 use crate::platform::web::cpu::wait_packets;
-use crate::{tr};
+use crate::tr;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn render(

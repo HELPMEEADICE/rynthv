@@ -6,8 +6,7 @@ use crate::synthesis::voice::session_identity;
 use crate::{
     app::App,
     synthesis::runtime::{ContextImportPhase, ContextImportSource},
-    tr,
-    trf,
+    tr, trf,
 };
 use eframe::egui::*;
 
@@ -41,9 +40,9 @@ pub(super) fn controls(
             app.synthesis.can_import_context(selection),
             Button::new(label),
         )
-        .on_hover_text(
-            tr!("从本地会话文件、上下文文件、手动输入或原编辑器进程重新导入此歌声的模型上下文"),
-        )
+        .on_hover_text(tr!(
+            "从本地会话文件、上下文文件、手动输入或原编辑器进程重新导入此歌声的模型上下文"
+        ))
         .on_disabled_hover_text(tr!("当前声库不可用，或正在扫描声库、导入上下文"))
         .clicked()
     {
@@ -85,15 +84,19 @@ pub(super) fn dialog(app: &mut App, ctx: &Context) {
                         ContextImportSource::SessionFile,
                         tr!("本地会话文件"),
                     )
-                    .on_disabled_hover_text(
-                        tr!("导入本地会话文件仅支持 Windows x64；当前平台可导入上下文文件或手动输入"),
-                    );
+                    .on_disabled_hover_text(tr!(
+                        "导入本地会话文件仅支持 Windows x64；当前平台可导入上下文文件或手动输入"
+                    ));
                 });
                 ui.add_enabled_ui(session_identity::supports_online_import(), |ui| {
-                    ui.selectable_value(&mut source, ContextImportSource::Online, tr!("从原版获取"))
-                        .on_disabled_hover_text(
-                            tr!("从原版获取仅支持 Windows x64；当前平台可导入上下文文件或手动输入"),
-                        );
+                    ui.selectable_value(
+                        &mut source,
+                        ContextImportSource::Online,
+                        tr!("从原版获取"),
+                    )
+                    .on_disabled_hover_text(tr!(
+                        "从原版获取仅支持 Windows x64；当前平台可导入上下文文件或手动输入"
+                    ));
                 });
             });
             ui.horizontal(|ui| {
@@ -130,7 +133,9 @@ pub(super) fn dialog(app: &mut App, ctx: &Context) {
                     )
                     .clicked();
             }
-            cancel = ui.add_enabled(!importing, Button::new(tr!("取消"))).clicked();
+            cancel = ui
+                .add_enabled(!importing, Button::new(tr!("取消")))
+                .clicked();
             import = ui
                 .add_enabled(dialog.can_import(), Button::new(tr!("导入")))
                 .clicked();

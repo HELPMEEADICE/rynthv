@@ -2,6 +2,7 @@ use super::{
     super::voices::VoiceResources,
     protocol::{Completed, Job, Update},
 };
+use crate::tr;
 use crate::{
     platform::web::cpu::progress,
     synthesis::{
@@ -25,7 +26,6 @@ use std::{
     },
 };
 use web_time::Instant;
-use crate::{tr};
 
 const BASELINE_BUDGET: usize = 24 << 20;
 const PARTIAL_BUDGET: usize = 24 << 20;

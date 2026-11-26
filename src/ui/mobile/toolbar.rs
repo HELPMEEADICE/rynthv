@@ -1,5 +1,7 @@
 use super::{Page, current_page, set_page};
 #[cfg(target_os = "android")]
+use crate::trf;
+#[cfg(target_os = "android")]
 use crate::ui::time_edit::{self, Target};
 use crate::{
     app::App,
@@ -11,8 +13,6 @@ use crate::{
     },
 };
 use eframe::egui::*;
-#[cfg(target_os = "android")]
-use crate::trf;
 
 pub(super) fn show(app: &mut App, ui: &mut Ui) {
     let width = ui.max_rect().width();
@@ -166,16 +166,16 @@ pub(in crate::ui) fn transport_options(app: &mut App, ui: &mut Ui) {
             (event.position, event.bpm)
         });
     if ui
-        .button(trf!(
-            "编辑拍号 {}/{}…",
-            meter.numerator, meter.denominator
-        ))
+        .button(trf!("编辑拍号 {}/{}…", meter.numerator, meter.denominator))
         .clicked()
     {
         time_edit::open(app, Target::Meter(meter.index));
         ui.close();
     }
-    if ui.button(trf!("编辑曲速 {} BPM…", format!("{bpm:.2}"))).clicked() {
+    if ui
+        .button(trf!("编辑曲速 {} BPM…", format!("{bpm:.2}")))
+        .clicked()
+    {
         time_edit::open(app, Target::Tempo(tempo_position));
         ui.close();
     }

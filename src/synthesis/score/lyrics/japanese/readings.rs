@@ -2,8 +2,8 @@
 
 use crate::platform::fs;
 use crate::synthesis::voice::{Result, VoiceError};
+use crate::trf;
 use std::{collections::HashMap, path::Path};
-use crate::{trf};
 
 const HEADER: [u8; 10] = [0, 0, 1, 0, 0, 0, 3, 0, 0, 0];
 const BOUNDARY: &str = "#";

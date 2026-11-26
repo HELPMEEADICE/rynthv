@@ -2,6 +2,7 @@
 //! execution scopes and cancellation state belong to the captured render job.
 
 use super::voice::{Result, VoiceError};
+use crate::tr;
 use std::{
     cell::RefCell,
     sync::{
@@ -9,7 +10,6 @@ use std::{
         atomic::{AtomicBool, Ordering},
     },
 };
-use crate::{tr};
 
 #[derive(Clone, Debug)]
 pub struct Cancellation {

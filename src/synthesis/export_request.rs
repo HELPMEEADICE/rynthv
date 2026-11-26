@@ -3,10 +3,10 @@ use super::{
     mixer::VocalStem,
 };
 use crate::model::Project;
+use crate::{tr, trf};
 #[cfg(not(target_arch = "wasm32"))]
 use std::path::Path;
 use std::path::PathBuf;
-use crate::{tr, trf};
 
 pub struct ExportRequest {
     pub(crate) outputs: Vec<Output>,

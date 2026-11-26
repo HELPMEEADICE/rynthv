@@ -1,7 +1,7 @@
 mod dds;
 
 use super::{PreparedTree, PreparedTreeSummary, Result, VoiceError, VoiceFamily};
-use crate::{trf};
+use crate::trf;
 use serde::Serialize;
 use std::sync::{Arc, OnceLock};
 
@@ -150,7 +150,10 @@ impl PreparedVoice {
             .next()
             .ok_or_else(|| VoiceError::new(trf!("声库缺少本地 {0} 模型", role)))?;
         if models.next().is_some() {
-            return Err(VoiceError::new(trf!("声库包含多个 {0} 模型，无法确定执行目标", role)));
+            return Err(VoiceError::new(trf!(
+                "声库包含多个 {0} 模型，无法确定执行目标",
+                role
+            )));
         }
         Ok(model)
     }

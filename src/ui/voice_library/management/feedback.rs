@@ -2,8 +2,7 @@ use super::super::{context, error_label, text, weak};
 use crate::{
     app::App,
     synthesis::{runtime::VoiceState, voice::VoiceCatalogEntry},
-    tr,
-    trf,
+    tr, trf,
     ui::theme::*,
 };
 use eframe::egui::*;
@@ -58,7 +57,10 @@ pub(super) fn diagnostics(app: &App, ui: &mut Ui, entry: &VoiceCatalogEntry) {
             ui,
             trf!(
                 "{} 个文件 · {} 个资源 · {} 棵模块树 · {} 个张量",
-                file_count, voice.resource_count, voice.graph_count, voice.tensor_count
+                file_count,
+                voice.resource_count,
+                voice.graph_count,
+                voice.tensor_count
             ),
         );
         #[cfg(not(target_arch = "wasm32"))]
@@ -82,19 +84,19 @@ pub(super) fn diagnostics(app: &App, ui: &mut Ui, entry: &VoiceCatalogEntry) {
             );
         }
         if let Some(elapsed) = app.synthesis.load_elapsed(&entry.selection()) {
-            weak(ui, trf!("加载耗时 {} 秒", format!("{:.2}", elapsed.as_secs_f64())));
+            weak(
+                ui,
+                trf!("加载耗时 {} 秒", format!("{:.2}", elapsed.as_secs_f64())),
+            );
         }
     }
     if let Some(catalog) = app.synthesis.library.catalog()
         && !catalog.warnings.is_empty()
     {
-        ui.collapsing(
-            trf!("扫描提示（{}）", catalog.warnings.len()),
-            |ui| {
-                for warning in &catalog.warnings {
-                    weak(ui, warning);
-                }
-            },
-        );
+        ui.collapsing(trf!("扫描提示（{}）", catalog.warnings.len()), |ui| {
+            for warning in &catalog.warnings {
+                weak(ui, warning);
+            }
+        });
     }
 }

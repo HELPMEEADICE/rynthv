@@ -99,7 +99,9 @@ pub fn show(app: &mut App, ctx: &Context) {
                             .any(|(track, &selected)| selected && !track.notes.is_empty());
                         ui.label(
                             RichText::new(match import.mode {
-                                MidiImportMode::NewProject => tr!("新建工程，使用 MIDI 的曲速和拍号。"),
+                                MidiImportMode::NewProject => {
+                                    tr!("新建工程，使用 MIDI 的曲速和拍号。")
+                                }
                                 MidiImportMode::Tracks => {
                                     tr!("从工程起点追加音轨，保留当前曲速和拍号。")
                                 }

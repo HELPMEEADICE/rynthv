@@ -1,7 +1,7 @@
 //! Seek only the public voice configuration, never tensor or session resources.
 
-use crate::{tr, trf};
 use crate::platform::fs::{self, File};
+use crate::{tr, trf};
 use std::{
     collections::{BTreeMap, HashSet},
     io::{Read, Seek, SeekFrom},
@@ -83,18 +83,22 @@ pub(super) fn configuration(directory: &Path, context: &FormatContext) -> Result
     for path in files {
         if let Some(bytes) = read_configuration(&path, context, &mut models)? {
             if configuration.is_some() {
-                return Err(VoiceError::new(tr!("声库含有多个配置资源，需要明确模型路由")));
+                return Err(VoiceError::new(tr!(
+                    "声库含有多个配置资源，需要明确模型路由"
+                )));
             }
             configuration = Some(parse_configuration(&bytes)?);
         }
     }
-    let mut configuration = configuration.ok_or_else(|| VoiceError::new(tr!("声库缺少名称配置资源")))?;
+    let mut configuration =
+        configuration.ok_or_else(|| VoiceError::new(tr!("声库缺少名称配置资源")))?;
     configuration.models = models;
     Ok(configuration)
 }
 
 fn parse_configuration(bytes: &[u8]) -> Result<Configuration> {
-    let text = std::str::from_utf8(bytes).map_err(|_| VoiceError::new(tr!("声库配置不是 UTF-8")))?;
+    let text =
+        std::str::from_utf8(bytes).map_err(|_| VoiceError::new(tr!("声库配置不是 UTF-8")))?;
     let mut fields = BTreeMap::new();
     for line in text.lines() {
         let (key, value) = line

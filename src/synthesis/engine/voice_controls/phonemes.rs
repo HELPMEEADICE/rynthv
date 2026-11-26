@@ -3,7 +3,7 @@ use crate::synthesis::{
     stages::timbre::records::FrameControl,
     voice::{Result, VoiceError},
 };
-use crate::{tr};
+use crate::tr;
 
 struct Phone {
     begin: f64,

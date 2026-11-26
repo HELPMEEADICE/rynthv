@@ -88,7 +88,9 @@ impl Editor {
         if self.is_editing() {
             return Err(tr!("请先完成当前编辑").into());
         }
-        let state = self.voice_parameter_state()?.ok_or(tr!("伴奏轨不能设置唱法"))?;
+        let state = self
+            .voice_parameter_state()?
+            .ok_or(tr!("伴奏轨不能设置唱法"))?;
         let changes = state
             .values
             .vocal_modes

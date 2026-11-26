@@ -1,5 +1,5 @@
-use crate::{tr, trf};
 use crate::platform::fs;
+use crate::{tr, trf};
 use std::path::Path;
 
 use serde::Serialize;

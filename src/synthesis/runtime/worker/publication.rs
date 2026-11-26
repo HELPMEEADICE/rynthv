@@ -11,8 +11,8 @@ use crate::synthesis::{
         mixer::{self, LiveMixer},
     },
 };
+use crate::trf;
 use std::sync::Arc;
-use crate::{trf};
 
 impl<'network, 'tree> WorkState<'network, 'tree> {
     pub fn publish(&mut self, events: &Events) {

@@ -1,5 +1,5 @@
+use crate::tr;
 use std::{ffi::c_void, mem::size_of, ptr};
-use crate::{tr};
 
 use zeroize::Zeroizing;
 

@@ -107,9 +107,9 @@ fn continuation(
             }
         }
     }
-    Err(VoiceError::new(
-        tr!("延音前缺少相连的元音，请填写歌词或显式音素。"),
-    ))
+    Err(VoiceError::new(tr!(
+        "延音前缺少相连的元音，请填写歌词或显式音素。"
+    )))
 }
 
 fn split_syllables(

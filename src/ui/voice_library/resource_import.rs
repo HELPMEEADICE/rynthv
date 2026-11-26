@@ -30,7 +30,8 @@ pub(super) fn dictionaries(app: &mut App, ui: &mut Ui) {
     {
         app.pick_one(
             ui.ctx(),
-            Picker::new(Selection::File, tr!("导入 clf-data 词典")).filter("ZIP / 7z", &["zip", "7z"]),
+            Picker::new(Selection::File, tr!("导入 clf-data 词典"))
+                .filter("ZIP / 7z", &["zip", "7z"]),
             |app, _, path| app.synthesis.import_dictionaries(path),
         );
     }

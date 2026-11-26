@@ -2,8 +2,7 @@ use super::{error_label, widgets};
 use crate::{
     app::App,
     model::{Language, database_language},
-    tr,
-    trf,
+    tr, trf,
     ui::theme::*,
 };
 use eframe::egui::*;
@@ -13,7 +12,12 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
         .voice_inventory()
         .and_then(|voice| voice.configuration.as_ref())
     else {
-        widgets::field(ui, tr!("未加载歌声"), true, tr!("加载声库后可选择其支持的语言"));
+        widgets::field(
+            ui,
+            tr!("未加载歌声"),
+            true,
+            tr!("加载声库后可选择其支持的语言"),
+        );
         return;
     };
     let Some(native) = Language::parse(&config.default_language) else {

@@ -10,7 +10,8 @@ use sha2::{Digest, Sha256};
 use super::{Result, VoiceCatalog, VoiceError, hex, nofs};
 use crate::{
     platform::{config_directory, temporary},
-    synthesis::resource_archive, tr, trf,
+    synthesis::resource_archive,
+    tr, trf,
 };
 
 const ZIP_OFFSET: u64 = 264;
@@ -72,7 +73,11 @@ pub fn import(input: &Path, dry_run: bool) -> Result<ImportedVoice> {
     let id = hex(&digest.finalize()[..16]);
     let destination = root.join(revision.to_string()).join(&id);
     if fs::try_exists(&destination)? {
-        return Err(VoiceError::new(trf!("声库 {0} 的 {1} 版已导入", voice.name, revision)));
+        return Err(VoiceError::new(trf!(
+            "声库 {0} 的 {1} 版已导入",
+            voice.name,
+            revision
+        )));
     }
     if !dry_run {
         fs::create_dir_all(
@@ -120,9 +125,9 @@ fn unpack(input: &Path, destination: &Path) -> Result<()> {
     }
     let mut archive = resource_archive::zip(reader, ZIP_OFFSET, 128)?;
     if archive.index_for_name(VOICE).is_none() {
-        return Err(VoiceError::new(
-            tr!("SVPK 缺少 voice.nofs，仅支持原生 SV1 AI 声库"),
-        ));
+        return Err(VoiceError::new(tr!(
+            "SVPK 缺少 voice.nofs，仅支持原生 SV1 AI 声库"
+        )));
     }
     for (name, max_bytes) in [
         (VOICE, MAX_NOFS_BYTES),

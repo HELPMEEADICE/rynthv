@@ -20,6 +20,7 @@ use crate::synthesis::{
     rendered::{PhonemeSnapshot, VisualPatch, VisualSnapshot},
     voice::flat::FlatModelRegistry,
 };
+use crate::trf;
 use runner::run;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -32,7 +33,6 @@ use std::{
     thread,
     time::Duration,
 };
-use crate::{trf};
 
 pub(super) enum Command {
     Plan {

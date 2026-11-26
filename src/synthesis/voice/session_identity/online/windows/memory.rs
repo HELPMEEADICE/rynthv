@@ -1,5 +1,5 @@
+use crate::tr;
 use std::ffi::c_void;
-use crate::{tr};
 
 use zeroize::Zeroizing;
 
@@ -28,30 +28,32 @@ pub(super) fn session_field(process: &Handle, slot: usize) -> Result<Zeroizing<V
             let mut confirmation = Zeroizing::new(vec![0u8; offset + 1]);
             read(process, text, &mut confirmation)?;
             if pointer(process, slot)? != object || pointer(process, field_pointer)? != text {
-                return Err(VoiceError::new(
-                    tr!("原编辑器的在线会话在读取时发生变化，请重试。"),
-                ));
+                return Err(VoiceError::new(tr!(
+                    "原编辑器的在线会话在读取时发生变化，请重试。"
+                )));
             }
             if confirmation[..] != field[..offset + 1] {
-                return Err(VoiceError::new(
-                    tr!("原编辑器的在线上下文在读取时发生变化，请重试。"),
-                ));
+                return Err(VoiceError::new(tr!(
+                    "原编辑器的在线上下文在读取时发生变化，请重试。"
+                )));
             }
             if offset == 0 {
-                return Err(VoiceError::new(
-                    tr!("原编辑器尚未准备好在线模型上下文，请先登录并加载歌声。"),
-                ));
+                return Err(VoiceError::new(tr!(
+                    "原编辑器尚未准备好在线模型上下文，请先登录并加载歌声。"
+                )));
             }
             if std::str::from_utf8(&field[..offset]).is_err() {
-                return Err(VoiceError::new(tr!("原编辑器的模型上下文不是有效的 UTF-8。")));
+                return Err(VoiceError::new(tr!(
+                    "原编辑器的模型上下文不是有效的 UTF-8。"
+                )));
             }
             field.truncate(offset);
             return Ok(field);
         }
     }
-    Err(VoiceError::new(
-        tr!("原编辑器的模型上下文超过安全读取上限，已停止导入。"),
-    ))
+    Err(VoiceError::new(tr!(
+        "原编辑器的模型上下文超过安全读取上限，已停止导入。"
+    )))
 }
 
 fn pointer(process: &Handle, address: usize) -> Result<usize> {
@@ -81,9 +83,9 @@ fn read(process: &Handle, address: usize, output: &mut [u8]) -> Result<()> {
         )
     };
     if success == 0 || received != output.len() {
-        return Err(VoiceError::new(
-            tr!("无法完整读取原编辑器的在线模型上下文，请确认会话仍在运行。"),
-        ));
+        return Err(VoiceError::new(tr!(
+            "无法完整读取原编辑器的在线模型上下文，请确认会话仍在运行。"
+        )));
     }
     Ok(())
 }

@@ -25,6 +25,7 @@ use super::{
     settings::VoiceSelection,
     voice::VoiceInventory,
 };
+use crate::tr;
 pub use context::{ContextImport, ContextImportDialog, ContextImportPhase, ContextImportSource};
 pub use export::ExportRequest;
 pub use library::VoiceLibrary;
@@ -34,7 +35,6 @@ use std::{
     sync::mpsc::{Receiver, TryRecvError},
     time::Duration,
 };
-use crate::{tr};
 
 pub enum VoiceState {
     Unloaded,

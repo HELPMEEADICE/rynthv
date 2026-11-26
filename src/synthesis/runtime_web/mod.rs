@@ -23,8 +23,8 @@ use crate::platform::web::{
     client::Pending,
     protocol::{ComputeDiagnostics, Export, ExportMetrics, Inventory},
 };
+use crate::tr;
 use std::{collections::BTreeMap, path::PathBuf, time::Duration};
-use crate::{tr};
 
 pub enum VoiceState {
     Unloaded,

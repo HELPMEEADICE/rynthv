@@ -1,4 +1,5 @@
 use super::{PreparedVoiceControls, control_buffer, validate_clock};
+use crate::tr;
 use crate::{
     model::{Parameter, VoiceParameter},
     synthesis::{
@@ -6,7 +7,6 @@ use crate::{
         voice::{Result, VoiceError, VoiceFamily},
     },
 };
-use crate::{tr};
 
 impl PreparedVoiceControls {
     pub fn sample_timbre_controls(
@@ -37,9 +37,9 @@ impl PreparedVoiceControls {
                 mouth
             };
             if self.family != VoiceFamily::Sv2 && mouth != 0.0 {
-                return Err(VoiceError::new(
-                    tr!("一代及一代兼容歌声暂不支持口型参数曲线；请使用二代歌声或清除口型曲线。"),
-                ));
+                return Err(VoiceError::new(tr!(
+                    "一代及一代兼容歌声暂不支持口型参数曲线；请使用二代歌声或清除口型曲线。"
+                )));
             }
             let pitch_ratio = ((cents / 1200.0).exp2() as f32)
                 .clamp(f32::from_bits(0x3f35_0481), f32::from_bits(0x3fb5_0481));

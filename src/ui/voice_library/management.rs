@@ -198,7 +198,9 @@ fn empty(app: &mut App, ui: &mut Ui, state: &mut State) {
                         .size(16.0),
                 );
                 weak(ui, tr!("选择声库目录，或导入 .svpk、.sfpk、.sfpks 文件。"));
-                ui.menu_button(tr!("选择声库目录…"), |ui| paths::directory_menu(app, ui));
+                ui.menu_button(tr!("选择声库目录…"), |ui| {
+                    paths::directory_menu(app, ui)
+                });
             }
             if let Some(catalog) = app.synthesis.library.catalog()
                 && !catalog.warnings.is_empty()

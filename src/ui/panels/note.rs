@@ -172,7 +172,11 @@ fn phonemes(app: &mut App, ui: &mut Ui) {
         vec2(ui.available_width(), 28.0),
         TextEdit::singleline(&mut draft.text)
             .id(id.with("input"))
-            .hint_text(if mixed { tr!("多个值") } else { tr!("自动") })
+            .hint_text(if mixed {
+                tr!("多个值")
+            } else {
+                tr!("自动")
+            })
             .vertical_align(Align::Center)
             .margin(vec2(7.0, 5.0))
             .background_color(crate::ui::theme::border_color()),

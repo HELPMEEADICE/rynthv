@@ -2,6 +2,7 @@ use super::{
     super::{OwnerId, StageTimings, SynthesisSettings},
     protocol::{Activity, Completed, Job, Update},
 };
+use crate::tr;
 use crate::{
     platform::web::cpu::{
         cancel_cpu_job, cpu_slots, poll_cpu_packet, prioritize_cpu_job, start_cpu_job, stop_jobs,
@@ -22,7 +23,6 @@ use std::{
 };
 use wasm_bindgen::{JsCast, JsValue};
 use web_time::Instant;
-use crate::{tr};
 
 #[derive(Default)]
 pub(in crate::synthesis::offline) struct Pool {
@@ -179,7 +179,10 @@ impl Pool {
         let Some(packet) = poll_cpu_packet() else {
             return Ok(None);
         };
-        let index = packet.get(0).as_f64().ok_or(tr!("CPU Worker 消息缺少槽位"))? as usize;
+        let index = packet
+            .get(0)
+            .as_f64()
+            .ok_or(tr!("CPU Worker 消息缺少槽位"))? as usize;
         let active = self.slots[index]
             .active
             .as_ref()

@@ -24,8 +24,8 @@ use crate::{
         render_cache::PublishedOwner,
     },
 };
-use std::{collections::BTreeSet, ops::Range, sync::Arc};
 use crate::{tr, trf};
+use std::{collections::BTreeSet, ops::Range, sync::Arc};
 
 const NATIVE_SAMPLE_RATE: u32 = 48_000;
 
@@ -147,7 +147,9 @@ pub(crate) fn mix_with_recordings(
     {
         return Ok(None);
     }
-    let sample_count = output_frames.checked_mul(2).ok_or(tr!("混音样本数量溢出"))?;
+    let sample_count = output_frames
+        .checked_mul(2)
+        .ok_or(tr!("混音样本数量溢出"))?;
     let mut samples = Vec::new();
     samples
         .try_reserve_exact(sample_count)
@@ -200,12 +202,19 @@ fn visit_audible_owners<'a>(
             continue;
         }
         if owner.audio.sample_rate() != NATIVE_SAMPLE_RATE {
-            return Err(trf!("音符组 {} 的 PCM 采样率为 {} Hz，混音要求所有音符组使用 48000 Hz", owner.owner.0, owner.audio.sample_rate()));
+            return Err(trf!(
+                "音符组 {} 的 PCM 采样率为 {} Hz，混音要求所有音符组使用 48000 Hz",
+                owner.owner.0,
+                owner.audio.sample_rate()
+            ));
         }
         let controls = Controls::read(&owner.controls.mixer)
             .map_err(|error| trf!("音轨 {}：{}", owner.controls.track_id, error))?;
         if controls.solo != solo_tracks.contains(&owner.controls.track_id) {
-            return Err(trf!("音轨 {} 的独奏状态与项目混音快照不一致", owner.controls.track_id));
+            return Err(trf!(
+                "音轨 {} 的独奏状态与项目混音快照不一致",
+                owner.controls.track_id
+            ));
         }
         if owner.controls.reference_muted
             || controls.mute

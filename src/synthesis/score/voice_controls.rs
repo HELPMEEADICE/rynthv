@@ -15,7 +15,7 @@ use crate::{
 };
 
 use super::PreparedAutomations;
-use crate::{tr};
+use crate::tr;
 
 #[derive(Clone, Debug)]
 pub struct PreparedVoiceControls {
@@ -39,9 +39,9 @@ impl PreparedVoiceControls {
                 .values()
                 .any(|style| style.pitch != 0.0 || style.pronunciation != 0.0)
         {
-            return Err(VoiceError::new(
-                tr!("一代及一代兼容歌声仅支持唱法的音色参数；音高与发音参数需使用二代歌声。"),
-            ));
+            return Err(VoiceError::new(tr!(
+                "一代及一代兼容歌声仅支持唱法的音色参数；音高与发音参数需使用二代歌声。"
+            )));
         }
         let scalars = VoiceParameter::BASIC.map(|parameter| {
             settings

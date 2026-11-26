@@ -1,6 +1,7 @@
 mod worker;
 
 use crate::synthesis::audio::{LoopControl, PianoControl, PlaybackControl, PlaybackSource};
+use crate::{tr, trf};
 use std::{
     sync::{
         Arc, Mutex,
@@ -9,7 +10,6 @@ use std::{
     },
     thread,
 };
-use crate::{tr, trf};
 
 #[derive(Clone, Default)]
 pub(super) struct Snapshot {

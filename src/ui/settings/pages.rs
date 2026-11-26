@@ -49,10 +49,19 @@ pub(super) fn general(app: &mut App, ui: &mut Ui) {
             ui.ctx().data_mut(|data| data.remove::<f32>(id));
         }
     });
-    fixed(ui, tr!("图形渲染"), &app.graphics_api, tr!("编辑器图形渲染后端"));
+    fixed(
+        ui,
+        tr!("图形渲染"),
+        &app.graphics_api,
+        tr!("编辑器图形渲染后端"),
+    );
     section(ui, tr!("帮助和指导"));
     toggle(ui, tr!("显示状态栏"), &mut app.preferences.show_status_bar);
-    toggle(ui, tr!("显示控件操作提示"), &mut app.preferences.control_hints);
+    toggle(
+        ui,
+        tr!("显示控件操作提示"),
+        &mut app.preferences.control_hints,
+    );
     section(ui, tr!("工作区"));
     #[cfg(not(target_os = "android"))]
     row(ui, tr!("工具列宽度"), |ui| {
@@ -115,7 +124,12 @@ pub(super) fn editing(app: &mut App, ui: &mut Ui) {
 }
 
 pub(super) fn recording(ui: &mut Ui) {
-    fixed(ui, tr!("录音输入设备"), tr!("未启用"), tr!("录音功能尚未接入"));
+    fixed(
+        ui,
+        tr!("录音输入设备"),
+        tr!("未启用"),
+        tr!("录音功能尚未接入"),
+    );
     fixed(ui, tr!("录音声道"), tr!("未启用"), tr!("录音功能尚未接入"));
     section(ui, tr!("录制"));
     ui.weak(tr!("录制功能尚未接入，相关设置暂不可用。"));
@@ -142,5 +156,7 @@ pub(super) fn rendering(app: &mut App, ui: &mut Ui) {
             app.settings = false;
         }
     });
-    ui.weak(tr!("目标文件夹、音轨、声道、位深度和采样率在渲染面板中设置。"));
+    ui.weak(tr!(
+        "目标文件夹、音轨、声道、位深度和采样率在渲染面板中设置。"
+    ));
 }

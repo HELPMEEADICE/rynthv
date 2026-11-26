@@ -1,10 +1,10 @@
+use crate::tr;
 use std::{
     fs::{File, OpenOptions},
     io::Read,
     os::windows::fs::OpenOptionsExt,
     path::Path,
 };
-use crate::{tr};
 
 use sha2::{Digest, Sha256};
 use zeroize::Zeroizing;
@@ -55,9 +55,9 @@ pub(super) fn sources() -> Result<Vec<OnlineContextSource>> {
 pub(super) fn read_field(process_id: u32) -> Result<Zeroizing<Vec<u8>>> {
     let process = Handle::process(process_id, true)?;
     if !access::same_user_and_session(&process)? {
-        return Err(VoiceError::new(
-            tr!("只能从当前 Windows 用户、当前会话的原编辑器导入模型上下文。"),
-        ));
+        return Err(VoiceError::new(tr!(
+            "只能从当前 Windows 用户、当前会话的原编辑器导入模型上下文。"
+        )));
     }
     let path = process::image_path(&process)?;
     // Keep this read-only handle alive through the read to deny file mutation
@@ -65,7 +65,9 @@ pub(super) fn read_field(process_id: u32) -> Result<Zeroizing<Vec<u8>>> {
     let _verified_executable = verify_executable(&path)?;
     let (base, size) = process::main_module(process_id, &path)?;
     if SESSION_SINGLETON_RVA + size_of::<u64>() > size {
-        return Err(VoiceError::new(tr!("原编辑器的主模块范围不符合已验证版本。")));
+        return Err(VoiceError::new(tr!(
+            "原编辑器的主模块范围不符合已验证版本。"
+        )));
     }
     let slot = base
         .checked_add(SESSION_SINGLETON_RVA)
@@ -76,9 +78,9 @@ pub(super) fn read_field(process_id: u32) -> Result<Zeroizing<Vec<u8>>> {
     if process::main_module(process_id, &path)? != (base, size)
         || !access::same_user_and_session(&process)?
     {
-        return Err(VoiceError::new(
-            tr!("原编辑器进程在导入期间发生变化，请重新选择来源。"),
-        ));
+        return Err(VoiceError::new(tr!(
+            "原编辑器进程在导入期间发生变化，请重新选择来源。"
+        )));
     }
     Ok(field)
 }
@@ -91,9 +93,9 @@ fn verify_executable(path: &Path) -> Result<File> {
         .share_mode(FILE_SHARE_READ)
         .open(path)?;
     if file.metadata()?.len() > MAXIMUM_EXECUTABLE_BYTES {
-        return Err(VoiceError::new(
-            tr!("所选原编辑器的可执行文件大小超出已支持范围。"),
-        ));
+        return Err(VoiceError::new(tr!(
+            "所选原编辑器的可执行文件大小超出已支持范围。"
+        )));
     }
     let mut hash = Sha256::new();
     let mut bytes = [0; 64 * 1024];
@@ -105,9 +107,9 @@ fn verify_executable(path: &Path) -> Result<File> {
         hash.update(&bytes[..count]);
     }
     if hash.finalize()[..] != EXECUTABLE_SHA256 {
-        return Err(VoiceError::new(
-            tr!("所选原编辑器版本尚未支持上下文导入；当前只支持已验证的 Windows x64 2.2.1。"),
-        ));
+        return Err(VoiceError::new(tr!(
+            "所选原编辑器版本尚未支持上下文导入；当前只支持已验证的 Windows x64 2.2.1。"
+        )));
     }
     Ok(file)
 }

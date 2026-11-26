@@ -1,10 +1,10 @@
 use super::{Runtime, events::WakeOnExit};
 use crate::synthesis::inference::compute::{AdapterId, AdapterInfo, Backend, Diagnostics, Session};
+use crate::{tr, trf};
 use std::{
     sync::mpsc::{self, Receiver, TryRecvError},
     thread,
 };
-use crate::{tr, trf};
 
 pub(super) enum State {
     Loading(Backend, Receiver<Session>),

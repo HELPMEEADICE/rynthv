@@ -4,6 +4,7 @@ use crate::synthesis::{
     audio::{ChannelLayout, RenderedAudio, conversion},
     rendered::Waveform,
 };
+use crate::{tr, trf};
 use std::{
     path::Path,
     sync::{
@@ -16,7 +17,6 @@ use symphonia::core::{
     formats::{TrackType, probe::Hint},
     io::MediaSourceStream,
 };
-use crate::{tr, trf};
 
 const MAX_SAMPLES: usize = 512 * 1024 * 1024;
 

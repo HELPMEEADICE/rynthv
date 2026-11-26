@@ -3,6 +3,7 @@ mod decode;
 
 use super::{audio::RenderedAudio, rendered::Waveform};
 use crate::model::Project;
+use crate::{tr, trf};
 #[cfg(not(target_arch = "wasm32"))]
 use std::thread;
 use std::{
@@ -14,7 +15,6 @@ use std::{
         mpsc,
     },
 };
-use crate::{tr, trf};
 
 pub struct AudioAsset {
     pub audio: Arc<RenderedAudio>,

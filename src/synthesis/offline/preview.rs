@@ -16,10 +16,10 @@ use crate::synthesis::{
     render_cache::{Completion, RenderJob},
     rendered::RenderedClip,
 };
+use crate::tr;
 use scheduler::Scheduler;
 use serde::Serialize;
 use std::cell::OnceCell;
-use crate::{tr};
 
 #[derive(Default, Serialize, serde::Deserialize)]
 pub struct PreviewMetrics {

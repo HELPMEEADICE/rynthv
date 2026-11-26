@@ -1,5 +1,5 @@
-use crate::{tr, trf};
 use crate::platform::fs::File;
+use crate::{tr, trf};
 use std::{
     io::{self, BufReader, Read},
     path::Path,
@@ -16,7 +16,9 @@ pub(super) fn open(path: &Path, max_bytes: u64) -> Result<BufReader<File>> {
     let file = File::open(path)?;
     let metadata = file.metadata()?;
     if !metadata.is_file() || metadata.len() > max_bytes {
-        return Err(VoiceError::new(tr!("资源压缩包不是普通文件，或超出大小限制")));
+        return Err(VoiceError::new(tr!(
+            "资源压缩包不是普通文件，或超出大小限制"
+        )));
     }
     Ok(BufReader::new(file))
 }
@@ -45,7 +47,10 @@ pub(super) fn zip(
 pub(super) fn copy_member(reader: &mut dyn Read, size: u64, destination: &Path) -> Result<()> {
     let mut output = File::create_new(destination)?;
     if io::copy(&mut reader.take(size + 1), &mut output)? != size {
-        return Err(VoiceError::new(trf!("资源条目大小与压缩包记录不一致：{0}", destination.display())));
+        return Err(VoiceError::new(trf!(
+            "资源条目大小与压缩包记录不一致：{0}",
+            destination.display()
+        )));
     }
     output.sync_all()?;
     Ok(())

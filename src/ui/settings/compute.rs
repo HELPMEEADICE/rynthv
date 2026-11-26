@@ -1,7 +1,10 @@
 use super::widgets::{row, section};
+#[cfg(any(target_os = "android", target_arch = "wasm32"))]
+use crate::trf;
 use crate::{
-    app::App, tr,
+    app::App,
     synthesis::inference::compute::{AdapterId, Backend},
+    tr,
 };
 use eframe::egui::{ComboBox, Label, Ui};
 
@@ -98,7 +101,10 @@ pub(super) fn settings(app: &mut App, ui: &mut Ui) {
             "{} {} · {} MiB / 存储缓冲区",
             device.driver,
             device.driver_info,
-            format!("{:.0}", device.max_storage_binding_bytes as f64 / (1024.0 * 1024.0)),
+            format!(
+                "{:.0}",
+                device.max_storage_binding_bytes as f64 / (1024.0 * 1024.0)
+            ),
         ));
     }
     let initialization = match (status.requested, &status.device, &status.error) {

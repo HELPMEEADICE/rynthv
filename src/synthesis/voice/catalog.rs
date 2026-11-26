@@ -1,7 +1,7 @@
 //! Lightweight discovery of installed voice revisions, without loading model weights.
 
-use crate::{tr, trf};
 use crate::platform::fs;
+use crate::{tr, trf};
 mod dnni;
 mod flat;
 mod metadata;
@@ -83,7 +83,11 @@ impl VoiceCatalog {
             let is_dir = match database.file_type() {
                 Ok(kind) => kind.is_dir(),
                 Err(error) => {
-                    catalog.warnings.push(trf!("无法读取声库目录 {0}：{1}", database.path().display(), error));
+                    catalog.warnings.push(trf!(
+                        "无法读取声库目录 {0}：{1}",
+                        database.path().display(),
+                        error
+                    ));
                     continue;
                 }
             };
@@ -100,7 +104,11 @@ impl VoiceCatalog {
                         catalog.entries.push(nofs::entry(&path)?);
                     }
                 }
-                Err(error) => catalog.warnings.push(trf!("无法读取声库目录 {0}：{1}", database.path().display(), error)),
+                Err(error) => catalog.warnings.push(trf!(
+                    "无法读取声库目录 {0}：{1}",
+                    database.path().display(),
+                    error
+                )),
             }
         }
         let mut counts = std::collections::BTreeMap::new();

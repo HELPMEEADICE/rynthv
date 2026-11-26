@@ -1,9 +1,9 @@
+use crate::tr;
 use std::{
     ffi::OsString,
     os::windows::ffi::OsStringExt,
     path::{Path, PathBuf},
 };
-use crate::{tr};
 
 use super::{Result, VoiceError, native::*};
 
@@ -80,9 +80,9 @@ pub(super) fn main_module(process_id: u32, executable: &Path) -> Result<(usize, 
         || entry.base_address.is_null()
         || entry.image_size == 0
     {
-        return Err(VoiceError::new(
-            tr!("无法确认所选原编辑器的主模块，未读取模型上下文。"),
-        ));
+        return Err(VoiceError::new(tr!(
+            "无法确认所选原编辑器的主模块，未读取模型上下文。"
+        )));
     }
     Ok((entry.base_address as usize, entry.image_size as usize))
 }

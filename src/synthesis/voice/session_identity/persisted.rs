@@ -1,7 +1,7 @@
 //! Read only an explicitly selected session file; never persist its contents.
 
-use crate::{tr, trf};
 use crate::platform::fs::File;
+use crate::{tr, trf};
 mod smbios;
 
 use blowfish::{
@@ -50,9 +50,9 @@ pub(super) fn read_session_field(path: &Path) -> Result<Option<Vec<u8>>> {
     // Padding length is stored in the final byte; other padding bytes are ignored.
     let padding = usize::from(*bytes.0.last().expect("nonempty buffer"));
     if !(1..=8).contains(&padding) || padding > bytes.0.len() {
-        return Err(VoiceError::new(
-            tr!("无法解码所选会话文件，请选择本机 Synthesizer V Studio 2 保存的 session 文件。"),
-        ));
+        return Err(VoiceError::new(tr!(
+            "无法解码所选会话文件，请选择本机 Synthesizer V Studio 2 保存的 session 文件。"
+        )));
     }
     let payload = &bytes.0[..bytes.0.len() - padding];
     if std::str::from_utf8(payload).is_err() {
@@ -73,9 +73,9 @@ pub(super) fn read_session_field(path: &Path) -> Result<Option<Vec<u8>>> {
                     return Err(VoiceError::new(tr!("所选会话文件的模型上下文字段为空。")));
                 }
                 if std::str::from_utf8(field).is_err() {
-                    return Err(VoiceError::new(
-                        tr!("所选会话文件的模型上下文字段包含无效的 UTF-8 数据。"),
-                    ));
+                    return Err(VoiceError::new(tr!(
+                        "所选会话文件的模型上下文字段包含无效的 UTF-8 数据。"
+                    )));
                 }
                 return Ok(Some(field.to_vec()));
             }

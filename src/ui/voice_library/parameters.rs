@@ -8,8 +8,7 @@ use crate::{
     editor::{VoiceEditParameter, VoiceParameterState},
     model::{VocalModeValues, VoiceParameter},
     synthesis::voice::VoiceFamily,
-    tr,
-    trf,
+    tr, trf,
 };
 use eframe::egui::*;
 

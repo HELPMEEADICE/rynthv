@@ -1,5 +1,5 @@
+use crate::trf;
 use std::{ffi::c_void, mem::size_of, ptr};
-use crate::{trf};
 
 use super::{Result, VoiceError};
 
@@ -134,5 +134,9 @@ impl Drop for Handle {
 pub(super) fn api_error(operation: &str) -> VoiceError {
     // Process/session contents never enter diagnostic text.
     let code = unsafe { GetLastError() };
-    VoiceError::new(trf!("在线模型上下文导入：{0} 失败（{1}）。", operation, code))
+    VoiceError::new(trf!(
+        "在线模型上下文导入：{0} 失败（{1}）。",
+        operation,
+        code
+    ))
 }

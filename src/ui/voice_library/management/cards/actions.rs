@@ -124,7 +124,9 @@ pub(super) fn menu(
                     app.synthesis.can_import_context(&entry.selection()),
                     Button::new(tr!("重新导入上下文…")),
                 )
-                .on_hover_text(tr!("重新选择上下文来源，导入成功后重新加载使用此上下文的歌声"))
+                .on_hover_text(tr!(
+                    "重新选择上下文来源，导入成功后重新加载使用此上下文的歌声"
+                ))
                 .on_disabled_hover_text(tr!("当前声库不可用，或正在扫描声库、导入上下文"))
                 .clicked()
         {

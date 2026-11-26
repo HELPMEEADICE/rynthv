@@ -1,8 +1,7 @@
 use super::{super::language_name, CARD, INK, Sort, State, resource_import};
 use crate::{
     app::App,
-    tr,
-    trf,
+    tr, trf,
     ui::{
         child,
         icons::{Icon, IconButton},

@@ -52,7 +52,11 @@ pub fn foreground(color: Color32) -> Color32 {
 pub fn picker(ui: &mut Ui, current: TrackColor) -> Option<TrackColor> {
     let mut picked = None;
     ui.scope(|ui| {
-        ui.label(RichText::new(tr!("音轨颜色")).size(11.0).color(text_color()));
+        ui.label(
+            RichText::new(tr!("音轨颜色"))
+                .size(11.0)
+                .color(text_color()),
+        );
         ui.add_space(5.0);
         ui.spacing_mut().item_spacing = vec2(3.0, 3.0);
         for row in TrackColor::PALETTE.chunks(6) {

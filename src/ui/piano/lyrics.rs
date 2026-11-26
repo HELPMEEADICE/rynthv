@@ -1,7 +1,7 @@
 use super::LyricEdit;
-use crate::{app::App, model::*};
 #[cfg(target_os = "android")]
 use crate::tr;
+use crate::{app::App, model::*};
 use eframe::egui::{
     text::{CCursor, CCursorRange},
     *,

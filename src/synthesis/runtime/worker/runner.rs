@@ -13,6 +13,7 @@ use crate::synthesis::{
     score::{self, LyricFrontend},
     voice::{self, PreparedVoice, VoiceError, VoiceInventory},
 };
+use crate::{tr, trf};
 use std::{
     path::PathBuf,
     sync::{
@@ -23,7 +24,6 @@ use std::{
     time::Duration,
 };
 use web_time::Instant;
-use crate::{tr, trf};
 
 pub(super) fn run(
     path: PathBuf,

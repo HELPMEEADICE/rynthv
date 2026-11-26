@@ -122,7 +122,8 @@ impl VoiceSettings {
             }
         }
         if let Some(value) = voice.get("vocalModeInherited") {
-            settings.vocal_mode_inherited = value.as_bool().ok_or(tr!("唱法继承标记必须是布尔值"))?;
+            settings.vocal_mode_inherited =
+                value.as_bool().ok_or(tr!("唱法继承标记必须是布尔值"))?;
         }
         if let Some(value) = voice.get("vocalModePreset") {
             settings.vocal_mode_preset = value.as_str().ok_or(tr!("唱法预设必须是字符串"))?.into();

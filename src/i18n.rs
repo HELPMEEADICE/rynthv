@@ -119,9 +119,9 @@ static CATALOG: OnceLock<Catalog> = OnceLock::new();
 
 fn catalog() -> &'static Catalog {
     CATALOG.get_or_init(|| Catalog {
-        traditional_chinese: load(&CATALOG_ZH_TW),
-        english: load(&CATALOG_EN),
-        japanese: load(&CATALOG_JA),
+        traditional_chinese: load(CATALOG_ZH_TW),
+        english: load(CATALOG_EN),
+        japanese: load(CATALOG_JA),
     })
 }
 

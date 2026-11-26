@@ -1,7 +1,7 @@
 use super::*;
 use crate::synthesis::{audio::AudioLayer, plan::OwnerRequest, render_cache::CompletedOwner};
+use crate::tr;
 use std::ops::Range;
-use crate::{tr};
 
 const DEMAND_BATCH: usize = 64;
 const BACKGROUND_BATCH: usize = 128;
@@ -285,7 +285,10 @@ impl<'network, 'tree: 'network, 'plan> Scheduler<'network, 'tree, 'plan> {
                         .start(network, &program.voice, start)
                         .map_err(|error| error.to_string())?;
                 }
-                let cursor = active.cursor.as_mut().ok_or(tr!("找不到待渲染音频的推理位置"))?;
+                let cursor = active
+                    .cursor
+                    .as_mut()
+                    .ok_or(tr!("找不到待渲染音频的推理位置"))?;
                 let budget = if target.is_some() {
                     DEMAND_BATCH
                 } else {

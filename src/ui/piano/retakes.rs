@@ -102,7 +102,8 @@ pub(super) fn show(app: &mut App, ui: &mut Ui, canvas: Rect, groups: &[SceneGrou
             response
                 .on_hover_cursor(CursorIcon::Default)
                 .on_hover_text(trf!(
-                    "{} · 点击切换此音符的采样", retakes::label(takes.active_take_id)
+                    "{} · 点击切换此音符的采样",
+                    retakes::label(takes.active_take_id)
                 ));
         }
     }

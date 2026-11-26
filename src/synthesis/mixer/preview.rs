@@ -6,12 +6,12 @@ use crate::synthesis::{
     plan::{OwnerId, RenderPlan},
     rendered::patch::PREVIEW_BLOCK_SAMPLES as BLOCK,
 };
+use crate::tr;
 use std::{
     collections::{BTreeMap, BTreeSet},
     ops::Range,
     sync::Arc,
 };
-use crate::{tr};
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum PreviewSource {

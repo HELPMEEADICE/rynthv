@@ -26,9 +26,10 @@ pub(super) fn mode(app: &mut App, ui: &mut Ui) {
                 ui.allocate_exact_size(vec2(ui.available_width(), 28.0), Sense::hover());
             ui.painter().rect_filled(rect, 3, background_color());
             let mut clicked = None;
-            for (index, value, label) in
-                [(0, NoteMode::Singing, tr!("歌唱")), (1, NoteMode::Rap, tr!("说唱"))]
-            {
+            for (index, value, label) in [
+                (0, NoteMode::Singing, tr!("歌唱")),
+                (1, NoteMode::Rap, tr!("说唱")),
+            ] {
                 let half = Rect::from_min_max(
                     pos2(rect.left() + rect.width() * index as f32 * 0.5, rect.top()),
                     pos2(

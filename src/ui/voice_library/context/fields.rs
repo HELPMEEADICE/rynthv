@@ -38,8 +38,11 @@ fn session_file(ui: &mut Ui, dialog: &ContextImportDialog) -> Option<Picker> {
         weak(ui, tr!("尚未选择会话文件"));
     }
     ui.button(tr!("选择会话文件…")).clicked().then(|| {
-        Picker::new(Selection::File, tr!("选择 Synthesizer V Studio 2 的会话文件"))
-            .starting_at(dialog.session_path.as_ref().and_then(|path| path.parent()))
+        Picker::new(
+            Selection::File,
+            tr!("选择 Synthesizer V Studio 2 的会话文件"),
+        )
+        .starting_at(dialog.session_path.as_ref().and_then(|path| path.parent()))
     })
 }
 

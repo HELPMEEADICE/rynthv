@@ -2,8 +2,7 @@ use super::super::{text, weak};
 use crate::{
     app::App,
     synthesis::voice::{VoiceCatalogEntry, flat::ModelRole},
-    tr,
-    trf,
+    tr, trf,
 };
 use eframe::egui::*;
 
