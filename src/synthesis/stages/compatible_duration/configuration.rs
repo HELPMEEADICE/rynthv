@@ -16,7 +16,7 @@ pub(super) fn validate(tree: &PreparedTree) -> Result<(Configuration, [usize; 9]
         root.children.as_slice().try_into().map_err(|_| {
             VoiceError::new("Compatibility duration requires nine serialized children")
         })?;
-    let configuration = Configuration::parse(&tree.payload(tree.root_index())?)?;
+    let configuration = Configuration::parse(tree.payload(tree.root_index())?)?;
     let constant = tree
         .tensor(children[1])?
         .vector()

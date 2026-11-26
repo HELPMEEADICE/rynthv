@@ -26,7 +26,7 @@ pub(crate) fn encode(
     }
     let module = tree.node(node)?;
     let payload = tree.payload(node)?;
-    let flag = match payload.as_ref() {
+    let flag = match payload {
         [] => true,
         [value] => *value != 0,
         _ => return Err(VoiceError::new("Invalid context block configuration")),

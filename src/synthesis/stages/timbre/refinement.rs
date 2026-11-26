@@ -43,7 +43,7 @@ impl Refinement {
             return Err(VoiceError::new("Unexpected timbre refinement child types"));
         }
         let config =
-            ConditionalConfig::parse(&tree.payload(*conditional)?).map_err(VoiceError::new)?;
+            ConditionalConfig::parse(tree.payload(*conditional)?).map_err(VoiceError::new)?;
         if config.input_channels != config.condition_channels {
             return Err(VoiceError::new(
                 "Timbre refinement uses the same features for input and condition",

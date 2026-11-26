@@ -67,7 +67,7 @@ impl NoteFrontend {
                 "Expected the shared note frontend with four children",
             ));
         }
-        let configuration = Configuration::parse(&tree.payload(index)?)?;
+        let configuration = Configuration::parse(tree.payload(index)?)?;
         let normalizer_node = node.children[2];
         Ok(Self {
             configuration,

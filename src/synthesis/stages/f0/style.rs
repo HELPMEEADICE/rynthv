@@ -31,13 +31,13 @@ impl StyleBasis {
         }
         let bytes = tree.payload(index)?;
         let mut offset = 0;
-        let count = read_u32(&bytes, &mut offset)? as usize;
+        let count = read_u32(bytes, &mut offset)? as usize;
         if count > bytes.len() / 4 {
             return Err(VoiceError::new("Vocal-mode count exceeds its payload"));
         }
         let mut names = Vec::with_capacity(count);
         for _ in 0..count {
-            let length = read_u32(&bytes, &mut offset)? as usize;
+            let length = read_u32(bytes, &mut offset)? as usize;
             let end = offset
                 .checked_add(length)
                 .filter(|&end| end <= bytes.len())

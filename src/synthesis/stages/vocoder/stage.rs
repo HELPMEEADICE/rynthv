@@ -60,7 +60,7 @@ impl<'a> VocoderStage<'a> {
         #[cfg(feature = "synth-profile")]
         let _profile = crate::synthesis::profiling::span("vocoder.prepare");
         let root = tree.root_index();
-        let config = Configuration::parse(&tree.payload(root)?)?;
+        let config = Configuration::parse(tree.payload(root)?)?;
         let modules = Modules::prepare(tree, root, config)?;
         let condition = VocoderCondition::prepare(tree, modules.conditions)?;
         if config.bands != 8 || modules.input_projection.is_none() {

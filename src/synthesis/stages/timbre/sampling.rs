@@ -95,7 +95,7 @@ impl AcousticSampler {
             .as_slice()
             .try_into()
             .map_err(|_| VoiceError::new("Acoustic sampler requires six model children"))?;
-        let config = SamplerConfig::parse(&tree.payload(node)?)?;
+        let config = SamplerConfig::parse(tree.payload(node)?)?;
         Ok(Self { config, children })
     }
 }

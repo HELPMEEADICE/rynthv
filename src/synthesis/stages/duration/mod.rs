@@ -81,7 +81,7 @@ impl<'a> DurationStage<'a> {
         let children: [usize; 14] = root.children.as_slice().try_into().map_err(|_| {
             VoiceError::new("Duration model requires its fourteen observed children")
         })?;
-        let configuration = DurationConfiguration::parse(&tree.resource_bytes(tree.root_index())?)?;
+        let configuration = tree.duration_configuration()?;
         let PreparedModule::Affine(input) = &tree.node(children[5])?.module else {
             return Err(VoiceError::new("Duration input projection is not prepared"));
         };

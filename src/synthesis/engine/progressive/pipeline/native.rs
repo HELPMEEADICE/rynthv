@@ -180,12 +180,10 @@ fn run(
     let mut vocoder = VocoderStage::prepare(tree)?.into_stream()?;
     let mut setup_ms = started.elapsed().as_secs_f64() * 1000.0;
     loop {
-        execution::checkpoint()?;
-        let input = match inputs.recv_timeout(WAIT) {
-            Ok(input) => input,
-            Err(RecvTimeoutError::Timeout) => continue,
-            Err(RecvTimeoutError::Disconnected) => return Ok(()),
+        let Ok(input) = inputs.recv() else {
+            return Ok(());
         };
+        execution::checkpoint()?;
         let natural_final = input.natural_final;
         let output = input.process(
             &mut vocoder,

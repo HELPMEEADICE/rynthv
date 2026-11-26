@@ -116,10 +116,9 @@ impl TensorStorage {
 }
 
 /// Parse once into typed storage after the exact-size and overflow checks.
-pub(super) fn load(bytes: &[u8]) -> Result<TensorStorage> {
-    let layout = parse(bytes)?;
-    let payload = &bytes[16..];
-    match array(bytes, 0)? {
+pub(super) fn load(type_id: [u8; 16], payload: &[u8]) -> Result<TensorStorage> {
+    let layout = parse(type_id, payload, payload.len())?;
+    match type_id {
         FLOAT_MATRIX => Ok(TensorStorage::FloatMatrix {
             rows: layout.rows,
             columns: layout.columns,
@@ -163,14 +162,8 @@ const QUANTIZED: [u8; 16] = [
     0xce, 0x8d, 0x62, 0x7e, 0x89, 0x87, 0xe6, 0x38, 0xf9, 0x4d, 0xeb, 0xca, 0xa7, 0x70, 0x46, 0xdc,
 ];
 
-pub(super) fn is_known(prefix: &[u8]) -> bool {
-    prefix.len() >= 16
-        && [FLOAT_MATRIX, FLOAT_VECTOR, QUANTIZED]
-            .contains(&prefix[..16].try_into().expect("16-byte prefix"))
-}
-
-pub(super) fn parse(bytes: &[u8]) -> Result<TensorLayout> {
-    parse_with_length(bytes, bytes.len())
+pub(super) fn is_known(type_id: [u8; 16]) -> bool {
+    [FLOAT_MATRIX, FLOAT_VECTOR, QUANTIZED].contains(&type_id)
 }
 
 pub(super) fn required_inspection_bytes(prefix: &[u8], total_len: usize) -> Result<usize> {
@@ -196,16 +189,17 @@ pub(super) fn required_inspection_bytes(prefix: &[u8], total_len: usize) -> Resu
     }
 }
 
-pub(super) fn parse_with_length(bytes: &[u8], total_len: usize) -> Result<TensorLayout> {
-    if total_len < bytes.len() {
+pub(super) fn parse(
+    type_id: [u8; 16],
+    payload: &[u8],
+    payload_total: usize,
+) -> Result<TensorLayout> {
+    if payload_total < payload.len() {
         return Err(VoiceError::new(
             "Tensor storage does not exactly consume its resource",
         ));
     }
-    let kind: [u8; 16] = array(bytes, 0)?;
-    let payload = &bytes[16..];
-    let payload_total = total_len - 16;
-    match kind {
+    match type_id {
         FLOAT_MATRIX => {
             let rows = u32_at(payload, 0)? as usize;
             let columns = u32_at(payload, 4)? as usize;

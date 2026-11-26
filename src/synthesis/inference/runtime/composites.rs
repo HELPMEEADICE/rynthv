@@ -62,7 +62,7 @@ impl CompositeState {
                 let condition = condition.ok_or_else(|| {
                     VoiceError::new("Sampler network requires a condition sequence")
                 })?;
-                if tree.payload(index)?.as_ref() != [4, 0, 0, 1, 0, 1, 0, 1, 0, 1]
+                if tree.payload(index)? != [4, 0, 0, 1, 0, 1, 0, 1, 0, 1]
                     || node.children.len() != 5
                 {
                     return Err(VoiceError::new("Unsupported sampler network configuration"));

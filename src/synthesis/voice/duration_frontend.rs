@@ -21,15 +21,13 @@ pub struct DurationConfiguration {
 
 impl DurationConfiguration {
     /// Parses exactly eight little-endian u16 configuration fields.
-    pub fn parse(bytes: &[u8]) -> Result<Self> {
-        if bytes.len() != 32 || array::<16>(bytes, 0)? != DURATION_ROOT_TYPE_ID {
-            return Err(VoiceError::new(
-                "Invalid duration-root type or configuration size",
-            ));
+    pub(super) fn parse(payload: &[u8]) -> Result<Self> {
+        if payload.len() != 16 {
+            return Err(VoiceError::new("Invalid duration-root configuration size"));
         }
         let mut fields = [0_u16; 8];
         for (index, value) in fields.iter_mut().enumerate() {
-            *value = u16::from_le_bytes(array(bytes, 16 + index * 2)?);
+            *value = u16::from_le_bytes(array(payload, index * 2)?);
         }
         if fields[..6].contains(&0) || fields[6..].iter().any(|value| *value < 2) {
             return Err(VoiceError::new(

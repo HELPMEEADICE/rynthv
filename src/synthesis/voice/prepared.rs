@@ -19,12 +19,11 @@ pub(crate) use phones::PhoneResolver;
 pub use summary::*;
 pub use transposed_convolution::PreparedTransposedConvolution;
 
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use crate::synthesis::inference::{
     ModelRuntime, Sequence, UnaryOperator,
-    affine::{AFFINE_TYPE_ID, Affine},
-    convolution::{CONVOLUTION_TYPE_ID, TRANSPOSED_CONVOLUTION_TYPE_ID},
+    affine::Affine,
     ops::{
         attention::MultiHeadAttention,
         attention_relative::{AttentionOptions, RelativeAttention},
@@ -42,20 +41,15 @@ use crate::synthesis::inference::{
 };
 
 use super::{
-    DURATION_ROOT_TYPE_ID, DurationConfiguration, Result, VoiceError,
-    archive::Archive,
-    array, hex,
-    phones::{PHONE_SET_TYPE_ID, PhoneSet},
-    tensor::{self, TensorLayout, TensorStorage},
-    tree::ModuleTree,
+    DurationConfiguration, Result, VoiceError, hex,
+    phones::PhoneSet,
+    tensor::{TensorLayout, TensorStorage},
 };
 
 pub struct PreparedTree {
     nodes: Vec<PreparedNode>,
     root: usize,
     duration_input: Option<DurationInputLayout>,
-    // Keep the verified immutable source for unresolved modules and future stages.
-    source: source::ModelSource,
 }
 
 pub struct PreparedNode {
@@ -63,6 +57,7 @@ pub struct PreparedNode {
     pub type_id: [u8; 16],
     pub children: Vec<usize>,
     pub payload_bytes: usize,
+    payload: Option<Box<[u8]>>,
     pub module: PreparedModule,
 }
 
@@ -93,129 +88,6 @@ pub enum PreparedModule {
 }
 
 impl PreparedTree {
-    pub(super) fn prepare(archive: Arc<Archive>, source: &ModuleTree) -> Result<Self> {
-        let records = source
-            .nodes
-            .iter()
-            .map(|node| {
-                let index = archive
-                    .index(node.resource)
-                    .ok_or_else(|| VoiceError::new("Prepared node resource is absent"))?;
-                Ok((
-                    index,
-                    node.children.iter().map(|child| child.index()).collect(),
-                ))
-            })
-            .collect::<Result<Vec<_>>>()?;
-        Self::prepare_source(
-            source::ModelSource::Indexed(archive),
-            records,
-            source.root.index(),
-        )
-    }
-
-    pub(crate) fn prepare_embedded(bytes: &[u8]) -> Result<Self> {
-        Self::prepare_embedded_records(super::embedded::parse(bytes)?)
-    }
-
-    pub(super) fn prepare_flat_embedded(bytes: &[u8]) -> Result<Self> {
-        Self::prepare_embedded_records(super::embedded::parse_bounded(bytes, 65_536, 128)?)
-    }
-
-    fn prepare_embedded_records(records: Vec<super::embedded::Record>) -> Result<Self> {
-        let root = records
-            .len()
-            .checked_sub(1)
-            .ok_or_else(|| VoiceError::new("Embedded DNNI archive is empty"))?;
-        let mut nodes = Vec::with_capacity(records.len());
-        let mut resources = Vec::with_capacity(records.len());
-        for (index, record) in records.into_iter().enumerate() {
-            nodes.push((index, record.children));
-            resources.push(record.bytes);
-        }
-        Self::prepare_source(source::ModelSource::Inline(resources), nodes, root)
-    }
-
-    fn prepare_source(
-        source: source::ModelSource,
-        records: Vec<(usize, Vec<usize>)>,
-        root: usize,
-    ) -> Result<Self> {
-        if root >= records.len() {
-            return Err(VoiceError::new("Prepared root is outside its module arena"));
-        }
-        let mut tensors = HashMap::<usize, Arc<TensorStorage>>::new();
-        let mut nodes = Vec::with_capacity(records.len());
-        for (resource_index, children) in records {
-            let bytes = source.read(resource_index)?;
-            let type_id = array(&bytes, 0)?;
-            if children.iter().any(|index| *index >= nodes.len()) {
-                return Err(VoiceError::new("Module arena is not in checked postorder"));
-            }
-            let payload_bytes = bytes.len() - 16;
-            let module = if tensor::is_known(&bytes) {
-                require_leaf(&children, "Tensor")?;
-                let storage = match tensors.get(&resource_index) {
-                    Some(storage) => Arc::clone(storage),
-                    None => {
-                        let storage = Arc::new(tensor::load(&bytes)?);
-                        tensors.insert(resource_index, Arc::clone(&storage));
-                        storage
-                    }
-                };
-                PreparedModule::Tensor(storage)
-            } else if type_id == PHONE_SET_TYPE_ID {
-                require_leaf(&children, "Phone set")?;
-                PreparedModule::PhoneSet(PhoneSet::parse(&bytes)?)
-            } else if let Ok(operator) = UnaryOperator::from_type_id(type_id) {
-                require_empty_payload(payload_bytes)?;
-                require_leaf(&children, "Unary operator")?;
-                PreparedModule::Unary(operator)
-            } else if type_id == AFFINE_TYPE_ID {
-                require_empty_payload(payload_bytes)?;
-                PreparedModule::Affine(PreparedAffine::prepare(&nodes, &children)?)
-            } else if type_id == CONVOLUTION_TYPE_ID {
-                PreparedModule::Convolution(PreparedConvolution::prepare(
-                    &bytes[16..],
-                    &nodes,
-                    &children,
-                )?)
-            } else if type_id == TRANSPOSED_CONVOLUTION_TYPE_ID {
-                PreparedModule::TransposedConvolution(PreparedTransposedConvolution::prepare(
-                    &bytes[16..],
-                    &nodes,
-                    &children,
-                )?)
-            } else {
-                factory::prepare_operator(type_id, &bytes[16..], &nodes, &children)?
-                    .unwrap_or(PreparedModule::Unsupported)
-            };
-            nodes.push(PreparedNode {
-                resource_index,
-                type_id,
-                children,
-                payload_bytes,
-                module,
-            });
-        }
-        let duration_input = if nodes[root].type_id == DURATION_ROOT_TYPE_ID {
-            let bytes = source.read(nodes[root].resource_index)?;
-            Some(DurationInputLayout::prepare(
-                DurationConfiguration::parse(&bytes)?,
-                &nodes[root],
-                &nodes,
-            )?)
-        } else {
-            None
-        };
-        Ok(Self {
-            nodes,
-            root,
-            duration_input,
-            source,
-        })
-    }
-
     pub fn nodes(&self) -> &[PreparedNode] {
         &self.nodes
     }
@@ -230,18 +102,18 @@ impl PreparedTree {
             .ok_or_else(|| VoiceError::new("Model node index is out of range"))
     }
 
-    /// Raw verified resource including the type prefix; stays private to the
-    /// numerical pipeline and is never included in serialized diagnostics.
-    pub fn resource_bytes(&self, index: usize) -> Result<std::borrow::Cow<'_, [u8]>> {
-        self.source.read(self.node(index)?.resource_index)
+    pub(crate) fn duration_configuration(&self) -> Result<DurationConfiguration> {
+        self.duration_input
+            .as_ref()
+            .map(|layout| layout.configuration)
+            .ok_or_else(|| VoiceError::new("Expected a duration root"))
     }
 
-    pub fn payload(&self, index: usize) -> Result<std::borrow::Cow<'_, [u8]>> {
-        use std::borrow::Cow;
-        Ok(match self.resource_bytes(index)? {
-            Cow::Borrowed(bytes) => Cow::Borrowed(&bytes[16..]),
-            Cow::Owned(bytes) => Cow::Owned(bytes[16..].to_vec()),
-        })
+    pub fn payload(&self, index: usize) -> Result<&[u8]> {
+        self.node(index)?
+            .payload
+            .as_deref()
+            .ok_or_else(|| VoiceError::new("Raw tensor payload is unavailable after preparation"))
     }
 
     pub fn tensor(&self, index: usize) -> Result<&TensorStorage> {
@@ -309,22 +181,4 @@ impl PreparedTree {
         let input = Sequence::from_values(channels, input.to_vec())?;
         Ok(runtime.execute(index, &input, true)?.values)
     }
-}
-
-fn require_empty_payload(bytes: usize) -> Result<()> {
-    if bytes != 0 {
-        return Err(VoiceError::new(
-            "Recovered parameterless module contains a payload",
-        ));
-    }
-    Ok(())
-}
-
-fn require_leaf(children: &[usize], kind: &str) -> Result<()> {
-    if !children.is_empty() {
-        return Err(VoiceError::new(format!(
-            "{kind} unexpectedly contains child modules"
-        )));
-    }
-    Ok(())
 }

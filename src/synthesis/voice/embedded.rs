@@ -17,14 +17,14 @@ struct Entry {
     id: [u8; 16],
 }
 
-pub(crate) struct Record {
-    /// Canonical type prefix followed by the original, unmodified payload.
-    pub bytes: Vec<u8>,
+pub(crate) struct Record<'a> {
+    pub type_id: [u8; 16],
+    pub payload: &'a [u8],
     pub children: Vec<usize>,
 }
 
-struct Frame {
-    record: Record,
+struct Frame<'a> {
+    record: Record<'a>,
     remaining: usize,
 }
 
@@ -46,8 +46,8 @@ pub(crate) fn root_type(bytes: &[u8]) -> Result<[u8; 16]> {
 }
 
 /// Convert inline preorder records into the shared, checked postorder arena.
-/// Source tensors remain in memory and are never included in diagnostics.
-pub(crate) fn parse(bytes: &[u8]) -> Result<Vec<Record>> {
+/// Payloads borrow the input while the records are inspected or prepared.
+pub(crate) fn parse(bytes: &[u8]) -> Result<Vec<Record<'_>>> {
     parse_bounded(bytes, usize::MAX, usize::MAX)
 }
 
@@ -55,7 +55,7 @@ pub(super) fn parse_bounded(
     bytes: &[u8],
     max_nodes: usize,
     max_depth: usize,
-) -> Result<Vec<Record>> {
+) -> Result<Vec<Record<'_>>> {
     if u32_at(bytes, 0)? != 0x7fca00ff {
         return Err(VoiceError::new("Embedded DNNI signature is invalid"));
     }
@@ -95,7 +95,7 @@ pub(super) fn parse_bounded(
     Ok(records)
 }
 
-fn open(bytes: &[u8], offset: &mut usize, version: u32) -> Result<Frame> {
+fn open<'a>(bytes: &'a [u8], offset: &mut usize, version: u32) -> Result<Frame<'a>> {
     let header = &bytes[range(*offset, 20, bytes.len())?];
     if !matches!(u32_at(header, 0)?, 0x7fca40ff | 0x7fca41ff) {
         return Err(VoiceError::new("Embedded DNNI node marker is invalid"));
@@ -122,14 +122,11 @@ fn open(bytes: &[u8], offset: &mut usize, version: u32) -> Result<Frame> {
             "Embedded DNNI child count exceeds its remaining records",
         ));
     }
-    let payload = &bytes[payload_range.clone()];
-    let mut record_bytes = Vec::with_capacity(16 + payload.len());
-    record_bytes.extend_from_slice(&registry::resolve(identity));
-    record_bytes.extend_from_slice(payload);
     *offset = payload_range.end;
     Ok(Frame {
         record: Record {
-            bytes: record_bytes,
+            type_id: registry::resolve(identity),
+            payload: &bytes[payload_range],
             // Do not reserve memory from an untrusted child count.
             children: Vec::new(),
         },

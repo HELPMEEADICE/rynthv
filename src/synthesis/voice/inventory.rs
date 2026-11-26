@@ -7,7 +7,7 @@ mod nofs;
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
-    sync::{Arc, OnceLock},
+    sync::{Arc, Mutex, OnceLock},
 };
 
 use serde::Serialize;
@@ -40,7 +40,7 @@ pub struct VoiceInventory {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub flat_warnings: Vec<String>,
     #[serde(skip)]
-    _models: Vec<LoadedModel>,
+    models: Mutex<Vec<LoadedModel>>,
     #[serde(skip)]
     preparation: OnceLock<Result<Arc<PreparedVoice>>>,
 }
@@ -48,7 +48,7 @@ pub struct VoiceInventory {
 /// Each arena stays with its archive: a ResourceId is container-local.
 enum LoadedModel {
     Dnni {
-        archive: Arc<Archive>,
+        archive: Archive,
         trees: Vec<LoadedTree>,
     },
     Nofs {
@@ -102,20 +102,20 @@ impl VoiceInventory {
     pub fn prepare(&self) -> Result<Arc<PreparedVoice>> {
         self.preparation
             .get_or_init(|| {
-                let files = self
-                    ._models
-                    .iter()
+                let models = std::mem::take(&mut *self.models.lock().unwrap());
+                let files = models
+                    .into_iter()
                     .zip(&self.files)
-                    .map(|(model, metadata)| {
+                    .map(|(mut model, metadata)| {
                         let trees = metadata
                             .graphs
                             .iter()
                             .enumerate()
                             .map(|(index, graph)| {
-                                let tree = match model {
+                                let tree = match &mut model {
                                     LoadedModel::Dnni { archive, trees } => match &trees[index] {
                                         LoadedTree::Indexed(tree) => {
-                                            PreparedTree::prepare(Arc::clone(archive), tree)?
+                                            PreparedTree::prepare(archive, tree)?
                                         }
                                         LoadedTree::Embedded { resource_index } => {
                                             PreparedTree::prepare_embedded(
@@ -123,9 +123,9 @@ impl VoiceInventory {
                                             )?
                                         }
                                     },
-                                    LoadedModel::Nofs { trees } => {
-                                        PreparedTree::prepare_embedded(&trees[index])?
-                                    }
+                                    LoadedModel::Nofs { trees } => PreparedTree::prepare_embedded(
+                                        &std::mem::take(&mut trees[index]),
+                                    )?,
                                 };
                                 Ok(PreparedModel {
                                     role: graph.role,
@@ -249,11 +249,11 @@ impl VoiceInventory {
             resource_count: 0,
             graph_count: 0,
             tensor_count: 0,
-            _models: Vec::new(),
+            models: Mutex::default(),
             preparation: OnceLock::new(),
         };
         for path in paths {
-            let archive = Arc::new(Archive::load(&path, &context)?);
+            let archive = Archive::load(&path, &context)?;
             archive.verify_all()?;
             let (file, trees) = inspect::file(&path, &archive)?;
             if let Some(index) = archive.index(CONFIGURATION_ID) {
@@ -266,7 +266,11 @@ impl VoiceInventory {
                     Some(VoiceConfiguration::parse(&archive.read(index, None)?)?);
             }
             inventory.files.push(file);
-            inventory._models.push(LoadedModel::Dnni { archive, trees });
+            inventory
+                .models
+                .get_mut()
+                .unwrap()
+                .push(LoadedModel::Dnni { archive, trees });
         }
         let mut identity = Sha256::new();
         for file in &inventory.files {

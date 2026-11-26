@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     collections::{BTreeMap, HashSet},
     path::Path,
 };
@@ -7,6 +8,7 @@ use super::{GraphSummary, LoadedTree, TensorSummary, VoiceFile};
 use crate::synthesis::voice::{
     Result, VoiceError,
     archive::{Archive, ResourceId},
+    array,
     config::CONFIGURATION_ID,
     embedded, tensor,
     tree::ModuleTree,
@@ -20,20 +22,29 @@ pub(super) fn file(path: &Path, archive: &Archive) -> Result<(VoiceFile, Vec<Loa
     let mut references = HashSet::new();
     for (index, resource) in archive.resources.iter().enumerate() {
         let prefix = archive.prefix(index, 32)?;
-        if tensor::is_known(&prefix) {
+        if let Ok(type_id) = array(&prefix, 0)
+            && tensor::is_known(type_id)
+        {
             let total_len = resource.range.len();
             let required = tensor::required_inspection_bytes(&prefix, total_len)?;
-            if required > prefix.len() {
-                let header = archive.prefix(index, required)?;
-                count_tensor_with_length(&header, total_len, resource.flag, &mut tensors)?;
+            let header = if required > prefix.len() {
+                archive.prefix(index, required)?
             } else {
-                count_tensor_with_length(&prefix, total_len, resource.flag, &mut tensors)?;
-            }
+                Cow::Borrowed(prefix.as_ref())
+            };
+            count_tensor(
+                type_id,
+                &header[16..],
+                total_len - 16,
+                resource.flag,
+                &mut tensors,
+            )?;
         }
         if prefix.starts_with(&[0xff, 0, 0xca, 0x7f]) {
             let role = embedded_role(resource.id)
                 .ok_or_else(|| VoiceError::new("Unidentified embedded voice model resource"))?;
-            let records = embedded::parse(&archive.read(index, None)?)?;
+            let bytes = archive.read(index, None)?;
+            let records = embedded::parse(&bytes)?;
             let root = records
                 .last()
                 .ok_or_else(|| VoiceError::new("Embedded model tree is empty"))?;
@@ -46,8 +57,14 @@ pub(super) fn file(path: &Path, archive: &Archive) -> Result<(VoiceFile, Vec<Loa
                         .ok_or_else(|| VoiceError::new("Embedded model child is not in postorder"))
                 })?;
                 depths.push(depth);
-                if tensor::is_known(&record.bytes) {
-                    count_tensor(&record.bytes, resource.flag, &mut tensors)?;
+                if tensor::is_known(record.type_id) {
+                    count_tensor(
+                        record.type_id,
+                        record.payload,
+                        record.payload.len(),
+                        resource.flag,
+                        &mut tensors,
+                    )?;
                 }
             }
             graphs.push(GraphSummary {
@@ -132,20 +149,13 @@ pub(super) fn file(path: &Path, archive: &Archive) -> Result<(VoiceFile, Vec<Loa
 }
 
 pub(super) fn count_tensor(
-    bytes: &[u8],
+    type_id: [u8; 16],
+    payload: &[u8],
+    payload_length: usize,
     flag: u32,
     tensors: &mut BTreeMap<&'static str, TensorSummary>,
 ) -> Result<()> {
-    count_tensor_with_length(bytes, bytes.len(), flag, tensors)
-}
-
-fn count_tensor_with_length(
-    bytes: &[u8],
-    total_len: usize,
-    flag: u32,
-    tensors: &mut BTreeMap<&'static str, TensorSummary>,
-) -> Result<()> {
-    let layout = tensor::parse_with_length(bytes, total_len)?;
+    let layout = tensor::parse(type_id, payload, payload_length)?;
     let summary = tensors.entry(layout.storage).or_default();
     summary.resources += 1;
     summary.borrowed_resources += usize::from(flag == 0);

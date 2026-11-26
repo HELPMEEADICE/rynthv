@@ -24,7 +24,7 @@ pub(super) fn execute(
         return Err(VoiceError::new("Invalid duration attention window module"));
     }
     let payload = tree.payload(node)?;
-    let config = Window::parse(&payload)?;
+    let config = Window::parse(payload)?;
     if features == 0 || !input.len().is_multiple_of(features) {
         return Err(VoiceError::new(
             "Attention window input has incomplete frames",

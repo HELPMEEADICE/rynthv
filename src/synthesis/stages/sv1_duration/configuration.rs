@@ -25,7 +25,6 @@ pub(super) fn validate(tree: &PreparedTree) -> Result<(Configuration, [usize; 6]
         .map_err(|_| VoiceError::new("SV1 duration requires six serialized children"))?;
     let payload = tree.payload(tree.root_index())?;
     let bytes: &[u8; 8] = payload
-        .as_ref()
         .try_into()
         .map_err(|_| VoiceError::new("SV1 duration requires two u32 encoding widths"))?;
     let duration = u32::from_le_bytes(bytes[..4].try_into().unwrap()) as usize;

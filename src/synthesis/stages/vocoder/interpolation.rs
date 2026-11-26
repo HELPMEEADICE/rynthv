@@ -32,7 +32,7 @@ impl SpectralFilterConfig {
         if module.type_id != SPECTRAL_FILTER_TYPE_ID || !module.children.is_empty() {
             return Err(VoiceError::new("Expected a leaf vocoder spectral filter"));
         }
-        Self::parse(&tree.payload(node)?)
+        Self::parse(tree.payload(node)?)
     }
 
     pub fn parse(payload: &[u8]) -> Result<Self> {

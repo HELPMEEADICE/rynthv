@@ -81,7 +81,7 @@ pub(super) fn load(path: &Path, registry: &FlatModelRegistry) -> Result<VoiceInv
         configuration: Some(configuration),
         flat: Some(manifest),
         flat_warnings,
-        _models: Vec::new(),
+        models: Default::default(),
         preparation: OnceLock::from(Ok(prepared)),
     })
 }

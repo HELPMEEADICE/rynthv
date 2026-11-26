@@ -4,7 +4,9 @@
 //! Bluestein convolution removes the FFT's scale only: there is no
 //! division by the coefficient count and no one-sided-spectrum doubling.
 
-use super::fourier::{Complex, fft, multiply};
+use std::sync::Arc;
+
+use super::fourier::{Complex, FftPlan, multiply};
 use crate::synthesis::voice::{Result, VoiceError};
 
 /// Scratch and FFT roots persist across frames; chirps depend on each frame's
@@ -14,7 +16,7 @@ pub struct ChirpSynthesizer {
     chirp: Vec<Complex>,
     input: Vec<Complex>,
     kernel: Vec<Complex>,
-    roots: Vec<Complex>,
+    fft: Arc<FftPlan>,
 }
 
 impl ChirpSynthesizer {
@@ -28,17 +30,11 @@ impl ChirpSynthesizer {
             .checked_next_power_of_two()
             .and_then(|count| count.checked_mul(2))
             .ok_or_else(|| VoiceError::new("Excitation Fourier scratch size overflows"))?;
-        let mut roots = buffer(fft_count / 2)?;
-        for (index, root) in roots.iter_mut().enumerate() {
-            let angle = -std::f64::consts::TAU * index as f64 / fft_count as f64;
-            let (sin, cos) = angle.sin_cos();
-            *root = [cos as f32, sin as f32];
-        }
         Ok(Self {
             chirp: buffer(sample_count)?,
             input: buffer(fft_count)?,
             kernel: buffer(fft_count)?,
-            roots,
+            fft: FftPlan::shared(fft_count)?,
         })
     }
 
@@ -84,12 +80,12 @@ impl ChirpSynthesizer {
                 self.kernel[fft_count - index] = *chirp;
             }
         }
-        fft(&mut self.input, &self.roots, false);
-        fft(&mut self.kernel, &self.roots, false);
+        self.fft.transform::<false>(&mut self.input);
+        self.fft.transform::<false>(&mut self.kernel);
         for (input, kernel) in self.input.iter_mut().zip(&self.kernel) {
             *input = multiply(*input, *kernel);
         }
-        fft(&mut self.input, &self.roots, true);
+        self.fft.transform::<true>(&mut self.input);
         let scale = 1.0 / fft_count as f32;
         for (index, value) in output.iter_mut().enumerate() {
             let [real, imag] = self.input[index];

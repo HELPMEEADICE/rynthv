@@ -118,9 +118,7 @@ impl PreparedVoice {
                 if root.type_id != super::DURATION_ROOT_TYPE_ID || root.children.len() != 14 {
                     return Err(VoiceError::new("Unsupported duration stage structure"));
                 }
-                super::DurationConfiguration::parse(
-                    &duration.resource_bytes(duration.root_index())?,
-                )?;
+                duration.duration_configuration()?;
                 F0Stage::prepare(self.model("f0")?)?;
                 TimbreNetwork::prepare(self.model("timbre")?)?;
             }

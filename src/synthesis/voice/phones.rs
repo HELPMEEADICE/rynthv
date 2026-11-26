@@ -10,7 +10,7 @@ use std::{
 
 use serde::Serialize;
 
-use super::{Result, VoiceError, array, range, sum, u32_at};
+use super::{Result, VoiceError, range, sum, u32_at};
 
 pub const PHONE_SET_TYPE_ID: [u8; 16] = [
     0x4f, 0x0a, 0xa7, 0x7c, 0x74, 0xf4, 0xea, 0x4f, 0x14, 0x5d, 0xf4, 0x36, 0xab, 0xa8, 0xcb, 0x04,
@@ -117,12 +117,8 @@ pub(crate) fn resolve_with_overrides<'a>(
 }
 
 impl PhoneSet {
-    /// Parse the complete resource, including its 16-byte type prefix.
-    pub(crate) fn parse(bytes: &[u8]) -> Result<Self> {
-        if array::<16>(bytes, 0)? != PHONE_SET_TYPE_ID {
-            return Err(VoiceError::new("Resource is not a phone set"));
-        }
-        let mut reader = Reader { bytes, offset: 16 };
+    pub(super) fn parse(bytes: &[u8]) -> Result<Self> {
+        let mut reader = Reader { bytes, offset: 0 };
         let mut table = Self::read_tables(&mut reader)?;
         table.classes = reader.strings()?;
         table.validate(reader)?;

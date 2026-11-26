@@ -7,7 +7,7 @@
 use std::{collections::VecDeque, f32::consts::TAU, sync::Arc};
 
 use super::{
-    fourier::{fft, multiply},
+    fourier::{FftPlan, multiply},
     voice_control::{Component, SpectralControl, SpectralControlFilter},
 };
 use crate::synthesis::{
@@ -68,7 +68,8 @@ impl FlatQueue {
             if self.head >= self.values.len() {
                 self.values.clear();
                 self.head = 0;
-            } else if self.head >= 64 * self.stride {
+            } else if self.head >= 64 * self.stride && self.head >= self.values.len() - self.head {
+                // Move the remaining rows only after consuming at least half of the buffer.
                 self.values.drain(..self.head);
                 self.head = 0;
             }
@@ -87,7 +88,7 @@ pub struct DynamicFilter {
     fft_size: usize,
     parameter_channels: Option<usize>,
     window: Arc<[f32]>,
-    roots: Arc<[[f32; 2]]>,
+    fft: Arc<FftPlan>,
     spectrum: Vec<[f32; 2]>,
     response: Vec<[f32; 2]>,
     overlap: Vec<f32>,
@@ -133,20 +134,13 @@ impl DynamicFilter {
                 ((1.0 - (sample as f32 / window_samples as f32 * TAU).cos()) * 0.5) / normalization
             })
             .collect();
-        let roots: Arc<[[f32; 2]]> = (0..fft_size / 2)
-            .map(|sample| {
-                let angle = -std::f64::consts::TAU * sample as f64 / fft_size as f64;
-                let (sin, cos) = angle.sin_cos();
-                [cos as f32, sin as f32]
-            })
-            .collect();
         Ok(Self {
             frame_samples,
             window_frames,
             fft_size,
             parameter_channels: None,
             window,
-            roots,
+            fft: FftPlan::shared(fft_size)?,
             spectrum: vec![[0.0; 2]; fft_size],
             response: vec![[0.0; 2]; fft_size],
             overlap: vec![0.0; fft_size],
@@ -258,7 +252,7 @@ impl DynamicFilter {
             }
             self.parameters.pop_front();
         }
-        fft(&mut self.response, &self.roots, false);
+        self.fft.transform::<false>(&mut self.response);
         for value in &mut self.response[..=self.fft_size / 2] {
             let amplitude = value[0].exp();
             let (sin, cos) = value[1].sin_cos();
@@ -279,11 +273,11 @@ impl DynamicFilter {
                 self.spectrum[padding + index][0] = value * self.window[index];
             }
         }
-        fft(&mut self.spectrum, &self.roots, false);
+        self.fft.transform::<false>(&mut self.spectrum);
         for (sample, &response) in self.spectrum.iter_mut().zip(&self.response) {
             *sample = multiply(*sample, response);
         }
-        fft(&mut self.spectrum, &self.roots, true);
+        self.fft.transform::<true>(&mut self.spectrum);
         for (sample, (accumulated, value)) in
             self.overlap.iter_mut().zip(&self.spectrum).enumerate()
         {

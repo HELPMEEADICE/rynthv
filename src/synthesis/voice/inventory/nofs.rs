@@ -35,8 +35,14 @@ pub(super) fn load(path: &Path) -> Result<VoiceInventory> {
                     .ok_or_else(|| VoiceError::new("SV1 model is not in postorder"))
             })?;
             depths.push(depth);
-            if tensor::is_known(&record.bytes) {
-                inspect::count_tensor(&record.bytes, 0, &mut tensors)?;
+            if tensor::is_known(record.type_id) {
+                inspect::count_tensor(
+                    record.type_id,
+                    record.payload,
+                    record.payload.len(),
+                    0,
+                    &mut tensors,
+                )?;
             }
         }
         graphs.push(GraphSummary {
@@ -87,7 +93,7 @@ pub(super) fn load(path: &Path) -> Result<VoiceInventory> {
         configuration: Some(description.configuration),
         flat: None,
         flat_warnings: Vec::new(),
-        _models: vec![LoadedModel::Nofs { trees }],
+        models: vec![LoadedModel::Nofs { trees }].into(),
         preparation: OnceLock::new(),
     })
 }
