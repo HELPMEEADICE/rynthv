@@ -1,3 +1,7 @@
+mod vocoder;
+
+pub(crate) use vocoder::{VocoderBand, VocoderBandState, VocoderBranches};
+
 use super::{
     Batch,
     batch::Kernel,
@@ -16,6 +20,7 @@ use crate::synthesis::{
 use std::{collections::HashMap, ops::Range};
 use wgpu::Buffer;
 
+const MIN_AUTO_WORK: usize = 1_048_576;
 const MAX_SCRATCH_FLOATS: usize = 8 * 1024 * 1024;
 
 struct Layer<'a> {
@@ -37,6 +42,15 @@ pub(in super::super) struct ConditionalProjection<'a> {
     pub index: usize,
     pub streams: &'a mut HashMap<usize, ConvolutionStream>,
     pub flush: bool,
+}
+
+struct WindowPlan<'a> {
+    input: &'a Sequence,
+    condition: Option<&'a Sequence>,
+    rows: &'a Range<usize>,
+    capacity: usize,
+    lengths: Vec<usize>,
+    work: usize,
 }
 
 impl<'a> ConditionalGraph<'a> {
@@ -128,10 +142,97 @@ impl<'a> ConditionalGraph<'a> {
         output_rows: Range<usize>,
         projection: Option<ConditionalProjection<'_>>,
     ) -> Result<Option<(Sequence, bool)>> {
-        let frames = input.frames;
         if output_rows.is_empty() {
             return Ok(Some((Sequence::zeros(0, self.channels)?, false)));
         }
+        let Some(plan) = self.plan(input, condition, &output_rows)? else {
+            return Ok(None);
+        };
+        let head = match &projection {
+            Some(projection) => Chain::projection(
+                projection.tree,
+                projection.index,
+                output_rows.len(),
+                self.channels,
+                projection.streams,
+                projection.flush,
+            )?
+            .filter(|chain| {
+                chain.capacity <= MAX_SCRATCH_FLOATS
+                    && compute::can_append_gpu(&[Batch::readback_len(
+                        chain.frames * chain.channels,
+                    )])
+            }),
+            None => None,
+        };
+        let mut output = Sequence::zeros(
+            head.as_ref()
+                .map_or(output_rows.len(), |chain| chain.frames),
+            head.as_ref().map_or(self.channels, |chain| chain.channels),
+        )?;
+        let mut updates = Vec::new();
+        let ran = compute::accelerate(None, plan.work, MIN_AUTO_WORK, &plan.lengths, |batch| {
+            let validation = head.as_ref().map(|_| batch.validation_index());
+            let capacity = head
+                .as_ref()
+                .map_or(plan.capacity, |head| plan.capacity.max(head.capacity));
+            let scratch = [batch.output(capacity), batch.output(capacity)];
+            let result = self.encode(
+                batch,
+                &plan,
+                [&scratch[0], &scratch[1]],
+                validation.as_ref(),
+            )?;
+            if let Some((head, validation)) = head.as_ref().zip(validation.as_ref()) {
+                let label = if head.validates_intermediate() {
+                    "in the conditional stack or its output head"
+                } else {
+                    "before the conditional output projection"
+                };
+                head.read(
+                    batch,
+                    &result,
+                    [&scratch[0], &scratch[1]],
+                    &mut output.values,
+                    &mut updates,
+                    Some((validation, label)),
+                )
+            } else {
+                batch.read_from(
+                    &result,
+                    output_rows.start * self.channels,
+                    &mut output.values,
+                )
+            }
+        })
+        .map_err(|e| VoiceError::new(e.to_string()))?;
+        if !ran {
+            return Ok(None);
+        }
+        let projected = head.is_some();
+        if let Some(projection) = projection {
+            projection.streams.extend(updates);
+        }
+        Ok(Some((output, projected)))
+    }
+
+    fn plan<'window>(
+        &self,
+        input: &'window Sequence,
+        condition: Option<&'window Sequence>,
+        rows: &'window Range<usize>,
+    ) -> Result<Option<WindowPlan<'window>>> {
+        if rows.is_empty() {
+            return Ok(Some(WindowPlan {
+                input,
+                condition,
+                rows,
+                capacity: 0,
+                lengths: Vec::new(),
+                work: 0,
+            }));
+        }
+        let frames = input.frames;
         let mut work = 0usize;
         let mut lengths = vec![input.values.len(), condition.map_or(0, |s| s.values.len())];
         let mut capacity = 0;
@@ -154,130 +255,111 @@ impl<'a> ConditionalGraph<'a> {
             return Ok(None);
         }
         lengths.push(capacity);
+        let output_len = frames
+            .checked_mul(self.channels)
+            .ok_or_else(|| VoiceError::new("Conditional GPU output dimensions overflow"))?;
+        lengths.push(output_len);
+        Ok(Some(WindowPlan {
+            input,
+            condition,
+            rows,
+            capacity,
+            lengths,
+            work,
+        }))
+    }
+
+    fn encode(
+        &self,
+        batch: &mut Batch<'_>,
+        plan: &WindowPlan<'_>,
+        [projected, residual]: [&Buffer; 2],
+        validation: Option<&Buffer>,
+    ) -> std::result::Result<Buffer, MatrixError> {
+        let WindowPlan {
+            input,
+            condition,
+            rows,
+            capacity,
+            ..
+        } = *plan;
+        let frames = input.frames;
         let full_output_len = frames * self.channels;
-        let stable = output_rows.start * self.channels..output_rows.end * self.channels;
-        let head = match &projection {
-            Some(projection) => Chain::projection(
-                projection.tree,
-                projection.index,
-                output_rows.len(),
-                self.channels,
-                projection.streams,
-                projection.flush,
-            )?
-            .filter(|chain| chain.capacity <= MAX_SCRATCH_FLOATS),
-            None => None,
+        let stable = rows.start * self.channels..rows.end * self.channels;
+        let source = batch.input(&input.values);
+        let cond = condition.map(|s| batch.input(&s.values));
+        let [aux_or_skip, gated, state] = std::array::from_fn(|_| batch.output(capacity));
+        let outputs = [batch.output(full_output_len), batch.output(full_output_len)];
+        let project = |batch: &mut Batch<'_>, op: &Convolution, from: &Buffer, to: &Buffer| {
+            encode_convolution(
+                batch,
+                op,
+                from,
+                to,
+                frames,
+                frames,
+                Prefix::Zeros(op.config().padding),
+            )
         };
-        let mut output = Sequence::zeros(
-            head.as_ref()
-                .map_or(output_rows.len(), |chain| chain.frames),
-            head.as_ref().map_or(self.channels, |chain| chain.channels),
-        )?;
-        let mut history = vec![0.0; head.as_ref().map_or(0, |chain| chain.history_len)];
-        let ran = compute::accelerate(None, work, 1_048_576, &lengths, |batch| {
-            let source = batch.input(&input.values);
-            let cond = condition.map(|s| batch.input(&s.values));
-            let chain_capacity = head
-                .as_ref()
-                .map_or(capacity, |chain| capacity.max(chain.capacity));
-            let [projected, residual] = std::array::from_fn(|_| batch.output(chain_capacity));
-            let [aux_or_skip, gated, state] = std::array::from_fn(|_| batch.output(capacity));
-            let outputs = [batch.output(full_output_len), batch.output(full_output_len)];
-            let validation = head.as_ref().map(|_| batch.validation_index());
-            let project = |batch: &mut Batch<'_>, op: &Convolution, from: &Buffer, to: &Buffer| {
-                encode_convolution(
-                    batch,
-                    op,
-                    from,
-                    to,
-                    frames,
-                    frames,
-                    Prefix::Zeros(op.config().padding),
-                )
-            };
-            if let Some(op) = self.direct {
-                project(batch, op, cond.as_ref().unwrap(), &outputs[0])?;
-            }
-            for (index, layer) in self.layers.iter().enumerate() {
-                let activation = if index == 0 { &source } else { &state };
-                project(batch, layer.main, activation, &projected)?;
-                project(batch, layer.residual, activation, &residual)?;
-                let auxiliary = if let Some(op) = layer.condition {
-                    project(batch, op, cond.as_ref().unwrap(), &aux_or_skip)?;
-                    Some(&aux_or_skip)
-                } else {
-                    None
-                };
-                let width = layer.residual.output_channels();
-                elementwise::encode(
-                    batch,
-                    Element::Gate {
-                        channels: width,
-                        condition: None,
-                    },
-                    &projected,
-                    &gated,
-                    frames * width,
-                    auxiliary,
-                )?;
-                project(batch, layer.skip, &gated, &aux_or_skip)?;
-                add(
-                    batch,
-                    &gated,
-                    &residual,
-                    &state,
-                    0..frames * width,
-                    true,
-                    None,
-                )?;
-                // Only published rows enter the output head. The final
-                // skip sum also checks the boundary that used to be read on the CPU.
-                let validation = validation
-                    .as_ref()
-                    .filter(|_| index + 1 == self.layers.len());
-                let values = if validation.is_some() {
-                    stable.clone()
-                } else {
-                    0..full_output_len
-                };
-                add(
-                    batch,
-                    &outputs[index % 2],
-                    &aux_or_skip,
-                    &outputs[(index + 1) % 2],
-                    values,
-                    index != 0 || self.direct.is_some(),
-                    validation,
-                )?;
-            }
-            let result = &outputs[self.layers.len() % 2];
-            if let Some((head, validation)) = head.as_ref().zip(validation.as_ref()) {
-                let label = if head.validates_intermediate() {
-                    "in the conditional stack or its output head"
-                } else {
-                    "before the conditional output projection"
-                };
-                head.read(
-                    batch,
-                    result,
-                    [&projected, &residual],
-                    &mut output.values,
-                    &mut history,
-                    Some((validation, label)),
-                )
+        if let Some(op) = self.direct {
+            project(batch, op, cond.as_ref().unwrap(), &outputs[0])?;
+        }
+        for (index, layer) in self.layers.iter().enumerate() {
+            let activation = if index == 0 { &source } else { &state };
+            project(batch, layer.main, activation, projected)?;
+            project(batch, layer.residual, activation, residual)?;
+            let auxiliary = if let Some(op) = layer.condition {
+                project(batch, op, cond.as_ref().unwrap(), &aux_or_skip)?;
+                Some(&aux_or_skip)
             } else {
-                batch.read_from(result, stable.start, &mut output.values)
-            }
+                None
+            };
+            let width = layer.residual.output_channels();
+            elementwise::encode(
+                batch,
+                Element::Gate {
+                    channels: width,
+                    condition: None,
+                },
+                projected,
+                &gated,
+                frames * width,
+                auxiliary,
+            )?;
+            project(batch, layer.skip, &gated, &aux_or_skip)?;
+            add(
+                batch,
+                &gated,
+                residual,
+                &state,
+                0..frames * width,
+                true,
+                None,
+            )?;
+            // Only published rows enter the output head. The final
+            // skip sum also checks the boundary that used to be read on the CPU.
+            let validation = validation.filter(|_| index + 1 == self.layers.len());
+            let values = if validation.is_some() {
+                stable.clone()
+            } else {
+                0..full_output_len
+            };
+            add(
+                batch,
+                &outputs[index % 2],
+                &aux_or_skip,
+                &outputs[(index + 1) % 2],
+                values,
+                index != 0 || self.direct.is_some(),
+                validation,
+            )?;
+        }
+        let [first, second] = outputs;
+        Ok(if self.layers.len().is_multiple_of(2) {
+            first
+        } else {
+            second
         })
-        .map_err(|e| VoiceError::new(e.to_string()))?;
-        if !ran {
-            return Ok(None);
-        }
-        let projected = head.is_some();
-        if let Some((head, projection)) = head.zip(projection) {
-            head.commit(projection.streams, &[], &history);
-        }
-        Ok(Some((output, projected)))
     }
 }
 

@@ -43,11 +43,7 @@ impl Timestamps {
     }
 
     pub(super) fn bytes(&self) -> u64 {
-        self.bytes_after(0)
-    }
-
-    pub(super) fn bytes_after(&self, passes: usize) -> u64 {
-        self.kernels.len().saturating_add(passes).min(MAX_PASSES) as u64 * 16
+        self.kernels.len() as u64 * 16
     }
 
     pub(super) fn resolve(

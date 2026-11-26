@@ -3,14 +3,15 @@ mod history;
 use super::{ModelRuntime, queue::SumQueue};
 use crate::synthesis::{
     inference::{
-        Sequence, compute,
+        Sequence, VocoderBranches, compute,
+        convolution::ConvolutionStream,
         gpu::{ConditionalGraph, ConditionalProjection},
         ops::conditional::ConditionalConfig,
     },
     voice::{PreparedModule, PreparedTree, Result, VoiceError},
 };
 use history::History;
-use std::ops::Range;
+use std::{collections::HashMap, ops::Range};
 
 #[derive(Clone, Default)]
 struct LayerState {
@@ -81,13 +82,8 @@ impl ConditionalState {
         #[cfg(feature = "synth-profile")]
         let _profile = crate::synthesis::profiling::span("op.conditional");
         let tree = runtime.tree;
-        if (self.history.is_some() || !self.processed && compute::has_gpu())
-            && let Some(graph) = ConditionalGraph::prepare(
-                tree,
-                [&self.gates, &self.skips, &self.residuals],
-                condition.map(|_| children[3]),
-                self.config.output_channels,
-            )?
+        if (self.history.is_some() || compute::has_gpu())
+            && let Some(graph) = self.graph(tree, children, condition.is_some())?
         {
             let mut render = |input: &Sequence,
                               condition: Option<&Sequence>,
@@ -113,15 +109,14 @@ impl ConditionalState {
                 }
             } else {
                 let mut history = self.history.clone().unwrap_or_default();
-                let output = history.process(
+                let output = history.try_process(
                     input,
                     condition,
                     flush,
                     graph.radii(),
-                    self.config.output_channels,
                     |input, condition, rows| {
                         if let Some(output) = render(input, condition, rows.clone())? {
-                            return Ok(output);
+                            return Ok(Some(output));
                         }
                         // Replaying a bounded context is also valid on the CPU.
                         // The original stream queues are never mixed with halo state.
@@ -135,14 +130,63 @@ impl ConditionalState {
                             cpu.process_queued(&mut runtime, children, input, condition, true)
                         })?
                         .slice_frames(rows)
+                        .map(Some)
                     },
                 )?;
                 self.history = (!flush).then_some(history);
-                return Ok(output);
+                return Ok(output.expect("the conditional window always produces a result"));
             }
         }
         self.processed = true;
         self.process_queued(runtime, children, input, condition, flush)
+    }
+
+    fn graph<'a>(
+        &self,
+        tree: &'a PreparedTree,
+        children: &[usize],
+        conditioned: bool,
+    ) -> Result<Option<ConditionalGraph<'a>>> {
+        if self.processed {
+            return Ok(None);
+        }
+        ConditionalGraph::prepare(
+            tree,
+            [&self.gates, &self.skips, &self.residuals],
+            conditioned.then(|| children[3]),
+            self.config.output_channels,
+        )
+    }
+
+    pub(super) fn try_vocoder_branches(
+        &mut self,
+        tree: &PreparedTree,
+        children: &[usize],
+        streams: &mut HashMap<usize, ConvolutionStream>,
+        input: (&Sequence, Option<&Sequence>),
+        branches: &mut VocoderBranches<'_>,
+        flush: bool,
+    ) -> Result<Option<(Vec<Sequence>, Sequence)>> {
+        let Some(graph) = self.graph(tree, children, input.1.is_some())? else {
+            return Ok(None);
+        };
+        if flush && self.history.is_none() {
+            return branches.execute(&graph, tree, streams, input, 0..input.0.frames, flush);
+        }
+        let history = self.history.get_or_insert_with(History::default);
+        let output = history.try_process(
+            input.0,
+            input.1,
+            flush,
+            graph.radii(),
+            |input, condition, rows| {
+                branches.execute(&graph, tree, streams, (input, condition), rows, flush)
+            },
+        )?;
+        if output.is_some() && flush {
+            self.history = None;
+        }
+        Ok(output)
     }
 
     fn process_queued(

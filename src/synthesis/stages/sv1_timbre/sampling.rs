@@ -116,8 +116,13 @@ impl Sampler {
                 &noise.values[frame * noise.channels..(frame + 1) * noise.channels],
             );
         }
-        let hidden = runtime.execute_conditioned(self.conditional, &input, &condition, flush)?;
-        let output = runtime.execute(self.output, &hidden, flush)?;
+        let output = runtime.execute_conditioned_projected(
+            self.conditional,
+            self.output,
+            &input,
+            &condition,
+            flush,
+        )?;
         if output.channels != self.noise_channels {
             return Err(VoiceError::new(
                 "Compatible acoustic latent output dimensions differ",

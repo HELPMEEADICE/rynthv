@@ -7,8 +7,8 @@ mod sampler;
 
 use super::ModelRuntime;
 use crate::synthesis::{
-    inference::Sequence,
-    voice::{PreparedModule, Result, VoiceError},
+    inference::{Sequence, VocoderBranches, compute},
+    voice::{PreparedModule, PreparedTree, Result, VoiceError},
 };
 
 #[derive(Clone)]
@@ -28,6 +28,61 @@ enum Program {
 }
 
 impl CompositeState {
+    fn new(
+        tree: &PreparedTree,
+        index: usize,
+        input: &Sequence,
+        condition: Option<&Sequence>,
+    ) -> Result<Self> {
+        let node = tree.node(index)?;
+        let program = match node.module {
+            PreparedModule::Gated(config) => {
+                check_inputs(
+                    input,
+                    condition,
+                    config.input_channels,
+                    config.condition_channels,
+                )?;
+                Program::Gated(gated::GatedState::new(config, condition.is_some())?)
+            }
+            PreparedModule::Conditional(config) => {
+                check_inputs(
+                    input,
+                    condition,
+                    config.input_channels,
+                    config.condition_channels,
+                )?;
+                Program::Conditional(conditional::ConditionalState::new(
+                    tree,
+                    &node.children,
+                    config,
+                )?)
+            }
+            PreparedModule::SamplerNetwork => {
+                let condition = condition.ok_or_else(|| {
+                    VoiceError::new("Sampler network requires a condition sequence")
+                })?;
+                if tree.payload(index)?.as_ref() != [4, 0, 0, 1, 0, 1, 0, 1, 0, 1]
+                    || node.children.len() != 5
+                {
+                    return Err(VoiceError::new("Unsupported sampler network configuration"));
+                }
+                Program::Sampler(sampler::SamplerState::new(
+                    input.channels,
+                    condition.channels,
+                )?)
+            }
+            _ => return Err(VoiceError::new("Expected a recovered composite operator")),
+        };
+        Ok(Self {
+            program,
+            input_channels: input.channels,
+            condition_channels: condition.map(|s| s.channels),
+            input_frames: 0,
+            condition_frames: 0,
+        })
+    }
+
     fn accept(
         &mut self,
         input: &Sequence,
@@ -82,56 +137,7 @@ impl ModelRuntime<'_> {
         // child queues remain resident in this same runtime.
         let mut state = match self.composites.remove(&index) {
             Some(state) => state,
-            None => {
-                let program = match node.module {
-                    PreparedModule::Gated(config) => {
-                        check_inputs(
-                            input,
-                            condition,
-                            config.input_channels,
-                            config.condition_channels,
-                        )?;
-                        Program::Gated(gated::GatedState::new(config, condition.is_some())?)
-                    }
-                    PreparedModule::Conditional(config) => {
-                        check_inputs(
-                            input,
-                            condition,
-                            config.input_channels,
-                            config.condition_channels,
-                        )?;
-                        Program::Conditional(conditional::ConditionalState::new(
-                            tree,
-                            &node.children,
-                            config,
-                        )?)
-                    }
-                    PreparedModule::SamplerNetwork => {
-                        let condition = condition.ok_or_else(|| {
-                            VoiceError::new("Sampler network requires a condition sequence")
-                        })?;
-                        if tree.payload(index)?.as_ref() != [4, 0, 0, 1, 0, 1, 0, 1, 0, 1]
-                            || node.children.len() != 5
-                        {
-                            return Err(VoiceError::new(
-                                "Unsupported sampler network configuration",
-                            ));
-                        }
-                        Program::Sampler(sampler::SamplerState::new(
-                            input.channels,
-                            condition.channels,
-                        )?)
-                    }
-                    _ => return Err(VoiceError::new("Expected a recovered composite operator")),
-                };
-                CompositeState {
-                    program,
-                    input_channels: input.channels,
-                    condition_channels: condition.map(|s| s.channels),
-                    input_frames: 0,
-                    condition_frames: 0,
-                }
-            }
+            None => CompositeState::new(tree, index, input, condition)?,
         };
         let output = (|| {
             state.accept(input, condition, flush)?;
@@ -166,6 +172,49 @@ impl ModelRuntime<'_> {
         } else {
             Ok(output)
         }
+    }
+
+    pub(crate) fn try_vocoder_branches(
+        &mut self,
+        index: usize,
+        input: &Sequence,
+        condition: Option<&Sequence>,
+        branches: &mut VocoderBranches<'_>,
+        flush: bool,
+    ) -> Result<Option<(Vec<Sequence>, Sequence)>> {
+        if !compute::has_gpu() || self.closed.contains(&index) {
+            return Ok(None);
+        }
+        crate::synthesis::execution::checkpoint()?;
+        input.validate()?;
+        if let Some(condition) = condition {
+            condition.validate()?;
+        }
+        let tree = self.tree;
+        let node = tree.node(index)?;
+        let mut state = match self.composites.get(&index) {
+            Some(state) => state.clone(),
+            None => CompositeState::new(tree, index, input, condition)?,
+        };
+        state.accept(input, condition, flush)?;
+        let Program::Conditional(program) = &mut state.program else {
+            return Ok(None);
+        };
+        let output = program.try_vocoder_branches(
+            tree,
+            &node.children,
+            &mut self.convolutions,
+            (input, condition),
+            branches,
+            flush,
+        )?;
+        if output.is_some() {
+            self.composites.insert(index, state);
+            if flush {
+                self.closed.insert(index);
+            }
+        }
+        Ok(output)
     }
 }
 

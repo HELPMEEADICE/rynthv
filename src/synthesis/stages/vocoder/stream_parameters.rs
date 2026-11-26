@@ -114,49 +114,26 @@ impl<'a> ParameterStream<'a> {
         self.metadata.extend(metadata);
         self.physical.push(physical.clone())?;
         self.normalized.push(normalized.clone())?;
-        let features = {
-            #[cfg(feature = "synth-profile")]
-            let _profile = crate::synthesis::profiling::span("vocoder.conditioned_network");
-            if let Some(model) = &self.stage.positional {
-                let positions = (self.input_frames..input_frames)
-                    .map(|position| {
-                        u32::try_from(position)
-                            .map_err(|_| VoiceError::new("Vocoder frame position exceeds u32"))
-                    })
-                    .collect::<Result<Vec<_>>>()?;
-                let recurrent = model.execute(
-                    &normalized,
-                    &positions,
-                    self.positional.as_mut().expect("prepared positional state"),
-                )?;
-                self.runtime.execute_conditioned(
-                    self.stage.modules.conditioned_network,
-                    &normalized,
-                    &recurrent,
-                    final_batch,
-                )?
-            } else {
-                // The SV1 network streams without a condition tensor.
-                self.runtime.execute(
-                    self.stage.modules.conditioned_network,
-                    &normalized,
-                    final_batch,
-                )?
-            }
+        let recurrent = if let Some(model) = &self.stage.positional {
+            let positions = (self.input_frames..input_frames)
+                .map(|position| {
+                    u32::try_from(position)
+                        .map_err(|_| VoiceError::new("Vocoder frame position exceeds u32"))
+                })
+                .collect::<Result<Vec<_>>>()?;
+            Some(model.execute(
+                &normalized,
+                &positions,
+                self.positional.as_mut().expect("prepared positional state"),
+            )?)
+        } else {
+            None
         };
+        let (spectra, harmonic) = self.network(&normalized, recurrent.as_ref(), final_batch)?;
         self.input_frames = input_frames;
-        let spectra = self
-            .heads
-            .execute(&mut self.runtime, &features, final_batch)?;
         for (queue, spectrum) in self.spectra.iter_mut().zip(spectra) {
             queue.push(spectrum)?;
         }
-        let harmonic = {
-            #[cfg(feature = "synth-profile")]
-            let _profile = crate::synthesis::profiling::span("vocoder.gain_network");
-            self.runtime
-                .execute(self.stage.modules.gain_network, &features, final_batch)?
-        };
         self.harmonic.push(harmonic)?;
         let logits = {
             #[cfg(feature = "synth-profile")]
@@ -182,6 +159,43 @@ impl<'a> ParameterStream<'a> {
         let output = self.take_ready(final_batch)?;
         self.finished = final_batch;
         Ok(output)
+    }
+
+    fn network(
+        &mut self,
+        normalized: &Sequence,
+        recurrent: Option<&Sequence>,
+        final_batch: bool,
+    ) -> Result<(Vec<Sequence>, Sequence)> {
+        #[cfg(feature = "synth-profile")]
+        let _profile = crate::synthesis::profiling::span("vocoder.conditioned_network");
+        let index = self.stage.modules.conditioned_network;
+        let gain = self.stage.modules.gain_network;
+        if let Some(mut branches) = self.heads.gpu_branches(gain)
+            && let Some(output) = self.runtime.try_vocoder_branches(
+                index,
+                normalized,
+                recurrent,
+                &mut branches,
+                final_batch,
+            )?
+        {
+            return Ok(output);
+        }
+        let features = match recurrent {
+            Some(recurrent) => {
+                self.runtime
+                    .execute_conditioned(index, normalized, recurrent, final_batch)?
+            }
+            None => self.runtime.execute(index, normalized, final_batch)?,
+        };
+        let spectra = self
+            .heads
+            .execute(&mut self.runtime, &features, final_batch)?;
+        #[cfg(feature = "synth-profile")]
+        let _profile = crate::synthesis::profiling::span("vocoder.gain_network");
+        let harmonic = self.runtime.execute(gain, &features, final_batch)?;
+        Ok((spectra, harmonic))
     }
 
     fn take_ready(&mut self, final_batch: bool) -> Result<VocoderParameters> {

@@ -8,7 +8,7 @@ use std::sync::Arc;
 use crate::synthesis::{
     execution::checkpoint,
     inference::{
-        ModelRuntime, Sequence,
+        ModelRuntime, Sequence, VocoderBand, VocoderBandState, VocoderBranches,
         ops::{MODULE_LIST_TYPE_ID, SEQUENTIAL_TYPE_ID},
     },
     voice::{PreparedTree, Result, VoiceError},
@@ -19,18 +19,10 @@ pub const SPECTRAL_HEADS_TYPE_ID: [u8; 16] = [
 ];
 
 #[derive(Debug)]
-struct BandSpec {
-    node: usize,
-    start: usize,
-    end: usize,
-    weights: Arc<[f32]>,
-}
-
-#[derive(Debug)]
 struct SpectralHeadsSpec {
     head_count: usize,
     channels: usize,
-    bands: Vec<BandSpec>,
+    bands: Vec<VocoderBand>,
 }
 
 #[derive(Clone, Debug)]
@@ -75,6 +67,7 @@ impl BandQueue {
 pub struct SpectralHeads {
     spec: Arc<SpectralHeadsSpec>,
     queues: Vec<BandQueue>,
+    device_queues: VocoderBandState,
 }
 
 impl SpectralHeads {
@@ -157,7 +150,7 @@ impl SpectralHeads {
                 })
                 .collect();
             channels = channels.max(end);
-            bands.push(BandSpec {
+            bands.push(VocoderBand {
                 node,
                 start,
                 end,
@@ -172,6 +165,7 @@ impl SpectralHeads {
                 bands,
             }),
             queues,
+            device_queues: VocoderBandState::new(band_count as usize),
         })
     }
 
@@ -183,9 +177,23 @@ impl SpectralHeads {
         self.spec.channels
     }
 
+    pub(crate) fn gpu_branches(&mut self, gain: usize) -> Option<VocoderBranches<'_>> {
+        self.queues
+            .iter()
+            .all(|queue| queue.available() == 0)
+            .then_some(VocoderBranches {
+                bands: &self.spec.bands,
+                bins: self.spec.channels,
+                heads: self.spec.head_count,
+                gain,
+                state: &mut self.device_queues,
+            })
+    }
+
     /// Clear these output queues together with the associated model runtime.
     /// Calling only one reset would combine frames from unrelated segments.
     pub fn reset(&mut self) {
+        self.device_queues.clear();
         for queue in &mut self.queues {
             queue.clear();
         }
@@ -203,6 +211,8 @@ impl SpectralHeads {
         #[cfg(feature = "synth-profile")]
         let _profile = crate::synthesis::profiling::span("vocoder.spectral_heads.execute");
         input.validate()?;
+        self.device_queues
+            .materialize(|index, values| self.queues[index].extend(values))?;
         let mut frames = usize::MAX;
         for (band, queue) in self.spec.bands.iter().zip(&mut self.queues) {
             let result = runtime.execute(band.node, input, flush)?;

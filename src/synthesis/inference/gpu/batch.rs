@@ -1,8 +1,6 @@
 mod readback;
 
-pub(super) use readback::Readback;
-
-use super::{Device, timestamps::Timestamps};
+use super::{Device, Resident, timestamps::Timestamps};
 use crate::synthesis::{
     execution,
     inference::{compute::Activity, matrix::MatrixError},
@@ -23,7 +21,7 @@ struct Dispatch {
 }
 
 pub(in super::super) struct Batch<'a> {
-    device: &'a Device,
+    device: &'a Arc<Device>,
     encoder: Option<wgpu::CommandEncoder>,
     buffers: Vec<Buffer>,
     dispatches: Vec<Dispatch>,
@@ -33,7 +31,10 @@ pub(in super::super) struct Batch<'a> {
 }
 
 impl<'a> Batch<'a> {
-    pub(in super::super) fn new(device: &'a Device, timestamps: bool) -> Result<Self, MatrixError> {
+    pub(in super::super) fn new(
+        device: &'a Arc<Device>,
+        timestamps: bool,
+    ) -> Result<Self, MatrixError> {
         checkpoint(device)?;
         Ok(Self {
             device,
@@ -57,7 +58,10 @@ impl<'a> Batch<'a> {
     }
 
     pub(super) fn input(&mut self, values: &[f32]) -> Buffer {
-        self.upload(bytemuck::cast_slice(values), BufferUsages::STORAGE)
+        self.upload(
+            bytemuck::cast_slice(values),
+            BufferUsages::STORAGE | BufferUsages::COPY_SRC,
+        )
     }
 
     pub(super) fn staging_input(&mut self, len: usize) -> Buffer {
@@ -104,6 +108,37 @@ impl<'a> Batch<'a> {
             len as u64 * 4,
             BufferUsages::STORAGE | BufferUsages::COPY_SRC,
         )
+    }
+
+    pub(super) fn cleared_output(&mut self, len: usize) -> Buffer {
+        let buffer = self.buffer(
+            len as u64 * 4,
+            BufferUsages::STORAGE | BufferUsages::COPY_SRC | BufferUsages::COPY_DST,
+        );
+        self.flush_dispatches();
+        self.encoder
+            .as_mut()
+            .unwrap()
+            .clear_buffer(&buffer, 0, None);
+        buffer
+    }
+
+    pub(super) fn resident(&mut self, len: usize) -> Resident {
+        let resident = Resident::new(self.device.clone(), len);
+        self.track_buffer(resident.buffer());
+        resident
+    }
+
+    pub(super) fn resident_input(&mut self, resident: &Resident) -> Result<Buffer, MatrixError> {
+        if let Some(buffer) = self.current_resident(resident) {
+            Ok(buffer.clone())
+        } else {
+            Ok(self.input(&resident.read()?))
+        }
+    }
+
+    pub(super) fn current_resident<'b>(&self, resident: &'b Resident) -> Option<&'b Buffer> {
+        resident.on(self.device).then(|| resident.buffer())
     }
 
     pub(super) fn validation_index(&mut self) -> Buffer {
@@ -243,12 +278,16 @@ impl<'a> Batch<'a> {
             .unwrap()
             .buffer(self.device, bytes, usage);
         self.buffers.push(buffer.clone());
+        self.track_buffer(&buffer);
+        buffer
+    }
+
+    fn track_buffer(&mut self, buffer: &Buffer) {
         self.scratch_bytes += buffer.size();
         self.activity.peak_batch_buffer_bytes = self
             .activity
             .peak_batch_buffer_bytes
             .max(self.scratch_bytes);
-        buffer
     }
 }
 

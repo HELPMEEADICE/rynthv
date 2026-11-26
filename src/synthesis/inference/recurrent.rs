@@ -12,6 +12,7 @@ use super::{
     InferenceError,
     activation::ActivationOperator,
     affine::Affine,
+    gpu::Resident,
     matrix::{MatrixError, check_length},
 };
 
@@ -62,6 +63,7 @@ pub struct Gru {
 #[derive(Clone)]
 pub struct GruState {
     hidden: Vec<f32>,
+    resident: Option<Resident>,
     reset: Vec<f32>,
     update: Vec<f32>,
     candidate: Vec<f32>,
@@ -73,7 +75,12 @@ impl GruState {
         &self.hidden
     }
 
+    pub(super) fn resident(&self) -> Option<&Resident> {
+        self.resident.as_ref()
+    }
+
     pub fn reset(&mut self) {
+        self.resident = None;
         self.hidden.fill(0.0);
         self.reset.fill(0.0);
         self.update.fill(0.0);
@@ -152,6 +159,7 @@ impl Gru {
         let hidden = self.output_channels();
         GruState {
             hidden: vec![0.0; hidden],
+            resident: None,
             reset: vec![0.0; hidden],
             update: vec![0.0; hidden],
             candidate: vec![0.0; hidden],
@@ -163,6 +171,7 @@ impl Gru {
     pub fn step(&self, input: &[f32], state: &mut GruState) -> Result<(), RecurrentError> {
         check_length("GRU input", self.input_channels(), input.len())?;
         self.check_state(state)?;
+        state.resident = None;
         self.step_validated(input, state)
     }
 
@@ -186,10 +195,15 @@ impl Gru {
         check_length("GRU sequence input", inputs, input.len())?;
         check_length("GRU sequence output", outputs, output.len())?;
         self.check_state(state)?;
-        if frames != 0 && super::gpu::gru(self, input, output, state.hidden(), frames)? {
-            state.restore_hidden(&output[output.len() - self.output_channels()..])?;
+        if frames == 0 {
             return Ok(());
         }
+        if let Some(next) = super::gpu::gru(self, input, output, state, frames)? {
+            state.restore_hidden(&output[output.len() - self.output_channels()..])?;
+            state.resident = Some(next);
+            return Ok(());
+        }
+        state.resident = None;
         let cancellation = crate::synthesis::execution::current();
         for (frame, (input, output)) in input
             .chunks_exact(self.input_channels())

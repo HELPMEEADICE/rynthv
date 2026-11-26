@@ -1,4 +1,4 @@
-use super::{Batch, batch::Kernel};
+use super::{Batch, Resident, batch::Kernel};
 use crate::synthesis::inference::{
     compute,
     matrix::MatrixError,
@@ -13,10 +13,19 @@ pub(in super::super) fn gru(
     op: &Gru,
     input: &[f32],
     output: &mut [f32],
-    hidden: &[f32],
+    state: &GruState,
     frames: usize,
-) -> Result<bool, MatrixError> {
-    execute("gru", &[(op, hidden)], input, output, frames)
+) -> Result<Option<Resident>, MatrixError> {
+    let mut next = None;
+    execute(
+        "gru",
+        &[(op, state)],
+        input,
+        output,
+        frames,
+        Some(&mut next),
+    )?;
+    Ok(next)
 }
 
 pub(in super::super) fn bidirectional_gru(
@@ -26,20 +35,23 @@ pub(in super::super) fn bidirectional_gru(
     states: [&GruState; 2],
     frames: usize,
 ) -> Result<bool, MatrixError> {
-    let directions = operators
-        .into_iter()
-        .zip(states)
-        .map(|(op, state)| (op, state.hidden()))
-        .collect::<Vec<_>>();
-    execute("bidirectional_gru", &directions, input, output, frames)
+    execute(
+        "bidirectional_gru",
+        &[(operators[0], states[0]), (operators[1], states[1])],
+        input,
+        output,
+        frames,
+        None,
+    )
 }
 
 fn execute(
     name: &'static str,
-    directions: &[(&Gru, &[f32])],
+    directions: &[(&Gru, &GruState)],
     input: &[f32],
     output: &mut [f32],
     frames: usize,
+    next: Option<&mut Option<Resident>>,
 ) -> Result<bool, MatrixError> {
     let mut work = 0usize;
     let mut lengths = vec![input.len(), output.len()];
@@ -72,7 +84,21 @@ fn execute(
             )?;
             offset += op.output_channels();
         }
-        batch.read(&result, output)
+        let retained = next.as_ref().map(|_| {
+            let state = batch.resident(width);
+            batch.copy_floats(
+                &result,
+                output.len() - width..output.len(),
+                state.buffer(),
+                0,
+            );
+            state
+        });
+        batch.read(&result, output)?;
+        if let Some(next) = next {
+            *next = retained;
+        }
+        Ok(())
     })
 }
 
@@ -82,7 +108,7 @@ fn encode(
     source: &Buffer,
     result: &Buffer,
     op: &Gru,
-    initial: &[f32],
+    initial: &GruState,
     frames: usize,
     width: usize,
     offset: usize,
@@ -90,7 +116,10 @@ fn encode(
 ) -> Result<(), MatrixError> {
     let hidden = op.output_channels();
     let weights = batch.weight(op.gpu_weights());
-    let state = batch.input(initial);
+    let state = initial
+        .resident()
+        .and_then(|resident| batch.current_resident(resident).cloned())
+        .unwrap_or_else(|| batch.input(initial.hidden()));
     let projected = batch.output(frames * 3 * hidden);
     let grid = batch.grid(((frames * hidden) as u32).div_ceil(64))?;
     let mut params = [0; 16];

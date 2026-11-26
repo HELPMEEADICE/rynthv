@@ -1,14 +1,17 @@
+use super::super::{Batch, Resident};
 use crate::synthesis::{
-    inference::convolution::{Convolution, ConvolutionChunk, ConvolutionStream},
+    inference::{
+        convolution::{Convolution, ConvolutionChunk, ConvolutionStream, Pending},
+        matrix::MatrixError,
+    },
     voice::{Result, VoiceError},
 };
-use std::{collections::HashMap, ops::Range};
+use wgpu::Buffer;
 
 pub(super) struct StreamStep {
-    pub(super) state: ConvolutionStream,
+    pub(super) node: usize,
+    state: ConvolutionStream,
     pub(super) chunk: ConvolutionChunk,
-    pub(super) history: Option<Range<usize>>,
-    node: usize,
 }
 
 impl StreamStep {
@@ -18,41 +21,79 @@ impl StreamStep {
         state: Option<&ConvolutionStream>,
         input_len: usize,
         flush: bool,
-        device_history_start: Option<usize>,
     ) -> Result<Self> {
         let state = match state {
             Some(state) => state.clone(),
             None => op.stream().map_err(error)?,
         };
         let chunk = state.plan(input_len, flush).map_err(error)?;
-        let history = if let Some(start) = device_history_start {
-            let end = start
-                .checked_add(chunk.input_tail.len())
-                .ok_or_else(|| error("GPU convolution history size overflows"))?;
-            Some(start..end)
-        } else {
-            None
-        };
-        Ok(Self {
-            state,
-            chunk,
-            history,
-            node,
-        })
+        Ok(Self { node, state, chunk })
     }
 
-    pub(super) fn commit(
-        mut self,
-        streams: &mut HashMap<usize, ConvolutionStream>,
-        input: &[f32],
-        history: &[f32],
-    ) {
-        let tail = match self.history {
-            Some(range) => &history[range],
-            None => &input[self.chunk.input_tail.clone()],
+    pub(super) fn lengths(&self) -> [usize; 2] {
+        [
+            self.state.pending().len(),
+            self.chunk.pending_tail.len() + self.chunk.input_tail.len(),
+        ]
+    }
+
+    pub(super) fn is_resident(&self) -> bool {
+        matches!(self.state.pending(), Pending::Device(_))
+    }
+
+    pub(super) fn pending_frames(&self) -> usize {
+        self.state.pending_frames()
+    }
+
+    pub(super) fn previous(
+        &self,
+        batch: &mut Batch<'_>,
+    ) -> std::result::Result<Option<Buffer>, MatrixError> {
+        match self.state.pending() {
+            Pending::Host(values) if values.is_empty() => Ok(None),
+            Pending::Host(values) => Ok(Some(batch.input(values))),
+            Pending::Device(values) => batch.resident_input(values).map(Some),
+        }
+    }
+
+    pub(super) fn retain(
+        &self,
+        batch: &mut Batch<'_>,
+        previous: Option<&Buffer>,
+        input: &Buffer,
+    ) -> ConvolutionStream {
+        let [old, len] = self.lengths();
+        let resident = if len == 0 {
+            None
+        } else if self.chunk.input_tail.is_empty()
+            && len == old
+            && let Pending::Device(existing) = self.state.pending()
+        {
+            Some(existing.clone())
+        } else {
+            Some(self.copy_tail(batch, previous, input, len))
         };
-        self.state.advance(&self.chunk, tail);
-        streams.insert(self.node, self.state);
+        self.state.clone().retain(&self.chunk, resident)
+    }
+
+    fn copy_tail(
+        &self,
+        batch: &mut Batch<'_>,
+        previous: Option<&Buffer>,
+        input: &Buffer,
+        len: usize,
+    ) -> Resident {
+        let next = batch.resident(len);
+        if let Some(previous) = previous {
+            batch.copy_floats(previous, self.chunk.pending_tail.clone(), next.buffer(), 0);
+        }
+        batch.copy_floats(
+            input,
+            self.chunk.input_tail.clone(),
+            next.buffer(),
+            self.chunk.pending_tail.len(),
+        );
+        next
     }
 }
 

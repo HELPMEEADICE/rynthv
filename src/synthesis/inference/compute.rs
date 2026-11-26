@@ -36,7 +36,7 @@ pub struct Session(Arc<Inner>);
 struct Inner {
     requested: Backend,
     adapters: Vec<AdapterInfo>,
-    device: Option<Device>,
+    device: Option<Arc<Device>>,
     initialization_error: Option<String>,
     initialization_ms: f64,
     activity: Mutex<Activity>,
@@ -64,7 +64,7 @@ impl Session {
             Backend::Auto | Backend::WebGpu => {
                 let (adapters, result) = open(adapter);
                 match result {
-                    Ok(device) => (adapters, Some(device), None),
+                    Ok(device) => (adapters, Some(Arc::new(device)), None),
                     Err(error) => (adapters, None, Some(error)),
                 }
             }
@@ -99,11 +99,11 @@ impl Session {
     pub fn status(&self) -> Status {
         Status {
             requested: self.0.requested,
-            device: self.0.device.as_ref().map(Device::info),
+            device: self.0.device.as_deref().map(Device::info),
             error: self
                 .0
                 .device
-                .as_ref()
+                .as_deref()
                 .and_then(Device::error)
                 .or_else(|| self.0.initialization_error.clone()),
             initialization_ms: self.0.initialization_ms,
@@ -136,7 +136,7 @@ impl Session {
 
     #[cfg(all(target_os = "android", feature = "gui"))]
     pub(crate) fn device_lost(&self) -> bool {
-        self.0.device.as_ref().is_some_and(Device::is_lost)
+        self.0.device.as_deref().is_some_and(Device::is_lost)
     }
 
     #[cfg(feature = "synth-profile")]
@@ -257,6 +257,18 @@ pub(super) fn accelerate(
     result.map(|()| true)
 }
 
+pub(super) fn record_readback(device: &Arc<Device>, batch: &Batch<'_>) {
+    if let Some(session) = current()
+        && session
+            .0
+            .device
+            .as_ref()
+            .is_some_and(|current| Arc::ptr_eq(current, device))
+    {
+        session.0.activity.lock().unwrap().merge(batch.activity());
+    }
+}
+
 /// A stage appended to a GPU batch shares its submission and readback.
 pub(super) fn can_append_gpu(lengths: &[usize]) -> bool {
     current().is_some_and(|session| {
@@ -277,7 +289,7 @@ pub(super) fn has_gpu() -> bool {
         current
             .borrow()
             .as_ref()
-            .and_then(|session| session.0.device.as_ref())
+            .and_then(|session| session.0.device.as_deref())
             .is_some_and(Device::is_available)
     })
 }

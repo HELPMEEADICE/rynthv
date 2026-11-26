@@ -2,11 +2,9 @@ mod stream;
 
 use super::{
     Batch,
-    batch::Readback,
     convolution::{Prefix, encode_convolution},
     elementwise::{self, Element},
     linear,
-    timestamps::Timestamps,
 };
 use crate::synthesis::{
     inference::{
@@ -43,9 +41,8 @@ pub(super) struct Chain<'a> {
     input_frames: usize,
     pub(super) channels: usize,
     pub(super) capacity: usize,
-    lengths: Vec<usize>,
-    work: usize,
-    pub(super) history_len: usize,
+    pub(super) lengths: Vec<usize>,
+    pub(super) work: usize,
 }
 
 pub(in super::super) fn sequence(
@@ -58,25 +55,28 @@ pub(in super::super) fn sequence(
     if children.len() < 2 || !compute::has_gpu() {
         return Ok(None);
     }
-    let mut chain = Chain::prefix(
-        tree,
-        children,
-        input.frames,
-        input.channels,
-        streams,
-        flush,
-        false,
-    )?;
-    if !chain.is_batch() {
+    let chain = Chain::prefix(tree, children, input.frames, input.channels, streams, flush)?;
+    let resident = chain.steps.iter().any(
+        |step| matches!(&step.operation, Operation::Convolution(_, stream) if stream.is_resident()),
+    );
+    if chain.steps.len() < 2 || !resident && (chain.work == 0 || chain.frames == 0) {
         return Ok(None);
     }
-    let validate = chain.validates_intermediate();
     let output_len = sequence_len(chain.frames, chain.channels)?;
-    chain.include_readback(validate)?;
+    let validate = output_len == 0 || chain.validates_intermediate();
+    // Once history is resident, keep short chunks on the device as well.
+    let work = if resident {
+        chain.work.max(MIN_AUTO_WORK)
+    } else {
+        chain.work
+    };
+    if !compute::can_append_gpu(&[Batch::readback_len(output_len)]) {
+        return Ok(None);
+    }
     let mut result = None;
-    compute::accelerate(None, chain.work, MIN_AUTO_WORK, &chain.lengths, |batch| {
+    compute::accelerate(None, work, MIN_AUTO_WORK, &chain.lengths, |batch| {
         let mut output = vec![0.0; output_len];
-        let mut history = vec![0.0; chain.history_len];
+        let mut updates = Vec::new();
         let initial = batch.input(&input.values);
         let buffers = [batch.output(chain.capacity), batch.output(chain.capacity)];
         let validation = validate.then(|| batch.validation_index());
@@ -85,21 +85,21 @@ pub(in super::super) fn sequence(
             &initial,
             [&buffers[0], &buffers[1]],
             &mut output,
-            &mut history,
+            &mut updates,
             validation
                 .as_ref()
                 .map(|buffer| (buffer, "in a sequential convolution")),
         )?;
-        result = Some((output, history));
+        result = Some((output, updates));
         Ok(())
     })
     .map_err(|e| VoiceError::new(e.to_string()))?;
-    let Some((output, history)) = result else {
+    let Some((output, updates)) = result else {
         return Ok(None);
     };
     let output = Sequence::new(chain.frames, chain.channels, output)?;
     let consumed = chain.consumed;
-    chain.commit(streams, &input.values, &history);
+    streams.extend(updates);
     Ok(Some((consumed, output)))
 }
 
@@ -111,7 +111,6 @@ impl<'a> Chain<'a> {
         mut channels: usize,
         streams: &HashMap<usize, ConvolutionStream>,
         flush: bool,
-        device_input: bool,
     ) -> Result<Self> {
         let mut frames = input_frames;
         let mut lengths = vec![sequence_len(frames, channels)?];
@@ -119,7 +118,6 @@ impl<'a> Chain<'a> {
         let mut steps = Vec::new();
         let mut capacity = 0;
         let mut consumed = 0;
-        let mut history_len = 0;
         let mut convolutions = HashSet::new();
         for &child in children {
             let operation = match &tree.node(child)?.module {
@@ -149,7 +147,6 @@ impl<'a> Chain<'a> {
                         streams.get(&child),
                         sequence_len(frames, channels)?,
                         flush,
-                        (device_input || !steps.is_empty()).then_some(history_len),
                     )?;
                     if u32::try_from(
                         convolution
@@ -161,10 +158,7 @@ impl<'a> Chain<'a> {
                     {
                         break;
                     }
-                    if let Some(history) = &convolution.history {
-                        history_len = history.end;
-                    }
-                    lengths.push(convolution.state.pending().len());
+                    lengths.extend(convolution.lengths());
                     frames = convolution.chunk.frames;
                     channels = op.output_features;
                     let weights = operator.shared_weights().len();
@@ -208,12 +202,7 @@ impl<'a> Chain<'a> {
             capacity,
             lengths,
             work,
-            history_len,
         })
-    }
-
-    fn is_batch(&self) -> bool {
-        self.steps.len() >= 2 && self.work != 0 && self.frames != 0
     }
 
     pub(super) fn projection(
@@ -226,24 +215,18 @@ impl<'a> Chain<'a> {
     ) -> Result<Option<Self>> {
         let mut nodes = Vec::new();
         projection_nodes(tree, index, &mut nodes)?;
-        let mut chain = Self::prefix(tree, &nodes, frames, channels, streams, flush, true)?;
+        let chain = Self::prefix(tree, &nodes, frames, channels, streams, flush)?;
         if chain.consumed != nodes.len() || chain.steps.is_empty() {
             return Ok(None);
         }
-        chain.include_readback(true)?;
         Ok(compute::can_append_gpu(&chain.lengths).then_some(chain))
     }
 
-    fn include_readback(&mut self, validate: bool) -> Result<()> {
-        if validate || self.history_len != 0 {
-            self.lengths.push(
-                sequence_len(self.frames, self.channels)?
-                    .checked_add(self.history_len)
-                    .and_then(|len| len.checked_add(2 + (Timestamps::MAX_BYTES / 4) as usize))
-                    .ok_or_else(|| VoiceError::new("GPU sequence readback size overflows"))?,
-            );
-        }
-        Ok(())
+    pub(super) fn state_nodes(&self) -> impl Iterator<Item = usize> + '_ {
+        self.steps.iter().filter_map(|step| match &step.operation {
+            Operation::Convolution(_, stream) => Some(stream.node),
+            _ => None,
+        })
     }
 
     pub(super) fn validates_intermediate(&self) -> bool {
@@ -256,39 +239,25 @@ impl<'a> Chain<'a> {
         source: &Buffer,
         buffers: [&Buffer; 2],
         output: &mut [f32],
-        history: &mut [f32],
+        updates: &mut Vec<(usize, ConvolutionStream)>,
         validation: Option<(&Buffer, &'static str)>,
     ) -> std::result::Result<(), MatrixError> {
-        let staging = batch.stage_readback(
-            output.len(),
-            history.len(),
-            validation.map(|(_, label)| label),
-            self.steps.len().saturating_mul(2),
-        );
-        let validation = validation.map(|(buffer, _)| buffer);
-        let source = self.encode_steps(batch, source, buffers, &staging, validation)?;
-        batch.read_staged(staging, source, 0, output, history, validation)
+        let result = self.encode_steps(
+            batch,
+            source,
+            buffers,
+            updates,
+            validation.map(|(buffer, _)| buffer),
+        )?;
+        batch.read_outputs(&mut [(result, 0, output)], validation)
     }
 
-    pub(super) fn commit(
-        self,
-        streams: &mut HashMap<usize, ConvolutionStream>,
-        input: &[f32],
-        history: &[f32],
-    ) {
-        for step in self.steps {
-            if let Operation::Convolution(_, stream) = step.operation {
-                stream.commit(streams, input, history);
-            }
-        }
-    }
-
-    fn encode_steps<'buf>(
+    pub(super) fn encode_steps<'buf>(
         &self,
         batch: &mut Batch<'_>,
         mut source: &'buf Buffer,
         buffers: [&'buf Buffer; 2],
-        staging: &Readback,
+        updates: &mut Vec<(usize, ConvolutionStream)>,
         validation: Option<&Buffer>,
     ) -> std::result::Result<&'buf Buffer, MatrixError> {
         let mut input_frames = self.input_frames;
@@ -299,21 +268,12 @@ impl<'a> Chain<'a> {
                     linear::encode_affine(batch, op, step.frames, source, target)?;
                 }
                 Operation::Convolution(op, stream) => {
-                    if let Some(history) = &stream.history {
-                        staging.copy_history(
-                            batch,
-                            source,
-                            stream.chunk.input_tail.clone(),
-                            history.start,
-                        );
-                    }
+                    let previous = stream.previous(batch)?;
                     if step.frames != 0 {
-                        let pending = (!stream.state.pending().is_empty())
-                            .then(|| batch.input(stream.state.pending()));
-                        let prefix = match pending.as_ref() {
+                        let prefix = match previous.as_ref() {
                             Some(buffer) => Prefix::History {
                                 buffer,
-                                frames: stream.state.pending_frames(),
+                                frames: stream.pending_frames(),
                             },
                             None => Prefix::Zeros(0),
                         };
@@ -333,6 +293,7 @@ impl<'a> Chain<'a> {
                             elementwise::validate_finite(batch, target, step.len, validation)?;
                         }
                     }
+                    updates.push((stream.node, stream.retain(batch, previous.as_ref(), source)));
                 }
                 Operation::Element(op) if step.frames != 0 => {
                     elementwise::encode(batch, *op, source, target, step.len, None)?;

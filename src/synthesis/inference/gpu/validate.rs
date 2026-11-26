@@ -8,6 +8,10 @@ pub(in super::super) fn validate(device: &Device) -> Result<Vec<&'static str>, S
     for (source, entries) in [
         (include_str!("shaders/affine.wgsl"), &["affine"][..]),
         (
+            include_str!("shaders/spectral_heads.wgsl"),
+            &["merge_spectral_band"],
+        ),
+        (
             include_str!("shaders/convolution.wgsl"),
             &["convolution", "transposed_convolution"],
         ),

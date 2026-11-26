@@ -6,6 +6,7 @@ pub mod compute;
 pub mod convolution;
 pub mod extent;
 mod gpu;
+pub(crate) use gpu::{VocoderBand, VocoderBandState, VocoderBranches};
 pub mod matrix;
 pub mod noise;
 pub mod ops;

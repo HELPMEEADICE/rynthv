@@ -2,38 +2,16 @@
 
 use super::{Batch, Device, Timestamps, checkpoint};
 use crate::synthesis::inference::matrix::MatrixError;
-use std::ops::Range;
 #[cfg(not(target_arch = "wasm32"))]
 use std::{sync::mpsc, time::Duration};
 use web_time::Instant;
 use wgpu::{Buffer, BufferUsages};
 
-pub(in crate::synthesis::inference::gpu) struct Readback {
-    buffer: Buffer,
-    output_bytes: u64,
-    history_bytes: u64,
-    timestamp_offset: u64,
-    validation_label: Option<&'static str>,
-}
-
-impl Readback {
-    pub(in crate::synthesis::inference::gpu) fn copy_history(
-        &self,
-        batch: &mut Batch<'_>,
-        source: &Buffer,
-        range: Range<usize>,
-        offset: usize,
-    ) {
-        batch.copy_floats(
-            source,
-            range,
-            &self.buffer,
-            (self.output_bytes / 4) as usize + offset,
-        );
-    }
-}
-
 impl Batch<'_> {
+    pub(in crate::synthesis::inference::gpu) fn readback_len(values: usize) -> usize {
+        values.saturating_add(2 + (Timestamps::MAX_BYTES / 4) as usize)
+    }
+
     pub(in crate::synthesis::inference::gpu) fn read(
         &mut self,
         source: &Buffer,
@@ -48,78 +26,51 @@ impl Batch<'_> {
         first: usize,
         output: &mut [f32],
     ) -> Result<(), MatrixError> {
-        let staging = self.stage_readback(output.len(), 0, None, 0);
-        self.read_staged(staging, source, first, output, &mut [], None)
+        self.read_outputs(&mut [(source, first, output)], None)
     }
 
-    pub(in crate::synthesis::inference::gpu) fn stage_readback(
+    pub(in crate::synthesis::inference::gpu) fn read_outputs(
         &mut self,
-        output_len: usize,
-        history_len: usize,
-        validation_label: Option<&'static str>,
-        pending_dispatches: usize,
-    ) -> Readback {
-        let output_bytes = output_len as u64 * 4;
-        let history_bytes = history_len as u64 * 4;
-        let data_bytes = output_bytes + history_bytes;
-        let status_end = data_bytes + if validation_label.is_some() { 4 } else { 0 };
-        let timestamp_offset = status_end.next_multiple_of(8);
-        // A chain stages its history before all of its dispatches are encoded.
-        let timestamp_bytes = self
-            .timestamps
-            .as_ref()
-            .map_or(0, |timestamps| timestamps.bytes_after(pending_dispatches));
-        let capacity = if timestamp_bytes == 0 {
-            status_end
-        } else {
-            timestamp_offset + timestamp_bytes
-        };
-        let buffer = self.buffer(capacity, BufferUsages::MAP_READ | BufferUsages::COPY_DST);
-        Readback {
-            buffer,
-            output_bytes,
-            history_bytes,
-            timestamp_offset,
-            validation_label,
-        }
-    }
-
-    pub(in crate::synthesis::inference::gpu) fn read_staged(
-        &mut self,
-        staging: Readback,
-        source: &Buffer,
-        first: usize,
-        output: &mut [f32],
-        history: &mut [f32],
-        validation_index: Option<&Buffer>,
+        outputs: &mut [(&Buffer, usize, &mut [f32])],
+        validation: Option<(&Buffer, &'static str)>,
     ) -> Result<(), MatrixError> {
         checkpoint(self.device)?;
         self.flush_dispatches();
-        let Readback {
-            buffer,
-            output_bytes,
-            history_bytes,
-            timestamp_offset,
-            validation_label,
-        } = staging;
-        let data_bytes = output_bytes + history_bytes;
-        debug_assert_eq!(output_bytes, output.len() as u64 * 4);
-        debug_assert_eq!(history_bytes, history.len() as u64 * 4);
-        debug_assert_eq!(validation_label.is_some(), validation_index.is_some());
-        let mut encoder = self.encoder.take().unwrap();
-        if output_bytes != 0 {
-            encoder.copy_buffer_to_buffer(source, first as u64 * 4, &buffer, 0, Some(output_bytes));
-        }
-        if let Some(validation_index) = validation_index {
-            encoder.copy_buffer_to_buffer(validation_index, 0, &buffer, data_bytes, Some(4));
-        }
+        let data_bytes = outputs
+            .iter()
+            .map(|(_, _, output)| output.len() as u64 * 4)
+            .sum::<u64>();
+        let status_end = data_bytes + if validation.is_some() { 4 } else { 0 };
         let timestamp_bytes = self.timestamps.as_ref().map_or(0, Timestamps::bytes);
-        let status_end = data_bytes + if validation_index.is_some() { 4 } else { 0 };
+        let timestamp_offset = status_end.next_multiple_of(8);
         let mapped_bytes = if timestamp_bytes == 0 {
             status_end
         } else {
             timestamp_offset + timestamp_bytes
         };
+        let mapped_bytes = mapped_bytes.max(4);
+        let buffer = self.buffer(
+            mapped_bytes,
+            BufferUsages::MAP_READ | BufferUsages::COPY_DST,
+        );
+        let mut encoder = self.encoder.take().unwrap();
+        let mut offset = 0;
+        for (source, first, output) in outputs.iter() {
+            let bytes = output.len() as u64 * 4;
+            if bytes != 0 {
+                encoder.copy_buffer_to_buffer(
+                    source,
+                    *first as u64 * 4,
+                    &buffer,
+                    offset,
+                    Some(bytes),
+                );
+            }
+            offset += bytes;
+        }
+        if let Some((index, _)) = validation {
+            encoder.copy_buffer_to_buffer(index, 0, &buffer, data_bytes, Some(4));
+        }
         if timestamp_bytes != 0 {
             let resolved = self.buffer(
                 timestamp_bytes,
@@ -148,7 +99,7 @@ impl Batch<'_> {
             let data = slice
                 .get_mapped_range()
                 .map_err(|e| MatrixError::Compute(format!("WebGPU mapped range: {e}")))?;
-            if let Some(label) = validation_label {
+            if let Some((_, label)) = validation {
                 let offset = data_bytes as usize;
                 let invalid = u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap());
                 if invalid != u32::MAX {
@@ -157,24 +108,28 @@ impl Batch<'_> {
                     )));
                 }
             }
-            let values: &[f32] = bytemuck::cast_slice(&data[..output_bytes as usize]);
-            if let Some((index, value)) = values.iter().enumerate().find(|(_, v)| !v.is_finite()) {
-                let kernels = self
-                    .activity
-                    .gpu_dispatches
-                    .keys()
-                    .copied()
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                return Err(MatrixError::Compute(format!(
-                    "WebGPU inference produced a nonfinite value ({value}) at output element {} in batch [{kernels}]",
-                    first + index,
-                )));
+            let mut offset = 0;
+            for (_, first, output) in outputs {
+                let bytes = output.len() * 4;
+                let values: &[f32] = bytemuck::cast_slice(&data[offset..offset + bytes]);
+                if let Some((index, value)) =
+                    values.iter().enumerate().find(|(_, v)| !v.is_finite())
+                {
+                    let kernels = self
+                        .activity
+                        .gpu_dispatches
+                        .keys()
+                        .copied()
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    return Err(MatrixError::Compute(format!(
+                        "WebGPU inference produced a nonfinite value ({value}) at output element {} in batch [{kernels}]",
+                        *first + index,
+                    )));
+                }
+                output.copy_from_slice(values);
+                offset += bytes;
             }
-            output.copy_from_slice(values);
-            history.copy_from_slice(bytemuck::cast_slice(
-                &data[output_bytes as usize..data_bytes as usize],
-            ));
             if timestamp_bytes != 0 {
                 self.timestamps.as_ref().unwrap().record(
                     &data[timestamp_offset as usize..],

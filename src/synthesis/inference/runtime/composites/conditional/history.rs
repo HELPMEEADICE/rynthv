@@ -16,15 +16,14 @@ pub(super) struct History {
 }
 
 impl History {
-    pub(super) fn process(
+    pub(super) fn try_process<T>(
         &mut self,
         input: &Sequence,
         condition: Option<&Sequence>,
         flush: bool,
         radii: [usize; 2],
-        channels: usize,
-        render: impl FnOnce(&Sequence, Option<&Sequence>, Range<usize>) -> Result<Sequence>,
-    ) -> Result<Sequence> {
+        render: impl FnOnce(&Sequence, Option<&Sequence>, Range<usize>) -> Result<Option<T>>,
+    ) -> Result<Option<T>> {
         self.input.extend_from_slice(&input.values);
         let input_frames = self.input.len() / input.channels;
         let mut stable = input_frames.saturating_sub(radii[0]);
@@ -40,7 +39,7 @@ impl History {
         }
         let start = self.emitted - self.origin;
         if start >= stable {
-            return Sequence::zeros(0, channels);
+            return render(input, condition, 0..0);
         }
         // The faster branch may have arrived earlier. Its absent counterpart
         // is padded only outside the published interval's dependency radius.
@@ -48,7 +47,9 @@ impl History {
         let conditioning = condition
             .map(|c| window(&self.condition, c.channels, window_frames))
             .transpose()?;
-        let output = render(&sequence, conditioning.as_ref(), start..stable)?;
+        let Some(output) = render(&sequence, conditioning.as_ref(), start..stable)? else {
+            return Ok(None);
+        };
         self.emitted = self
             .origin
             .checked_add(stable)
@@ -63,7 +64,7 @@ impl History {
             }
             self.origin = retained;
         }
-        Ok(output)
+        Ok(Some(output))
     }
 }
 

@@ -198,9 +198,13 @@ impl<'network, 'tree> Program<'network, 'tree> {
             &input.timbre_shape[timbre_range.clone()],
         )?;
         self.timbre_rows = timbre_range.end;
-        let hidden =
-            runtime.execute_conditioned(sampler.children[4], &data, &condition, final_batch)?;
-        let latent = runtime.execute(sampler.children[5], &hidden, final_batch)?;
+        let latent = runtime.execute_conditioned_projected(
+            sampler.children[4],
+            sampler.children[5],
+            &data,
+            &condition,
+            final_batch,
+        )?;
         let decoded = runtime.execute(layout.decoder, &latent, final_batch)?;
         let decoded = self
             .decoder_hold

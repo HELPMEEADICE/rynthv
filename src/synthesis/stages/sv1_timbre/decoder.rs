@@ -38,8 +38,8 @@ impl Decoder {
         self.auxiliary_context.push(context)?;
         self.latent.push(latent)?;
         let (context, latent) = align(&mut self.spectral_context, &mut self.latent, flush)?;
-        let hidden = runtime.execute_conditioned(nodes[0], &context, &latent, flush)?;
-        let spectral = runtime.execute(nodes[1], &hidden, flush)?;
+        let spectral =
+            runtime.execute_conditioned_projected(nodes[0], nodes[1], &context, &latent, flush)?;
         self.spectral_auxiliary.push(&spectral)?;
         self.spectral_output.push(&spectral)?;
         let (context, spectral) = align(
@@ -47,9 +47,9 @@ impl Decoder {
             &mut self.spectral_auxiliary,
             flush,
         )?;
-        let hidden = runtime.execute_conditioned(nodes[2], &context, &spectral, flush)?;
-        self.auxiliary_output
-            .push(&runtime.execute(nodes[3], &hidden, flush)?)?;
+        let auxiliary = runtime
+            .execute_conditioned_projected(nodes[2], nodes[3], &context, &spectral, flush)?;
+        self.auxiliary_output.push(&auxiliary)?;
         let (spectral, auxiliary) =
             align(&mut self.spectral_output, &mut self.auxiliary_output, flush)?;
         let mut output = Sequence::zeros(spectral.frames, 71)?;

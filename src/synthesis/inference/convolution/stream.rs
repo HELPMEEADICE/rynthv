@@ -1,6 +1,7 @@
 //! Stateful row queue for temporal convolution.
 
 use super::{Convolution, ConvolutionError, MatrixError};
+use crate::synthesis::inference::gpu::Resident;
 use std::ops::Range;
 
 /// Stream state is independent of immutable weights and can be cloned for an
@@ -8,13 +9,28 @@ use std::ops::Range;
 #[derive(Clone)]
 pub struct ConvolutionStream {
     operator: Convolution,
-    pending: Vec<f32>,
+    pending: Pending,
     finished: bool,
+}
+
+#[derive(Clone)]
+pub(in crate::synthesis::inference) enum Pending {
+    Host(Vec<f32>),
+    Device(Resident),
+}
+
+impl Pending {
+    pub(in crate::synthesis::inference) fn len(&self) -> usize {
+        match self {
+            Self::Host(values) => values.len(),
+            Self::Device(values) => values.len(),
+        }
+    }
 }
 
 pub(in crate::synthesis::inference) struct ConvolutionChunk {
     pub(in crate::synthesis::inference) frames: usize,
-    consumed: usize,
+    pub(in crate::synthesis::inference) pending_tail: Range<usize>,
     finished: bool,
     pub(in crate::synthesis::inference) input_tail: Range<usize>,
 }
@@ -28,17 +44,17 @@ impl ConvolutionStream {
             .ok_or(MatrixError::InvalidShape)?;
         Ok(Self {
             operator,
-            pending: vec![0.0; length],
+            pending: Pending::Host(vec![0.0; length]),
             finished: false,
         })
     }
 
     pub fn reset(&mut self) {
-        self.pending.clear();
-        self.pending.resize(
-            self.operator.config.padding * self.operator.input_channels(),
-            0.0,
-        );
+        self.pending = Pending::Host(vec![
+            0.0;
+            self.operator.config.padding
+                * self.operator.input_channels()
+        ]);
         self.finished = false;
     }
 
@@ -60,18 +76,27 @@ impl ConvolutionStream {
         #[cfg(feature = "synth-profile")]
         let _profile = crate::synthesis::profiling::span("op.convolution");
         let chunk = self.plan(input.len(), final_chunk)?;
-        let previous_length = self.pending.len();
-        self.pending.extend_from_slice(input);
+        if input.is_empty() && chunk.frames == 0 {
+            return Ok(Vec::new());
+        }
+        if let Pending::Device(resident) = &self.pending {
+            self.pending = Pending::Host(resident.read()?);
+        }
+        let Pending::Host(pending) = &mut self.pending else {
+            unreachable!("resident convolution history was materialized");
+        };
+        let previous_length = pending.len();
+        pending.extend_from_slice(input);
         if chunk.frames == 0 {
             return Ok(Vec::new());
         }
         let output = self
             .operator
-            .execute_pending(&self.pending, chunk.frames)
-            .inspect_err(|_| {
-                self.pending.truncate(previous_length);
-            })?;
-        self.consume(&chunk);
+            .execute_pending(pending, chunk.frames)
+            .inspect_err(|_| pending.truncate(previous_length))?;
+        let retained = chunk.pending_tail.start + chunk.input_tail.start;
+        pending.drain(..retained);
+        self.finished = chunk.finished;
         Ok(output)
     }
 
@@ -116,34 +141,35 @@ impl ConvolutionStream {
         } else {
             consumed.saturating_sub(self.pending.len())
         };
+        let pending_len = self.pending.len();
+        let pending_start = if finished {
+            pending_len
+        } else {
+            consumed.min(pending_len)
+        };
         Ok(ConvolutionChunk {
             frames,
-            consumed,
+            pending_tail: pending_start..pending_len,
             finished,
             input_tail: tail_start..input_len,
         })
     }
 
-    pub(in crate::synthesis::inference) fn pending(&self) -> &[f32] {
+    pub(in crate::synthesis::inference) fn pending(&self) -> &Pending {
         &self.pending
     }
 
-    pub(in crate::synthesis::inference) fn advance(
-        &mut self,
+    pub(in crate::synthesis::inference) fn retain(
+        mut self,
         chunk: &ConvolutionChunk,
-        tail: &[f32],
-    ) {
-        debug_assert_eq!(chunk.input_tail.len(), tail.len());
-        self.consume(chunk);
-        self.pending.extend_from_slice(tail);
-    }
-
-    fn consume(&mut self, chunk: &ConvolutionChunk) {
-        if chunk.finished {
-            self.pending.clear();
-            self.finished = true;
-        } else {
-            self.pending.drain(..chunk.consumed.min(self.pending.len()));
-        }
+        pending: Option<Resident>,
+    ) -> Self {
+        debug_assert_eq!(
+            pending.as_ref().map_or(0, Resident::len),
+            chunk.pending_tail.len() + chunk.input_tail.len(),
+        );
+        self.finished = chunk.finished;
+        self.pending = pending.map_or_else(|| Pending::Host(Vec::new()), Pending::Device);
+        self
     }
 }

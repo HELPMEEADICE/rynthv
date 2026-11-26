@@ -5,8 +5,8 @@ mod packing;
 mod stream;
 mod transpose;
 
-pub(super) use stream::ConvolutionChunk;
 pub use stream::ConvolutionStream;
+pub(super) use stream::{ConvolutionChunk, Pending};
 pub use transpose::{
     TRANSPOSED_CONVOLUTION_TYPE_ID, TransposedConvolution, TransposedConvolutionStream,
 };
