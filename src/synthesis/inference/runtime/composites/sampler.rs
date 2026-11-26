@@ -1,8 +1,7 @@
 //! Persistent two-rate sampler queues.
 
-use super::queue::FrameQueue;
 use crate::synthesis::{
-    inference::{Sequence, runtime::ModelRuntime},
+    inference::{Sequence, frame_queue::FrameQueue, runtime::ModelRuntime},
     voice::{Result, VoiceError},
 };
 
@@ -61,8 +60,8 @@ impl SamplerState {
                 "Sampler network has an invalid child count",
             ));
         }
-        self.main.push(input)?;
-        self.condition.push(condition)?;
+        self.main.push_borrowed(input)?;
+        self.condition.push_borrowed(condition)?;
         add_frames(&mut self.totals.main, input.frames)?;
         add_frames(&mut self.totals.condition, condition.frames)?;
         if flush {
@@ -98,7 +97,7 @@ impl SamplerState {
         if upsampled.frames != 0 {
             self.last_upsampled = Some(upsampled.frame(upsampled.frames - 1)?.to_vec());
         }
-        self.upsampled.push(&upsampled)?;
+        self.upsampled.push(upsampled)?;
 
         if flush {
             let low_frames = self.totals.main / RATE;
@@ -122,7 +121,7 @@ impl SamplerState {
                 for row in extension.values.as_chunks_mut::<CHANNELS>().0 {
                     row.copy_from_slice(last);
                 }
-                self.upsampled.push(&extension)?;
+                self.upsampled.push(extension)?;
             }
         }
 

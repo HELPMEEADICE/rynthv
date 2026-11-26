@@ -1,7 +1,8 @@
-use super::{ModelRuntime, queue::FrameQueue};
+use super::ModelRuntime;
 use crate::synthesis::{
     inference::{
         Sequence,
+        frame_queue::FrameQueue,
         ops::gated::{self, GatedConfig},
     },
     voice::{Result, VoiceError},
@@ -46,9 +47,9 @@ impl GatedState {
             return Err(VoiceError::new("Gated block has an invalid child count"));
         }
         self.main
-            .push(&runtime.execute(children[0], input, flush)?)?;
+            .push(runtime.execute(children[0], input, flush)?)?;
         if let (Some(queue), Some(condition)) = (&mut self.condition, condition) {
-            queue.push(&runtime.execute(children[1], condition, flush)?)?;
+            queue.push(runtime.execute(children[1], condition, flush)?)?;
         }
         let frames = self.condition.as_ref().map_or(self.main.frames(), |queue| {
             queue.frames().min(self.main.frames())

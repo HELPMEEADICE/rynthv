@@ -11,7 +11,7 @@ use crate::synthesis::{
     voice::{PreparedModule, PreparedTree, Result, VoiceError},
 };
 use history::History;
-use std::{collections::HashMap, ops::Range};
+use std::{borrow::Cow, collections::HashMap, ops::Range};
 
 #[derive(Clone, Default)]
 struct LayerState {
@@ -206,7 +206,7 @@ impl ConditionalState {
                 "Conditional direct projection has an invalid width",
             ));
         }
-        let mut state = input.clone();
+        let mut state = Cow::Borrowed(input);
         for (index, layer) in self.layers.iter_mut().enumerate() {
             let residual = runtime.execute(self.residuals[index], &state, flush)?;
             let gated = match condition {
@@ -218,12 +218,15 @@ impl ConditionalState {
             // Skip always sees the gate before its residual addition.
             // Each sum releases only a matched prefix.
             let skip = runtime.execute(self.skips[index], &gated, flush)?;
-            state = layer
-                .residual
-                .process(&gated, &residual, flush, "conditional residual")?;
+            state = Cow::Owned(layer.residual.process(
+                gated,
+                residual,
+                flush,
+                "conditional residual",
+            )?);
             output = layer
                 .skip
-                .process(&output, &skip, flush, "conditional skip")?;
+                .process(output, skip, flush, "conditional skip")?;
         }
         Ok(output)
     }

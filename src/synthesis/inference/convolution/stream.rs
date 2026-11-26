@@ -85,17 +85,28 @@ impl ConvolutionStream {
         let Pending::Host(pending) = &mut self.pending else {
             unreachable!("resident convolution history was materialized");
         };
-        let previous_length = pending.len();
-        pending.extend_from_slice(input);
         if chunk.frames == 0 {
+            pending.extend_from_slice(input);
             return Ok(Vec::new());
         }
-        let output = self
-            .operator
-            .execute_pending(pending, chunk.frames)
-            .inspect_err(|_| pending.truncate(previous_length))?;
-        let retained = chunk.pending_tail.start + chunk.input_tail.start;
-        pending.drain(..retained);
+        let output = if pending.is_empty() {
+            let output = self.operator.execute_pending(input, chunk.frames)?;
+            pending.extend_from_slice(&input[chunk.input_tail]);
+            output
+        } else {
+            let previous_length = pending.len();
+            pending.extend_from_slice(input);
+            let output = self
+                .operator
+                .execute_pending(pending, chunk.frames)
+                .inspect_err(|_| pending.truncate(previous_length))?;
+            let consumed = chunk.pending_tail.start + chunk.input_tail.start;
+            pending.drain(..consumed);
+            output
+        };
+        if chunk.finished {
+            *pending = Vec::new();
+        }
         self.finished = chunk.finished;
         Ok(output)
     }

@@ -18,7 +18,10 @@ use super::{
 use crate::synthesis::voice::{PreparedModule, PreparedTree, Result, VoiceError};
 use bidirectional::BidirectionalState;
 use composites::CompositeState;
-use std::collections::{HashMap, HashSet};
+use std::{
+    borrow::Cow,
+    collections::{HashMap, HashSet},
+};
 
 /// Clone creates an independent stream checkpoint while retaining shared weights.
 #[derive(Clone)]
@@ -253,7 +256,7 @@ impl<'a> ModelRuntime<'a> {
         input: &Sequence,
         flush: bool,
     ) -> Result<Sequence> {
-        let mut output = input.clone();
+        let mut output = Cow::Borrowed(input);
         let mut offset = 0;
         while offset < children.len() {
             if let Some((count, result)) = super::gpu::sequence(
@@ -263,14 +266,14 @@ impl<'a> ModelRuntime<'a> {
                 &mut self.convolutions,
                 flush,
             )? {
-                output = result;
+                output = Cow::Owned(result);
                 offset += count;
             } else {
-                output = self.execute(children[offset], &output, flush)?;
+                output = Cow::Owned(self.execute(children[offset], &output, flush)?);
                 offset += 1;
             }
         }
-        Ok(output)
+        Ok(output.into_owned())
     }
 
     pub fn execute_conditioned(

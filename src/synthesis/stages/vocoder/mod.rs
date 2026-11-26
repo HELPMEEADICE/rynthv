@@ -20,7 +20,6 @@ pub mod spectral_heads;
 mod stage;
 mod stream;
 mod stream_parameters;
-mod stream_queue;
 mod stream_signals;
 mod voice_control;
 mod voice_control_tension;

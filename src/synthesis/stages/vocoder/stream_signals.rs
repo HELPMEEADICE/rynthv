@@ -3,7 +3,10 @@
 use std::collections::VecDeque;
 
 use crate::synthesis::{
-    inference::{ModelRuntime, Sequence},
+    inference::{
+        ModelRuntime, Sequence,
+        frame_queue::{FrameQueue, paired},
+    },
     voice::{Result, VoiceError},
 };
 
@@ -13,7 +16,6 @@ use super::{
     interpolation::SpectralFilterStream,
     postfilter::Postfilter,
     stage::{VocoderParameterStage, VocoderParameters, VocoderSignalStage},
-    stream_queue::{FrameQueue, paired},
     voice_control::SpectralControl,
 };
 

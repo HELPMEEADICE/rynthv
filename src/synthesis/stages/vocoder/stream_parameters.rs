@@ -3,7 +3,7 @@
 use std::collections::VecDeque;
 
 use crate::synthesis::{
-    inference::{ModelRuntime, Sequence, recurrent::GruState},
+    inference::{ModelRuntime, Sequence, frame_queue::FrameQueue, recurrent::GruState},
     voice::{Result, VoiceError},
 };
 
@@ -15,7 +15,6 @@ use super::{
     source,
     spectral_heads::SpectralHeads,
     stage::{VocoderParameterStage, VocoderParameters},
-    stream_queue::FrameQueue,
     voice_control::{SpectralControl, VoiceControl},
 };
 
@@ -112,8 +111,7 @@ impl<'a> ParameterStream<'a> {
             return self.take_ready(final_batch);
         }
         self.metadata.extend(metadata);
-        self.physical.push(physical.clone())?;
-        self.normalized.push(normalized.clone())?;
+        self.physical.push_borrowed(physical)?;
         let recurrent = if let Some(model) = &self.stage.positional {
             let positions = (self.input_frames..input_frames)
                 .map(|position| {
@@ -147,6 +145,7 @@ impl<'a> ParameterStream<'a> {
                 final_batch,
             )?
         };
+        self.normalized.push(normalized)?;
         self.logits.push(logits)?;
         let source_frames = self.physical.frames().min(self.logits.frames());
         let physical = self.physical.take(source_frames)?;

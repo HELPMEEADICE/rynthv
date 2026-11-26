@@ -5,6 +5,7 @@ pub mod affine;
 pub mod compute;
 pub mod convolution;
 pub mod extent;
+pub(crate) mod frame_queue;
 mod gpu;
 pub(crate) use gpu::{VocoderBand, VocoderBandState, VocoderBranches};
 pub mod matrix;

@@ -162,9 +162,10 @@ impl ModelRuntime<'_> {
                 ),
             }
         })();
-        self.composites.insert(index, state);
         if output.is_ok() && flush {
             self.closed.insert(index);
+        } else {
+            self.composites.insert(index, state);
         }
         let output = output?;
         if let Some(projection) = projection {
@@ -209,9 +210,11 @@ impl ModelRuntime<'_> {
             flush,
         )?;
         if output.is_some() {
-            self.composites.insert(index, state);
             if flush {
+                self.composites.remove(&index);
                 self.closed.insert(index);
+            } else {
+                self.composites.insert(index, state);
             }
         }
         Ok(output)

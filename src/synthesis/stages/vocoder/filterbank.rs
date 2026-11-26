@@ -128,9 +128,6 @@ impl AnalysisBank {
 /// Eight-channel subband frames to full-rate mono PCM by overlap-add.
 #[derive(Clone)]
 pub struct SynthesisBank {
-    #[cfg(not(all(target_arch = "wasm32", target_feature = "simd128")))]
-    kernels: Kernels,
-    #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
     kernels: Arc<[[f32; TAPS]; BANDS]>,
     pending: Vec<f32>,
     /// Sample position of the next input impulse relative to `pending[0]`.
@@ -145,7 +142,6 @@ impl SynthesisBank {
         #[cfg(feature = "synth-profile")]
         let _profile = crate::synthesis::profiling::span("vocoder.filterbank.synthesis.prepare");
         let kernels = Kernels::prepare(tree, index, SYNTHESIS_TYPE_ID)?;
-        #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
         let kernels = Arc::new(std::array::from_fn(|band| {
             std::array::from_fn(|tap| kernels.0[tap * BANDS + band])
         }));
@@ -192,8 +188,9 @@ impl SynthesisBank {
             #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
             wasm::synthesis(input, &self.kernels, output);
             #[cfg(not(all(target_arch = "wasm32", target_feature = "simd128")))]
-            for (target, weights) in output.iter_mut().zip(self.kernels.0.as_chunks::<BANDS>().0) {
-                for (&value, &weight) in input.iter().zip(weights) {
+            for (&value, weights) in input.iter().zip(self.kernels.iter()) {
+                // Adjacent taps are independent; each still accumulates bands in order.
+                for (target, &weight) in output.iter_mut().zip(weights) {
                     *target += value * weight;
                 }
             }
