@@ -1,5 +1,6 @@
 //! Read only an explicitly selected session file; never persist its contents.
 
+use crate::{tr, trf};
 use crate::platform::fs::File;
 mod smbios;
 
@@ -23,20 +24,20 @@ impl Drop for PrivateBytes {
 pub(super) fn read_session_field(path: &Path) -> Result<Option<Vec<u8>>> {
     const MAX_SESSION_BYTES: u64 = 1024 * 1024;
     let file = File::open(path)
-        .map_err(|error| VoiceError::new(format!("无法打开所选会话文件：{error}")))?;
+        .map_err(|error| VoiceError::new(trf!("无法打开所选会话文件：{0}", error)))?;
     let metadata = file.metadata()?;
     if !metadata.is_file() || metadata.len() > MAX_SESSION_BYTES {
-        return Err(VoiceError::new("请选择大小不超过 1 MiB 的会话文件。"));
+        return Err(VoiceError::new(tr!("请选择大小不超过 1 MiB 的会话文件。")));
     }
     let mut bytes = PrivateBytes(Vec::new());
     file.take(MAX_SESSION_BYTES + 1)
         .read_to_end(&mut bytes.0)
-        .map_err(|error| VoiceError::new(format!("无法读取所选会话文件：{error}")))?;
+        .map_err(|error| VoiceError::new(trf!("无法读取所选会话文件：{0}", error)))?;
     if bytes.0.len() as u64 > MAX_SESSION_BYTES {
-        return Err(VoiceError::new("所选会话文件超过 1 MiB。"));
+        return Err(VoiceError::new(tr!("所选会话文件超过 1 MiB。")));
     }
     if bytes.0.is_empty() || !bytes.0.len().is_multiple_of(8) {
-        return Err(VoiceError::new("所选会话文件的长度无效。"));
+        return Err(VoiceError::new(tr!("所选会话文件的长度无效。")));
     }
     let mut key = smbios::session_key()?;
     let cipher =
@@ -50,12 +51,12 @@ pub(super) fn read_session_field(path: &Path) -> Result<Option<Vec<u8>>> {
     let padding = usize::from(*bytes.0.last().expect("nonempty buffer"));
     if !(1..=8).contains(&padding) || padding > bytes.0.len() {
         return Err(VoiceError::new(
-            "无法解码所选会话文件，请选择本机 Synthesizer V Studio 2 保存的 session 文件。",
+            tr!("无法解码所选会话文件，请选择本机 Synthesizer V Studio 2 保存的 session 文件。"),
         ));
     }
     let payload = &bytes.0[..bytes.0.len() - padding];
     if std::str::from_utf8(payload).is_err() {
-        return Err(VoiceError::new("所选会话文件包含无效的 UTF-8 数据。"));
+        return Err(VoiceError::new(tr!("所选会话文件包含无效的 UTF-8 数据。")));
     }
     let payload = &payload[..payload
         .iter()
@@ -69,11 +70,11 @@ pub(super) fn read_session_field(path: &Path) -> Result<Option<Vec<u8>>> {
             let field = &payload[start..cursor];
             if field_index == 5 {
                 if field.is_empty() {
-                    return Err(VoiceError::new("所选会话文件的模型上下文字段为空。"));
+                    return Err(VoiceError::new(tr!("所选会话文件的模型上下文字段为空。")));
                 }
                 if std::str::from_utf8(field).is_err() {
                     return Err(VoiceError::new(
-                        "所选会话文件的模型上下文字段包含无效的 UTF-8 数据。",
+                        tr!("所选会话文件的模型上下文字段包含无效的 UTF-8 数据。"),
                     ));
                 }
                 return Ok(Some(field.to_vec()));
@@ -90,6 +91,6 @@ pub(super) fn read_session_field(path: &Path) -> Result<Option<Vec<u8>>> {
         // Online sessions omit the sixth field by design; this is not damage.
         Ok(None)
     } else {
-        Err(VoiceError::new("所选会话文件缺少必需字段。"))
+        Err(VoiceError::new(tr!("所选会话文件缺少必需字段。")))
     }
 }

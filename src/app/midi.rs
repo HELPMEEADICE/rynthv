@@ -1,6 +1,6 @@
 use super::App;
 use super::picker::{Picker, Selection};
-use crate::{editor::Editor, midi::MidiFile, model::beats, ui};
+use crate::{editor::Editor, midi::MidiFile, model::beats, tr, trf, ui};
 use eframe::egui::Context;
 use std::{
     path::PathBuf,
@@ -35,7 +35,8 @@ impl App {
         self.editor.finish();
         self.pick_one(
             ctx,
-            Picker::new(Selection::File, "导入 MIDI").filter("MIDI 文件", &["mid", "midi"]),
+            Picker::new(Selection::File, tr!("导入 MIDI"))
+                .filter(tr!("MIDI 文件"), &["mid", "midi"]),
             move |app, ctx, path| app.load_midi_import(path, mode, ctx),
         );
     }
@@ -55,7 +56,7 @@ impl App {
                 });
             match worker {
                 Ok(_) => MidiImportPhase::Loading(rx),
-                Err(error) => MidiImportPhase::Failed(format!("无法启动 MIDI 读取线程：{error}")),
+                Err(error) => MidiImportPhase::Failed(trf!("无法启动 MIDI 读取线程：{}", error)),
             }
         };
         #[cfg(target_arch = "wasm32")]
@@ -92,7 +93,7 @@ impl App {
         let result = match receiver.try_recv() {
             Ok(result) => result,
             Err(TryRecvError::Empty) => return,
-            Err(TryRecvError::Disconnected) => Err("MIDI 读取线程意外停止。".into()),
+            Err(TryRecvError::Disconnected) => Err(tr!("MIDI 读取线程意外停止。").into()),
         };
         import.phase = match result {
             Ok(file) => {
@@ -110,7 +111,7 @@ impl App {
     pub fn apply_midi_import(&mut self, import: &MidiImport) -> Result<(), String> {
         ui::phonemes::phoneme_deactivate(self);
         let MidiImportPhase::Ready { file, selected } = &import.phase else {
-            return Err("MIDI 尚未读取完成。".into());
+            return Err(tr!("MIDI 尚未读取完成。").into());
         };
         let indices: Vec<_> = selected
             .iter()
@@ -162,13 +163,14 @@ impl App {
             self.view.arrangement.start = start;
             self.view.top_pitch = (first.pitch + 9).clamp(12, 127) as f32;
         }
-        self.status = format!(
+        self.status = trf!(
             "已导入 {} 个音符到 {} 条音轨",
-            summary.notes, summary.tracks
+            summary.notes,
+            summary.tracks
         );
         if summary.split_tracks > 0 {
             self.status
-                .push_str(&format!(" · 重叠音符拆出 {} 条声部", summary.split_tracks));
+                .push_str(&trf!(" · 重叠音符拆出 {} 条声部", summary.split_tracks));
         }
         Ok(())
     }

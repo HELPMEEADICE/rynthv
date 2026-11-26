@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">RynthV</string>
+    <string name="app_name_test">RynthV（テスト版）</string>
+    <!-- DocumentStore -->
+    <string name="document_name_unreadable">ドキュメント名を読み取れません。</string>
+    <string name="file_type_unsupported">このファイル形式はサポートされていません：%1$s</string>
+    <string name="resource_directory_too_deep">リソースディレクトリの階層が深すぎます。</string>
+    <string name="resource_directory_unreadable">リソースディレクトリを読み取れません。</string>
+    <string name="resource_directory_duplicate_entry">リソースディレクトリに同名の項目があります：%1$s</string>
+    <string name="document_cannot_open">ドキュメントを開けません：%1$s</string>
+    <string name="document_changed_while_reading">読み取り中にドキュメントが変更されました：%1$s</string>
+    <string name="document_target_cannot_open">対象のドキュメントを開けません。</string>
+    <string name="storage_insufficient">アプリのストレージ容量が不足しています。</string>
+    <string name="document_name_invalid">ドキュメント名が無効です。</string>
+    <!-- RynthVActivity -->
+    <string name="graphics_device_lost_title">グラフィックデバイスの復元が必要です</string>
+    <string name="graphics_device_lost_message">%1$s\nRynthV を開き直すと最新の自動保存から復元できます。</string>
+    <string name="graphics_recovery_action">ワークスペースを復元</string>
+    <string name="picker_no_document_returned">ドキュメントプロバイダーがドキュメントを返しませんでした。</string>
+    <string name="picker_error_message">%1$s：%2$s</string>
+    <string name="file_operation_failed">ファイル操作に失敗しました：%1$s</string>
+    <string name="share_failed">共有に失敗しました：%1$s</string>
+    <!-- GraphicsRecoveryActivity -->
+    <string name="graphics_recovery_progress">グラフィックデバイスとワークスペースを復元しています…</string>
+</resources>

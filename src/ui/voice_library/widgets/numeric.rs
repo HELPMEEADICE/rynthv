@@ -1,6 +1,6 @@
 mod pointer;
 
-use crate::ui::theme::*;
+use crate::{tr, ui::theme::*};
 use eframe::egui::{
     text::{CCursor, CCursorRange},
     *,
@@ -212,7 +212,7 @@ pub(super) fn control(
         } else {
             CursorIcon::NotAllowed
         })
-        .on_hover_text("双击输入数值；右键恢复默认值");
+        .on_hover_text(tr!("双击输入数值；右键恢复默认值"));
     state.frame = frame;
     ui.data_mut(|data| data.insert_temp(state_id, state));
     result

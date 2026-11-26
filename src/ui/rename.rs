@@ -1,4 +1,4 @@
-use crate::{app::App, model::EntityId};
+use crate::{app::App, model::EntityId, tr};
 use eframe::egui::*;
 
 pub enum Target {
@@ -33,8 +33,8 @@ pub fn show(app: &mut App, ctx: &Context) {
     let mut close = false;
     Modal::new(Id::new("rename")).show(ctx, |ui| {
         ui.heading(match rename.target {
-            Target::Track(_) => "重命名音轨",
-            Target::Group(_) => "重命名音符组",
+            Target::Track(_) => tr!("重命名音轨"),
+            Target::Group(_) => tr!("重命名音符组"),
         });
         #[cfg(target_os = "android")]
         let width = super::dialog::width(ctx, 260.0);
@@ -47,7 +47,7 @@ pub fn show(app: &mut App, ctx: &Context) {
         }
         ui.horizontal(|ui| {
             let submit = ui
-                .add_enabled(!rename.text.trim().is_empty(), Button::new("确定"))
+                .add_enabled(!rename.text.trim().is_empty(), Button::new(tr!("确定")))
                 .clicked()
                 || (response.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)));
             if submit && !rename.text.trim().is_empty() {
@@ -57,7 +57,7 @@ pub fn show(app: &mut App, ctx: &Context) {
                 }
                 close = true;
             }
-            if ui.button("取消").clicked() || ui.input(|i| i.key_pressed(Key::Escape)) {
+            if ui.button(tr!("取消")).clicked() || ui.input(|i| i.key_pressed(Key::Escape)) {
                 close = true;
             }
         });

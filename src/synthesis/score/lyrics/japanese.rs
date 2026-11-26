@@ -3,6 +3,7 @@ mod readings;
 use super::dictionary::{PhoneTable, Phones, read, unknown};
 use crate::synthesis::voice::{Result, VoiceError};
 use std::{collections::HashMap, path::Path};
+use crate::{tr};
 
 pub(super) struct Japanese {
     phones: PhoneTable,
@@ -92,7 +93,7 @@ impl Japanese {
                     .last()
                     .and_then(|phones| phones.last())
                     .filter(|phone| matches!(phone.as_str(), "a" | "i" | "u" | "e" | "o"))
-                    .ok_or_else(|| VoiceError::new("日语长音前缺少元音，请填写罗马音或显式音素"))?;
+                    .ok_or_else(|| VoiceError::new(tr!("日语长音前缺少元音，请填写罗马音或显式音素")))?;
                 result.push(vec![vowel.clone()]);
                 continue;
             }

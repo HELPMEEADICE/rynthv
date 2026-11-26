@@ -3,6 +3,7 @@ use crate::synthesis::{
     stages::timbre::records::FrameControl,
     voice::{Result, VoiceError},
 };
+use crate::{tr};
 
 struct Phone {
     begin: f64,
@@ -31,7 +32,7 @@ pub(super) fn apply(
             .as_ref()
             .is_some_and(|values| values.len() != frames)
     {
-        return Err(VoiceError::new("音素强度与音色帧的时间线不一致。"));
+        return Err(VoiceError::new(tr!("音素强度与音色帧的时间线不一致。")));
     }
     let points = prepare(acoustic)?;
     if points.iter().all(|point| point.value == 0.0) {
@@ -41,7 +42,7 @@ pub(super) fn apply(
         let mut values = Vec::new();
         values
             .try_reserve_exact(frames)
-            .map_err(|_| VoiceError::new("音素强度帧数过大。"))?;
+            .map_err(|_| VoiceError::new(tr!("音素强度帧数过大。")))?;
         values.resize(frames, FrameControl::default());
         *controls = Some(values);
     }
@@ -50,7 +51,7 @@ pub(super) fn apply(
         let time = phrase.start_seconds + index as f64 * frame_seconds;
         let value = sample(&points, time);
         if !value.is_finite() {
-            return Err(VoiceError::new("音素强度曲线产生了无效数值。"));
+            return Err(VoiceError::new(tr!("音素强度曲线产生了无效数值。")));
         }
         control.scalars[1] = if value < -0.01 || value >= 0.01 {
             value * 0.25
@@ -67,27 +68,27 @@ fn prepare(acoustic: &PreparedRenderAcoustics) -> Result<Vec<Point>> {
     let mut phones = Vec::new();
     phones
         .try_reserve_exact(duration.durations.len())
-        .map_err(|_| VoiceError::new("音素强度数量过大。"))?;
+        .map_err(|_| VoiceError::new(tr!("音素强度数量过大。")))?;
     let mut predicted_begin = phrase.start_seconds;
     for (index, allocation) in duration.durations.iter().enumerate() {
         let source = phrase
             .records
             .get(allocation.record_index)
             .and_then(|record| record.phones.get(allocation.phone_index))
-            .ok_or_else(|| VoiceError::new("音素强度没有对应的源音符。"))?;
+            .ok_or_else(|| VoiceError::new(tr!("音素强度没有对应的源音符。")))?;
         let predicted_end = predicted_begin + allocation.duration_seconds;
         if !predicted_begin.is_finite()
             || !predicted_end.is_finite()
             || allocation.duration_seconds < 0.0
         {
-            return Err(VoiceError::new("音素强度的原始时值无效。"));
+            return Err(VoiceError::new(tr!("音素强度的原始时值无效。")));
         }
         let begin = match source.attributes.left_offset {
             Some(offset) => {
                 source
                     .source_note_onset_seconds
                     .filter(|value| value.is_finite())
-                    .ok_or_else(|| VoiceError::new("音素边界缺少原始音符起点。"))?
+                    .ok_or_else(|| VoiceError::new(tr!("音素边界缺少原始音符起点。")))?
                     + offset
             }
             None => predicted_begin,
@@ -107,9 +108,9 @@ fn prepare(acoustic: &PreparedRenderAcoustics) -> Result<Vec<Point>> {
                 .default_impulse_values
                 .get(index)
                 .copied()
-                .ok_or_else(|| VoiceError::new("音素强度缺少默认活动度。"))?;
+                .ok_or_else(|| VoiceError::new(tr!("音素强度缺少默认活动度。")))?;
             if !predicted.is_finite() {
-                return Err(VoiceError::new("音素强度的默认活动度无效。"));
+                return Err(VoiceError::new(tr!("音素强度的默认活动度无效。")));
             }
             if activity < predicted {
                 strength =
@@ -117,7 +118,7 @@ fn prepare(acoustic: &PreparedRenderAcoustics) -> Result<Vec<Point>> {
             }
         }
         if !begin.is_finite() || !strength.is_finite() {
-            return Err(VoiceError::new("音素强度包含无效的边界或数值。"));
+            return Err(VoiceError::new(tr!("音素强度包含无效的边界或数值。")));
         }
         phones.push(Phone {
             begin,
@@ -128,11 +129,11 @@ fn prepare(acoustic: &PreparedRenderAcoustics) -> Result<Vec<Point>> {
     let count = phones
         .len()
         .checked_mul(2)
-        .ok_or_else(|| VoiceError::new("音素强度控制点数量过大。"))?;
+        .ok_or_else(|| VoiceError::new(tr!("音素强度控制点数量过大。")))?;
     let mut points = Vec::new();
     points
         .try_reserve_exact(count)
-        .map_err(|_| VoiceError::new("音素强度控制点数量过大。"))?;
+        .map_err(|_| VoiceError::new(tr!("音素强度控制点数量过大。")))?;
     for (index, phone) in phones.iter().enumerate() {
         let end = phones.get(index + 1).map_or(phone.end, |next| next.begin);
         points.push(Point {

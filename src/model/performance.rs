@@ -1,4 +1,5 @@
 use super::{Extra, Note};
+use crate::{tr, trf};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
@@ -21,7 +22,7 @@ impl NoteMode {
         match value {
             "singing" => Ok(Self::Singing),
             "rap" => Ok(Self::Rap),
-            _ => Err(format!("不支持的音符模式：{value}")),
+            _ => Err(trf!("不支持的音符模式：{}", value)),
         }
     }
 }
@@ -76,7 +77,7 @@ impl NotePerformance {
             {
                 Ok(Some(value.as_bytes()[0] - b'0'))
             }
-            Some(_) => Err("说唱声调必须为空字符串或 1 到 5 的字符串".into()),
+            Some(_) => Err(tr!("说唱声调必须为空字符串或 1 到 5 的字符串").into()),
         }
     }
 
@@ -95,16 +96,16 @@ impl NotePerformance {
 
     pub fn validate(&self) -> Result<(), String> {
         if !Self::valid_expression(self.expression_x, self.expression_y) {
-            return Err("演绎坐标必须为 -1 到 1 之间的有限数值".into());
+            return Err(tr!("演绎坐标必须为 -1 到 1 之间的有限数值").into());
         }
         if !Self::valid_vibrato(self.vibrato) {
-            return Err("颤音调制必须为 0 到 2 之间的有限数值".into());
+            return Err(tr!("颤音调制必须为 0 到 2 之间的有限数值").into());
         }
         if !Self::valid_rap_tone(self.r_tone) {
-            return Err("说唱音调必须为 -5 到 1 之间的有限数值".into());
+            return Err(tr!("说唱音调必须为 -5 到 1 之间的有限数值").into());
         }
         if !Self::valid_rap_intonation(self.r_intonation) {
-            return Err("说唱语调必须为 -0.5 到 0.5 之间的有限数值".into());
+            return Err(tr!("说唱语调必须为 -0.5 到 0.5 之间的有限数值").into());
         }
         Ok(())
     }
@@ -154,7 +155,7 @@ fn read_number(attributes: &Extra, key: &str, default: f64) -> Result<f64, Strin
             .as_f64()
             .map(|value| f64::from(value as f32))
             .filter(|value| value.is_finite())
-            .ok_or_else(|| format!("音符属性 {key} 必须是有限数值")),
+            .ok_or_else(|| trf!("音符属性 {} 必须是有限数值", key)),
     }
 }
 

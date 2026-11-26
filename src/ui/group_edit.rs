@@ -1,4 +1,4 @@
-use crate::{app::App, editor::GroupEdit, model::*};
+use crate::{app::App, editor::GroupEdit, model::*, tr};
 use eframe::egui::*;
 
 pub struct GroupGesture {
@@ -21,8 +21,8 @@ pub fn start(
     app.commit_lyric();
     app.editor.select_reference(track, original.id);
     app.editor.begin(match kind {
-        GroupEdit::Move => "移动音符组",
-        _ => "调整音符组范围",
+        GroupEdit::Move => tr!("移动音符组"),
+        _ => tr!("调整音符组范围"),
     });
     app.group_gesture = Some(GroupGesture {
         original: original.clone(),
@@ -82,7 +82,7 @@ pub fn end_frame(app: &mut App, ctx: &Context) {
     }
 }
 pub fn context_menu(app: &mut App, ui: &mut Ui, reference: &GroupRef) {
-    if ui.button("重命名音符组…").clicked() {
+    if ui.button(tr!("重命名音符组…")).clicked() {
         if let Some(group) = app.editor.project.group(&reference.group_id) {
             app.rename = Some(super::rename::Rename::group(reference.id, &group.name));
         }
@@ -95,7 +95,7 @@ pub fn context_menu(app: &mut App, ui: &mut Ui, reference: &GroupRef) {
         .iter()
         .any(|r| r.id == reference.id);
     if ui
-        .add_enabled(ordinary, Button::new("删除音符组"))
+        .add_enabled(ordinary, Button::new(tr!("删除音符组")))
         .clicked()
     {
         app.editor.delete_group(reference.id);

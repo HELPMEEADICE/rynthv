@@ -1,5 +1,8 @@
 use super::theme::{canvas_color, text_color};
-use crate::model::{Track, TrackColor};
+use crate::{
+    model::{Track, TrackColor},
+    tr,
+};
 use eframe::egui::*;
 
 #[derive(Clone, Copy)]
@@ -49,7 +52,7 @@ pub fn foreground(color: Color32) -> Color32 {
 pub fn picker(ui: &mut Ui, current: TrackColor) -> Option<TrackColor> {
     let mut picked = None;
     ui.scope(|ui| {
-        ui.label(RichText::new("音轨颜色").size(11.0).color(text_color()));
+        ui.label(RichText::new(tr!("音轨颜色")).size(11.0).color(text_color()));
         ui.add_space(5.0);
         ui.spacing_mut().item_spacing = vec2(3.0, 3.0);
         for row in TrackColor::PALETTE.chunks(6) {
@@ -58,6 +61,7 @@ pub fn picker(ui: &mut Ui, current: TrackColor) -> Option<TrackColor> {
                     let selected = current == color;
                     let (rect, response) =
                         ui.allocate_exact_size(Vec2::splat(22.0), Sense::click());
+                    let name = tr!(name);
                     response.widget_info(|| {
                         WidgetInfo::selected(
                             WidgetType::SelectableLabel,

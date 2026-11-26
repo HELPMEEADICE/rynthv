@@ -10,7 +10,7 @@ use sha2::{Digest, Sha256};
 use super::{Result, VoiceCatalog, VoiceError, hex, nofs};
 use crate::{
     platform::{config_directory, temporary},
-    synthesis::resource_archive,
+    synthesis::resource_archive, tr, trf,
 };
 
 const ZIP_OFFSET: u64 = 264;
@@ -42,7 +42,7 @@ pub fn remove_import(path: &Path) -> Result<()> {
     let valid = path.file_name().is_some_and(|name| name == VOICE)
         && path.ancestors().nth(3).is_some_and(|parent| parent == root);
     if !valid {
-        return Err(VoiceError::new("只能移除由 RynthV 导入的 SVPK 声库"));
+        return Err(VoiceError::new(tr!("只能移除由 RynthV 导入的 SVPK 声库")));
     }
     fs::remove_dir_all(path.parent().expect("managed SVPK has a parent directory"))?;
     Ok(())
@@ -72,10 +72,7 @@ pub fn import(input: &Path, dry_run: bool) -> Result<ImportedVoice> {
     let id = hex(&digest.finalize()[..16]);
     let destination = root.join(revision.to_string()).join(&id);
     if fs::try_exists(&destination)? {
-        return Err(VoiceError::new(format!(
-            "声库 {} 的 {revision} 版已导入",
-            voice.name
-        )));
+        return Err(VoiceError::new(trf!("声库 {0} 的 {1} 版已导入", voice.name, revision)));
     }
     if !dry_run {
         fs::create_dir_all(
@@ -119,12 +116,12 @@ fn unpack(input: &Path, destination: &Path) -> Result<()> {
     let mut signature = [0; 4];
     reader.read_exact(&mut signature)?;
     if header != *b"SVPK\0\x01\0\0" || signature != *b"PK\x03\x04" {
-        return Err(VoiceError::new("无法识别的 SVPK 文件头"));
+        return Err(VoiceError::new(tr!("无法识别的 SVPK 文件头")));
     }
     let mut archive = resource_archive::zip(reader, ZIP_OFFSET, 128)?;
     if archive.index_for_name(VOICE).is_none() {
         return Err(VoiceError::new(
-            "SVPK 缺少 voice.nofs，仅支持原生 SV1 AI 声库",
+            tr!("SVPK 缺少 voice.nofs，仅支持原生 SV1 AI 声库"),
         ));
     }
     for (name, max_bytes) in [
@@ -138,7 +135,7 @@ fn unpack(input: &Path, destination: &Path) -> Result<()> {
             let mut file = archive.by_name(name).map_err(resource_archive::zip_error)?;
             let size = file.size();
             if !file.is_file() || file.is_symlink() || size > max_bytes {
-                return Err(VoiceError::new(format!("SVPK 资源条目无效：{name}")));
+                return Err(VoiceError::new(trf!("SVPK 资源条目无效：{0}", name)));
             }
             resource_archive::copy_member(&mut file, size, &destination.join(name))?;
         }

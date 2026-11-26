@@ -1,4 +1,4 @@
-use crate::{app::App, model::RetakeComponent, ui::retakes};
+use crate::{app::App, model::RetakeComponent, tr, ui::retakes};
 use eframe::egui::*;
 
 pub(super) fn show(app: &mut App, ui: &mut Ui) {
@@ -18,7 +18,7 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
         Ok(None) => {
             ui.add_enabled(
                 false,
-                Button::new("默认采样").min_size(vec2(ui.available_width(), 28.0)),
+                Button::new(tr!("默认采样")).min_size(vec2(ui.available_width(), 28.0)),
             );
         }
         Err(error) => {

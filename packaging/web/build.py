@@ -29,7 +29,7 @@ ASSETS = {
     ),
 }
 STATIC = (
-    "style.css", "main.js", "browser.js", "documents.js",
+    "style.css", "main.js", "strings.js", "browser.js", "documents.js",
     "worker.js", "worker-bridge.js", "cpu-pool.js", "cpu-worker.js", "cpu-worker-bridge.js",
     "opfs.js", "audio.js", "pcm-worklet.js",
 )

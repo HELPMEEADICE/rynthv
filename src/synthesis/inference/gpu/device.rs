@@ -5,6 +5,7 @@ use super::adapter::{AdapterId, AdapterInfo, limits};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use wgpu::{Adapter, Backends, Features, Limits};
+use crate::{trf};
 
 pub(in super::super) struct Device {
     pub(super) raw: wgpu::Device,
@@ -86,9 +87,9 @@ fn open_device(
         let (adapter, info) = adapters
             .into_iter()
             .find(|(_, info)| &info.id == id)
-            .ok_or_else(|| format!("未找到所选 WebGPU 显卡：{id}"))?;
+            .ok_or_else(|| trf!("未找到所选 WebGPU 显卡：{}", id))?;
         if info.ambiguous {
-            return Err(format!("无法区分具有相同标识的 WebGPU 显卡：{id}"));
+            return Err(trf!("无法区分具有相同标识的 WebGPU 显卡：{}", id));
         }
         return request_device(adapter, info);
     }

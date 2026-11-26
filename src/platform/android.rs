@@ -28,12 +28,12 @@ pub(crate) fn install_activity(app: AndroidApp) {
     FILES_DIRECTORY.get_or_init(|| {
         string_method(jni::jni_str!("rynthvFilesDirectory"))?
             .map(PathBuf::from)
-            .ok_or_else(|| "Android 无法定位应用私有目录".into())
+            .ok_or_else(|| crate::tr!("Android 无法定位应用私有目录").into())
     });
     CACHE_DIRECTORY.get_or_init(|| {
         string_method(jni::jni_str!("rynthvCacheDirectory"))?
             .map(PathBuf::from)
-            .ok_or_else(|| "Android 无法定位应用缓存目录".into())
+            .ok_or_else(|| crate::tr!("Android 无法定位应用缓存目录").into())
     });
     TOTAL_MEMORY.get_or_init(|| {
         with_activity(|env, activity| {
@@ -83,7 +83,9 @@ pub(crate) fn with_activity<T>(
     f: impl FnOnce(&mut Env<'_>, &JObject<'_>) -> JniResult<T>,
 ) -> Result<T, String> {
     ACTIVITY.with_borrow(|app| {
-        let app = app.as_ref().ok_or("Android Activity 未初始化")?;
+        let app = app
+            .as_ref()
+            .ok_or(crate::tr!("Android Activity 未初始化"))?;
         let vm = JavaVM::singleton().map_err(|error| error.to_string())?;
         let activity = app.activity_as_ptr().cast();
         vm.attach_current_thread(|env| {
@@ -112,14 +114,14 @@ pub(crate) fn files_directory() -> Result<PathBuf, String> {
     FILES_DIRECTORY
         .get()
         .cloned()
-        .unwrap_or_else(|| Err("Android 应用目录未初始化".into()))
+        .unwrap_or_else(|| Err(crate::tr!("Android 应用目录未初始化").into()))
 }
 
 pub(crate) fn cache_directory() -> Result<PathBuf, String> {
     CACHE_DIRECTORY
         .get()
         .cloned()
-        .unwrap_or_else(|| Err("Android 缓存目录未初始化".into()))
+        .unwrap_or_else(|| Err(crate::tr!("Android 缓存目录未初始化").into()))
 }
 
 pub(crate) fn move_to_background() -> Result<(), String> {

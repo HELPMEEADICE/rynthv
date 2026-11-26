@@ -1,3 +1,4 @@
+use crate::{i18n::Locale, tr, trf};
 use eframe::egui::Context;
 use serde::{Deserialize, Serialize};
 #[cfg(not(target_arch = "wasm32"))]
@@ -9,6 +10,8 @@ pub struct Preferences {
     pub zoom: f32,
     pub show_status_bar: bool,
     pub control_hints: bool,
+    #[serde(default)]
+    pub locale: Locale,
     #[cfg(target_arch = "wasm32")]
     #[serde(default)]
     pub light_theme: bool,
@@ -20,6 +23,7 @@ impl Default for Preferences {
             zoom: 1.0,
             show_status_bar: true,
             control_hints: false,
+            locale: Locale::default(),
             #[cfg(target_arch = "wasm32")]
             light_theme: false,
         }
@@ -34,12 +38,12 @@ impl Preferences {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
                 return Ok(Self::default());
             }
-            Err(error) => return Err(format!("无法读取界面设置：{error}")),
+            Err(error) => return Err(trf!("无法读取界面设置：{}", error)),
         };
-        let value: Self =
-            serde_json::from_slice(&bytes).map_err(|e| format!("无法读取界面设置：{e}"))?;
+        let value: Self = serde_json::from_slice(&bytes)
+            .map_err(|error| trf!("无法读取界面设置：{}", error))?;
         if !value.valid() {
-            return Err("界面缩放必须为 75% 至 200%".into());
+            return Err(tr!("界面缩放必须为 75% 至 200%").into());
         }
         Ok(value)
     }
@@ -49,6 +53,7 @@ impl Preferences {
     }
 
     pub fn apply(&self, ctx: &Context) {
+        crate::i18n::set_locale(self.locale);
         #[cfg(target_arch = "wasm32")]
         crate::ui::theme::set_light(ctx, self.light_theme);
         ctx.set_zoom_factor(self.zoom);

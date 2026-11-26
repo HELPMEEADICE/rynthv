@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">RynthV</string>
+    <string name="app_name_test">RynthV（测试版）</string>
+    <!-- DocumentStore -->
+    <string name="document_name_unreadable">无法读取文档名称</string>
+    <string name="file_type_unsupported">不支持此文件类型：%1$s</string>
+    <string name="resource_directory_too_deep">资源目录层级过深</string>
+    <string name="resource_directory_unreadable">无法读取资源目录</string>
+    <string name="resource_directory_duplicate_entry">资源目录有同名条目：%1$s</string>
+    <string name="document_cannot_open">文档无法打开：%1$s</string>
+    <string name="document_changed_while_reading">文档在读取期间变更：%1$s</string>
+    <string name="document_target_cannot_open">无法打开目标文档</string>
+    <string name="storage_insufficient">应用存储空间不足</string>
+    <string name="document_name_invalid">文档名称无效</string>
+    <!-- RynthVActivity -->
+    <string name="graphics_device_lost_title">图形设备需要恢复</string>
+    <string name="graphics_device_lost_message">%1$s\n重新打开 RynthV 可恢复最近的自动保存。</string>
+    <string name="graphics_recovery_action">恢复工作区</string>
+    <string name="picker_no_document_returned">文件提供方没有返回文档。</string>
+    <string name="picker_error_message">%1$s：%2$s</string>
+    <string name="file_operation_failed">文件操作失败：%1$s</string>
+    <string name="share_failed">分享失败：%1$s</string>
+    <!-- GraphicsRecoveryActivity -->
+    <string name="graphics_recovery_progress">正在恢复图形设备和工作区…</string>
+</resources>

@@ -1,5 +1,5 @@
 mod clip;
-use crate::{app::App, model::*};
+use crate::{app::App, model::*, tr};
 pub use clip::show;
 use eframe::egui::*;
 
@@ -11,12 +11,12 @@ pub struct AudioDrag {
 }
 
 pub fn create_menu(app: &mut App, ui: &mut Ui) {
-    if ui.button("创建新的音轨").clicked() {
+    if ui.button(tr!("创建新的音轨")).clicked() {
         app.commit_lyric();
         app.editor.add_track();
         ui.close();
     }
-    if ui.button("创建新的伴奏轨").clicked() {
+    if ui.button(tr!("创建新的伴奏轨")).clicked() {
         app.commit_lyric();
         let id = app.editor.add_instrumental_track();
         ui.close();

@@ -1,6 +1,9 @@
 use super::App;
 use super::picker::{Picker, Selection};
-use crate::model::{AudioClip, EntityId};
+use crate::{
+    model::{AudioClip, EntityId},
+    tr,
+};
 use eframe::egui::Context;
 use std::path::PathBuf;
 
@@ -25,13 +28,13 @@ impl App {
         let picker = Picker::new(
             Selection::File,
             if relink {
-                "重新链接音频"
+                tr!("重新链接音频")
             } else {
-                "导入伴奏"
+                tr!("导入伴奏")
             },
         )
         .filter(
-            "音频文件",
+            tr!("音频文件"),
             &[
                 "wav", "mp3", "flac", "ogg", "aif", "aiff", "aac", "m4a", "mp4",
             ],
@@ -83,7 +86,7 @@ impl App {
             onset,
             placement,
         });
-        self.status = "正在导入伴奏…".into();
+        self.status = tr!("正在导入伴奏…").into();
     }
 
     pub(super) fn poll_audio_import(&mut self) {
@@ -106,7 +109,7 @@ impl App {
             self.error = Some(error.to_owned());
             self.audio_import = None;
             self.synthesis.instrumentals.finish_import();
-            self.status = "伴奏导入失败".into();
+            self.status = tr!("伴奏导入失败").into();
             return;
         }
         let Some(asset) = self.synthesis.instrumentals.asset(&import.path) else {
@@ -121,8 +124,8 @@ impl App {
         self.synthesis.instrumentals.finish_import();
         let clip = if let Some(mut clip) = import.placement {
             if duration <= clip.source_offset_seconds {
-                self.error = Some("文件的时长短于片段的源起点，无法重新链接".into());
-                self.status = "重新链接音频失败".into();
+                self.error = Some(tr!("文件的时长短于片段的源起点，无法重新链接").into());
+                self.status = tr!("重新链接音频失败").into();
                 return;
             }
             clip.path = import.path;
@@ -136,7 +139,7 @@ impl App {
             }
         };
         self.editor.set_audio_clip(import.track, Some(clip));
-        self.status = "伴奏已加载，可拖动片段调整位置".into();
+        self.status = tr!("伴奏已加载，可拖动片段调整位置").into();
     }
 }
 

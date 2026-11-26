@@ -1,4 +1,5 @@
 use super::Extra;
+use crate::{tr, trf};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeSet;
@@ -90,7 +91,7 @@ impl TakeSet {
 
     pub fn from_value(value: &Value) -> Result<Self, String> {
         let set = <Self as serde::Deserialize>::deserialize(value)
-            .map_err(|error| format!("重录采样数据无效：{error}"))?;
+            .map_err(|error| trf!("重录采样数据无效：{}", error))?;
         set.validate()?;
         Ok(set)
     }
@@ -98,19 +99,19 @@ impl TakeSet {
     pub fn validate(&self) -> Result<(), String> {
         let mut ids = BTreeSet::new();
         if self.takes.is_empty() || self.takes.iter().any(|take| !ids.insert(take.id)) {
-            return Err("重录采样列表为空或采样编号重复".into());
+            return Err(tr!("重录采样列表为空或采样编号重复").into());
         }
         if self.takes.iter().any(|take| take.id > i32::MAX as u32) {
-            return Err("重录采样编号超出范围".into());
+            return Err(tr!("重录采样编号超出范围").into());
         }
         if !ids.contains(&self.active_take_id) {
-            return Err("当前重录采样不存在".into());
+            return Err(tr!("当前重录采样不存在").into());
         }
         let Some(default) = self.takes.iter().find(|take| take.id == 0) else {
-            return Err("重录采样缺少默认采样".into());
+            return Err(tr!("重录采样缺少默认采样").into());
         };
         if default.seeds() != RetakeSeeds::default() {
-            return Err("默认采样的随机种子必须为零".into());
+            return Err(tr!("默认采样的随机种子必须为零").into());
         }
         Ok(())
     }
@@ -132,7 +133,7 @@ impl TakeSet {
 
     pub fn select(&mut self, id: u32) -> Result<(), String> {
         if !self.takes.iter().any(|take| take.id == id) {
-            return Err(format!("采样 {id} 不存在"));
+            return Err(trf!("采样 {} 不存在", id));
         }
         self.active_take_id = id;
         Ok(())
@@ -140,10 +141,10 @@ impl TakeSet {
 
     pub fn append(&mut self, id: u32, component: RetakeComponent) -> Result<(), String> {
         if id > i32::MAX as u32 {
-            return Err("重录采样编号已用尽".into());
+            return Err(tr!("重录采样编号已用尽").into());
         }
         if self.takes.iter().any(|take| take.id == id) {
-            return Err(format!("采样编号 {id} 已存在"));
+            return Err(trf!("采样编号 {} 已存在", id));
         }
         let take = self.active().rerolled(id, component);
         self.takes.push(take);

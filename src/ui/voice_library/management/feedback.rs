@@ -2,6 +2,8 @@ use super::super::{context, error_label, text, weak};
 use crate::{
     app::App,
     synthesis::{runtime::VoiceState, voice::VoiceCatalogEntry},
+    tr,
+    trf,
     ui::theme::*,
 };
 use eframe::egui::*;
@@ -14,12 +16,12 @@ pub(super) fn status(
         VoiceState::Loading => {
             ui.horizontal(|ui| {
                 ui.spinner();
-                weak(ui, "正在准备歌声，请稍候…");
+                weak(ui, tr!("正在准备歌声，请稍候…"));
             });
         }
         VoiceState::Loaded(_) if app.synthesis.voice_error(selection).is_none() => {
-            text(ui, RichText::new("已加载").color(green_color()));
-            weak(ui, "编辑音符后自动合成，按空格键试听。");
+            text(ui, RichText::new(tr!("已加载")).color(green_color()));
+            weak(ui, tr!("编辑音符后自动合成，按空格键试听。"));
         }
         _ => {}
     }
@@ -28,12 +30,12 @@ pub(super) fn status(
         error_label(
             ui,
             if matches!(app.synthesis.voice_state(selection), VoiceState::Failed(_)) {
-                "歌声加载失败"
+                tr!("歌声加载失败")
             } else {
-                "合成环境准备失败"
+                tr!("合成环境准备失败")
             },
         );
-        ui.collapsing("查看错误详情", |ui| error_label(ui, &error));
+        ui.collapsing(tr!("查看错误详情"), |ui| error_label(ui, &error));
         if app
             .synthesis
             .inventory(selection)
@@ -45,7 +47,7 @@ pub(super) fn status(
 }
 
 pub(super) fn diagnostics(app: &App, ui: &mut Ui, entry: &VoiceCatalogEntry) {
-    weak(ui, "声库目录");
+    weak(ui, tr!("声库目录"));
     text(ui, entry.directory.display().to_string());
     if let Some(voice) = app.synthesis.inventory(&entry.selection()) {
         #[cfg(not(target_arch = "wasm32"))]
@@ -54,7 +56,7 @@ pub(super) fn diagnostics(app: &App, ui: &mut Ui, entry: &VoiceCatalogEntry) {
         let file_count = voice.file_count;
         weak(
             ui,
-            format!(
+            trf!(
                 "{} 个文件 · {} 个资源 · {} 棵模块树 · {} 个张量",
                 file_count, voice.resource_count, voice.graph_count, voice.tensor_count
             ),
@@ -71,20 +73,23 @@ pub(super) fn diagnostics(app: &App, ui: &mut Ui, entry: &VoiceCatalogEntry) {
             }
             weak(
                 ui,
-                format!(
-                    "已装配 {affine} 个线性层、{unary} 个逐元素模块；{other} 个模块由阶段执行器处理或尚未装配"
+                trf!(
+                    "已装配 {} 个线性层、{} 个逐元素模块；{} 个模块由阶段执行器处理或尚未装配",
+                    affine,
+                    unary,
+                    other
                 ),
             );
         }
         if let Some(elapsed) = app.synthesis.load_elapsed(&entry.selection()) {
-            weak(ui, format!("加载耗时 {:.2} 秒", elapsed.as_secs_f64()));
+            weak(ui, trf!("加载耗时 {} 秒", format!("{:.2}", elapsed.as_secs_f64())));
         }
     }
     if let Some(catalog) = app.synthesis.library.catalog()
         && !catalog.warnings.is_empty()
     {
         ui.collapsing(
-            format!("扫描提示（{}）", catalog.warnings.len()),
+            trf!("扫描提示（{}）", catalog.warnings.len()),
             |ui| {
                 for warning in &catalog.warnings {
                     weak(ui, warning);

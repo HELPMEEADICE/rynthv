@@ -16,6 +16,7 @@ use std::{
     path::{Path, PathBuf},
     sync::OnceLock,
 };
+use crate::{tr, trf};
 
 /// Immutable resource dictionaries are loaded on first use of a language, not
 /// on each edit and not all at application startup. They never cache rendered audio.
@@ -38,7 +39,7 @@ impl LyricFrontend {
         supported: &[String],
     ) -> Result<Self> {
         let parse = |id: &str| {
-            Language::parse(id).ok_or_else(|| VoiceError::new(format!("无法识别声库语言：{id}")))
+            Language::parse(id).ok_or_else(|| VoiceError::new(trf!("无法识别声库语言：{}", id)))
         };
         let default_language = parse(default_language)?;
         let dictionaries = supported
@@ -46,7 +47,7 @@ impl LyricFrontend {
             .map(|id| Ok((parse(id)?, OnceLock::new())))
             .collect::<Result<HashMap<_, _>>>()?;
         if !dictionaries.contains_key(&default_language) {
-            return Err(VoiceError::new("声库未声明支持其默认语言"));
+            return Err(VoiceError::new(tr!("声库未声明支持其默认语言")));
         }
         Ok(Self {
             directory: directory.as_ref().to_owned(),
@@ -58,10 +59,7 @@ impl LyricFrontend {
     pub(super) fn language(&self, input: &OwnerInput) -> Result<Language> {
         let language = super::options::language(input, self.default_language)?;
         if !self.dictionaries.contains_key(&language) {
-            return Err(VoiceError::new(format!(
-                "当前声库不支持{}",
-                language.label()
-            )));
+            return Err(VoiceError::new(trf!("当前声库不支持{}", language.label())));
         }
         Ok(language)
     }
@@ -69,10 +67,7 @@ impl LyricFrontend {
     pub(super) fn note_language(&self, note: &NoteInput, inherited: Language) -> Result<Language> {
         let language = super::options::note_language(note, inherited)?;
         if !self.dictionaries.contains_key(&language) {
-            return Err(VoiceError::new(format!(
-                "当前声库不支持{}",
-                language.label()
-            )));
+            return Err(VoiceError::new(trf!("当前声库不支持{}", language.label())));
         }
         Ok(language)
     }
@@ -84,10 +79,7 @@ impl LyricFrontend {
             Lexicon::Dictionary(dictionary) => dictionary.resolve(lyrics),
         }?;
         if result.is_empty() || result.iter().any(Vec::is_empty) {
-            return Err(VoiceError::new(format!(
-                "{}歌词没有可合成的音素",
-                language.label()
-            )));
+            return Err(VoiceError::new(trf!("{}歌词没有可合成的音素", language.label())));
         }
         Ok(result)
     }
@@ -103,7 +95,7 @@ impl LyricFrontend {
         let dictionary = self
             .dictionaries
             .get(&language)
-            .ok_or_else(|| VoiceError::new(format!("当前声库不支持{}", language.label())))?
+            .ok_or_else(|| VoiceError::new(trf!("当前声库不支持{}", language.label())))?
             .get_or_init(|| match language {
                 Language::Mandarin => MandarinLexicon::load(&self.directory).map(Lexicon::Mandarin),
                 Language::Japanese => {

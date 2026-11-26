@@ -1,6 +1,7 @@
 use crate::{
     app::{App, MidiImportMode, MidiImportPhase},
     midi::MidiTrack,
+    tr, trf,
     ui::theme::*,
 };
 use eframe::egui::*;
@@ -30,7 +31,7 @@ pub fn show(app: &mut App, ctx: &Context) {
             super::dialog::body(ui, width, |ui| {
                 ui.spacing_mut().item_spacing.y = 12.0;
                 ui.label(
-                    RichText::new("导入 MIDI")
+                    RichText::new(tr!("导入 MIDI"))
                         .font(FontId::new(18.0, FontFamily::Name("SectionTitle".into()))),
                 );
                 ui.label(
@@ -49,7 +50,7 @@ pub fn show(app: &mut App, ctx: &Context) {
                     MidiImportPhase::Loading(_) => {
                         ui.horizontal(|ui| {
                             ui.spinner();
-                            ui.label("正在读取 MIDI 音轨…");
+                            ui.label(tr!("正在读取 MIDI 音轨…"));
                         });
                     }
                     MidiImportPhase::Failed(error) => {
@@ -59,13 +60,13 @@ pub fn show(app: &mut App, ctx: &Context) {
                     }
                     MidiImportPhase::Ready { file, selected } => {
                         ui.horizontal(|ui| {
-                            ui.label(RichText::new("要导入的音轨").color(muted_color()));
+                            ui.label(RichText::new(tr!("要导入的音轨")).color(muted_color()));
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                if ui.small_button("取消全选").clicked() {
+                                if ui.small_button(tr!("取消全选")).clicked() {
                                     selected.fill(false);
                                     import.validation_error = None;
                                 }
-                                if ui.small_button("全选").clicked() {
+                                if ui.small_button(tr!("全选")).clicked() {
                                     import.validation_error = None;
                                     for (selected, track) in selected.iter_mut().zip(&file.tracks) {
                                         *selected = !track.notes.is_empty();
@@ -98,21 +99,21 @@ pub fn show(app: &mut App, ctx: &Context) {
                             .any(|(track, &selected)| selected && !track.notes.is_empty());
                         ui.label(
                             RichText::new(match import.mode {
-                                MidiImportMode::NewProject => "新建工程，使用 MIDI 的曲速和拍号。",
+                                MidiImportMode::NewProject => tr!("新建工程，使用 MIDI 的曲速和拍号。"),
                                 MidiImportMode::Tracks => {
-                                    "从工程起点追加音轨，保留当前曲速和拍号。"
+                                    tr!("从工程起点追加音轨，保留当前曲速和拍号。")
                                 }
                             })
                             .size(11.0)
                             .color(muted_color()),
                         );
                         ui.label(
-                            RichText::new("重叠音符会拆分为独立声部。")
+                            RichText::new(tr!("重叠音符会拆分为独立声部。"))
                                 .size(11.0)
                                 .color(muted_color()),
                         );
                         if !file.warnings.is_empty() {
-                            CollapsingHeader::new(format!("导入提示（{}）", file.warnings.len()))
+                            CollapsingHeader::new(trf!("导入提示（{}）", file.warnings.len()))
                                 .show(ui, |ui| {
                                     ScrollArea::vertical()
                                         .id_salt("midi-import-warnings")
@@ -129,7 +130,7 @@ pub fn show(app: &mut App, ctx: &Context) {
                                 });
                         }
                         if file.tracks.iter().all(|track| track.notes.is_empty()) {
-                            ui.label("文件中没有可导入的音符。");
+                            ui.label(tr!("文件中没有可导入的音符。"));
                         }
                     }
                 }
@@ -140,13 +141,13 @@ pub fn show(app: &mut App, ctx: &Context) {
                 ui.horizontal(|ui| {
                     let size = vec2(((ui.available_width() - 10.0) / 2.0).max(1.0), 34.0);
                     cancel = ui
-                        .add_sized(size, Button::new("取消").fill(button_hover_color()))
+                        .add_sized(size, Button::new(tr!("取消")).fill(button_hover_color()))
                         .clicked();
                     ui.add_space(2.0);
                     submit = ui
                         .add_enabled(
                             can_import,
-                            Button::new(RichText::new("导入").color(canvas_color()))
+                            Button::new(RichText::new(tr!("导入")).color(canvas_color()))
                                 .fill(green_color())
                                 .min_size(size),
                         )
@@ -172,15 +173,15 @@ pub fn show(app: &mut App, ctx: &Context) {
 }
 
 fn track_label(track: &MidiTrack) -> String {
-    let mut details = format!("{} 个音符", track.notes.len());
+    let mut details = trf!("{} 个音符", track.notes.len());
     if let Some(low) = track.notes.iter().map(|note| note.pitch).min() {
         let high = track.notes.iter().map(|note| note.pitch).max().unwrap();
-        details.push_str(&format!("，{} – {}", pitch_name(low), pitch_name(high)));
+        details.push_str(&trf!("，{} – {}", pitch_name(low), pitch_name(high)));
     }
     if !track.instrument.is_empty() {
-        details.push_str(&format!("，{}", track.instrument));
+        details.push_str(&trf!("，{}", track.instrument));
     }
-    format!("{}（{details}）", track.name)
+    trf!("{}（{}）", track.name, details)
 }
 
 fn pitch_name(pitch: i32) -> String {

@@ -7,6 +7,7 @@ use crate::{
     },
 };
 use std::collections::{BTreeMap, BTreeSet};
+use crate::{tr};
 
 impl Runtime {
     pub fn resolve_voice(
@@ -32,7 +33,7 @@ impl Runtime {
                         .library
                         .settings_error()
                         .or_else(|| self.library.catalog_error())
-                        .unwrap_or("请设置 databases 目录以加载音轨歌手")
+                        .unwrap_or(tr!("请设置 databases 目录以加载音轨歌手"))
                         .to_owned())
                 } else {
                     Ok(None)
@@ -88,11 +89,11 @@ impl Runtime {
                 continue;
             }
             let worker = (|| {
-                let entry = self.library.entry(&key).ok_or("声库不在当前目录中")?;
+                let entry = self.library.entry(&key).ok_or(tr!("声库不在当前目录中"))?;
                 let dictionaries = self
                     .dictionaries()
                     .filter(|p| p.is_dir())
-                    .ok_or("请设置有效的 clf-data 词典目录")?;
+                    .ok_or(tr!("请设置有效的 clf-data 词典目录"))?;
                 worker::Worker::spawn(
                     entry.directory.clone(),
                     dictionaries.to_owned(),

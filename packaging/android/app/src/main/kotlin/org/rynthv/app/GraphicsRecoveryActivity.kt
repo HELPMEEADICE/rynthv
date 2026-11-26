@@ -28,7 +28,7 @@ class GraphicsRecoveryActivity : Activity() {
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
         val progress = TextView(this).apply {
-            text = "正在恢复图形设备和工作区…"
+            text = getString(R.string.graphics_recovery_progress)
             gravity = Gravity.CENTER
         }
         setContentView(progress)

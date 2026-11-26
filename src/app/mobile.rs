@@ -1,5 +1,5 @@
 use super::App;
-use crate::{platform::android::lifecycle, ui};
+use crate::{platform::android::lifecycle, tr, ui};
 use eframe::egui::{Context, Popup};
 
 impl App {
@@ -56,7 +56,7 @@ impl App {
         self.audio_wanted = wanted;
         match lifecycle::request_audio(wanted) {
             Ok(granted) if !wanted || granted => return,
-            Ok(_) => self.status = "系统音频焦点暂不可用".into(),
+            Ok(_) => self.status = tr!("系统音频焦点暂不可用").into(),
             Err(error) => self.error = Some(error),
         }
         self.audio_wanted = false;

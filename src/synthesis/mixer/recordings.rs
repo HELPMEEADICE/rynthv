@@ -9,6 +9,7 @@ use std::{
     path::Path,
     sync::Arc,
 };
+use crate::{trf};
 
 #[derive(Default)]
 pub(crate) struct RecordingMix {
@@ -30,7 +31,7 @@ pub(crate) fn recordings<'a, 'track>(
             continue;
         };
         if !clip.valid() {
-            return Err(format!("伴奏音轨 {} 的片段时间无效", track.name));
+            return Err(trf!("伴奏音轨 {} 的片段时间无效", track.name));
         }
         let controls = Controls::read(&track.mixer)?;
         if controls.mute || (!solo.is_empty() && !solo.contains(&track.id)) {
@@ -53,7 +54,7 @@ pub(crate) fn recordings<'a, 'track>(
             let (left, right) = controls.gains(asset.audio.layout());
             let gains = [left as f32, right as f32];
             if gains.iter().any(|gain| !gain.is_finite()) {
-                return Err(format!("音轨 {} 的音量超出有效范围", track.name));
+                return Err(trf!("音轨 {} 的音量超出有效范围", track.name));
             }
             mix.end = mix.end.max(start.saturating_add(frames));
             mix.layers.push(AudioLayer {
@@ -67,7 +68,7 @@ pub(crate) fn recordings<'a, 'track>(
         } else if let Some(Err(error)) = available {
             mix.failures.insert(
                 track.id,
-                format!("伴奏音轨 {} 加载失败：{error}", track.name),
+                trf!("伴奏音轨 {} 加载失败：{}", track.name, error),
             );
         } else {
             mix.end = mix.end.max(requested_end);

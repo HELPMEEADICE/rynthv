@@ -2,6 +2,7 @@ use super::{Viewport, beat_at, x_at};
 use crate::{
     editor::Transport,
     model::{beats, ticks},
+    tr,
 };
 use eframe::egui::*;
 
@@ -136,12 +137,12 @@ pub fn show(
             let Some(at) = ui.ctx().data(|data| data.get_temp::<i64>(menu_id)) else {
                 return;
             };
-            if ui.button("将循环开始标记移至此处").clicked() {
+            if ui.button(tr!("将循环开始标记移至此处")).clicked() {
                 transport.loop_region.place_start(at);
                 transport.looping = true;
                 ui.close();
             }
-            if ui.button("将循环结束标记移至此处").clicked() {
+            if ui.button(tr!("将循环结束标记移至此处")).clicked() {
                 transport.loop_region.place_end(at);
                 transport.looping = true;
                 ui.close();

@@ -1,3 +1,5 @@
+use crate::tr;
+
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum VoiceParameter {
     Loudness,
@@ -44,13 +46,13 @@ impl VoiceParameter {
 
     pub fn label(self) -> &'static str {
         match self {
-            Self::Loudness => "响度",
-            Self::Tension => "张力",
-            Self::Breathiness => "气声",
-            Self::Gender => "性别",
-            Self::ToneShift => "声区转换",
-            Self::PitchShift => "音高转换",
-            Self::KeyShift => "调性转换",
+            Self::Loudness => tr!("响度"),
+            Self::Tension => tr!("张力"),
+            Self::Breathiness => tr!("气声"),
+            Self::Gender => tr!("性别"),
+            Self::ToneShift => tr!("声区转换"),
+            Self::PitchShift => tr!("音高转换"),
+            Self::KeyShift => tr!("调性转换"),
         }
     }
 
@@ -66,8 +68,8 @@ impl VoiceParameter {
     pub fn unit(self) -> &'static str {
         match self {
             Self::Loudness => "dB",
-            Self::ToneShift | Self::PitchShift => "音分",
-            Self::KeyShift => "半音",
+            Self::ToneShift | Self::PitchShift => tr!("音分"),
+            Self::KeyShift => tr!("半音"),
             Self::Tension | Self::Breathiness | Self::Gender => "",
         }
     }

@@ -1,5 +1,5 @@
 use super::{documents, js_error, poll, task};
-use crate::{app::App, storage, ui};
+use crate::{app::App, storage, tr, ui};
 use eframe::egui::{Context, Id, Modal, ScrollArea};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -50,7 +50,7 @@ impl App {
                 self.install_project(loaded.project);
                 self.path = snapshot.name;
                 self.browser.recovered_dirty = snapshot.dirty;
-                self.status = "已打开浏览器工程".into();
+                self.status = tr!("已打开浏览器工程").into();
             }
             Err(error) => self.error = Some(error),
         }
@@ -80,7 +80,7 @@ impl App {
             .as_deref()
             .and_then(Path::file_name)
             .and_then(|name| name.to_str())
-            .unwrap_or("未命名.svp")
+            .unwrap_or(tr!("未命名.svp"))
             .to_owned();
         if save_as {
             let mut project = self.editor.project.clone();
@@ -137,9 +137,9 @@ impl App {
         };
         let mut selected = None;
         let dialog = Modal::new(Id::new("web-projects")).show(ctx, |ui| {
-            ui.heading("浏览器工程");
+            ui.heading(tr!("浏览器工程"));
             if projects.is_empty() {
-                ui.label("已保存的工程会显示在这里。");
+                ui.label(tr!("已保存的工程会显示在这里。"));
             }
             ScrollArea::vertical()
                 .max_height(ctx.content_rect().height() * 0.55)
@@ -150,7 +150,7 @@ impl App {
                         }
                     }
                 });
-            if ui.button("关闭").clicked() {
+            if ui.button(tr!("关闭")).clicked() {
                 ui.close();
             }
         });
@@ -159,7 +159,7 @@ impl App {
             self.browser.loading = Some(task(ctx, async move {
                 let value = documents::record(&format!("project:{id}"))
                     .await?
-                    .ok_or("找不到已保存的工程")?;
+                    .ok_or(tr!("找不到已保存的工程"))?;
                 serde_json::from_str(&value).map_err(|error| error.to_string())
             }));
         } else if dialog.should_close() {
@@ -194,7 +194,7 @@ impl App {
                         self.editor.mark_saved();
                         self.browser.recovered_dirty = false;
                         self.browser.last_recovery = Some((save.project, save.revision, false));
-                        self.status = "工程已保存到浏览器".into();
+                        self.status = tr!("工程已保存到浏览器").into();
                         if let Some(action) = self.pending.take() {
                             self.perform_file(action, ctx);
                         }

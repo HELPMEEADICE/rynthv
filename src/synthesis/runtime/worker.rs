@@ -32,6 +32,7 @@ use std::{
     thread,
     time::Duration,
 };
+use crate::{trf};
 
 pub(super) enum Command {
     Plan {
@@ -129,7 +130,7 @@ impl Worker {
                 });
                 compute.prune_weights();
             })
-            .map_err(|error| format!("无法启动合成线程：{error}"))?;
+            .map_err(|error| trf!("无法启动合成线程：{}", error))?;
         Ok(Self {
             tx,
             rx,

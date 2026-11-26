@@ -34,7 +34,7 @@ impl Picker {
 
     #[cfg(target_os = "android")]
     pub(crate) fn publish(path: PathBuf, mime: &'static str) -> Self {
-        let mut picker = Self::new(Selection::Publish, "保存副本");
+        let mut picker = Self::new(Selection::Publish, crate::tr!("保存副本"));
         picker.publish = Some((path, mime));
         picker
     }

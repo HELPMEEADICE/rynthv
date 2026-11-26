@@ -25,6 +25,7 @@ use crate::{
     },
 };
 use std::{collections::BTreeSet, ops::Range, sync::Arc};
+use crate::{tr, trf};
 
 const NATIVE_SAMPLE_RATE: u32 = 48_000;
 
@@ -35,7 +36,7 @@ pub(crate) fn solo_tracks(project: &Project) -> Result<BTreeSet<u64>, String> {
         .iter()
         .try_fold(BTreeSet::new(), |mut solo, track| {
             let controls = Controls::read(&track.mixer)
-                .map_err(|error| format!("音轨 {}：{error}", track.name))?;
+                .map_err(|error| trf!("音轨 {}：{}", track.name, error))?;
             if controls.solo {
                 solo.insert(track.id);
             }
@@ -96,7 +97,7 @@ pub(crate) fn can_mix_with_recordings(
         let _ = layer
             .start_frame
             .checked_add(layer.frames)
-            .ok_or("伴奏混音结束位置溢出")?;
+            .ok_or(tr!("伴奏混音结束位置溢出"))?;
         recording_frames = true;
     }
     Ok(owner_frames.is_some() || recording_frames)
@@ -113,7 +114,7 @@ pub(crate) fn mix_with_recordings(
     let mut spans = Vec::new();
     spans
         .try_reserve_exact(owners.len())
-        .map_err(|error| format!("无法分配混音片段：{error}"))?;
+        .map_err(|error| trf!("无法分配混音片段：{}", error))?;
     let mut output_frames =
         visit_audible_owners(owners, solo_tracks, track_id, stem, |span| spans.push(span))?
             .unwrap_or(0);
@@ -124,7 +125,7 @@ pub(crate) fn mix_with_recordings(
         let end = layer
             .start_frame
             .checked_add(layer.frames)
-            .ok_or("伴奏混音结束位置溢出")?;
+            .ok_or(tr!("伴奏混音结束位置溢出"))?;
         output_frames = output_frames.max(end);
         let channels = layer.audio.layout().channels();
         spans.push(Span {
@@ -146,11 +147,11 @@ pub(crate) fn mix_with_recordings(
     {
         return Ok(None);
     }
-    let sample_count = output_frames.checked_mul(2).ok_or("混音样本数量溢出")?;
+    let sample_count = output_frames.checked_mul(2).ok_or(tr!("混音样本数量溢出"))?;
     let mut samples = Vec::new();
     samples
         .try_reserve_exact(sample_count)
-        .map_err(|error| format!("无法分配立体声混音缓冲区：{error}"))?;
+        .map_err(|error| trf!("无法分配立体声混音缓冲区：{}", error))?;
     samples.resize(sample_count, 0.0_f32);
     for span in spans {
         super::execution::checkpoint().map_err(|error| error.to_string())?;
@@ -173,7 +174,7 @@ pub(crate) fn mix_with_recordings(
     RenderedAudio::new(NATIVE_SAMPLE_RATE, 0.0, ChannelLayout::Stereo, samples)
         .map(Arc::new)
         .map(Some)
-        .map_err(|error| format!("混音输出无效：{error}"))
+        .map_err(|error| trf!("混音输出无效：{}", error))
 }
 
 fn mix_samples(input: &[f32], channels: usize, output: &mut [f32], left: f64, right: f64) {
@@ -199,19 +200,12 @@ fn visit_audible_owners<'a>(
             continue;
         }
         if owner.audio.sample_rate() != NATIVE_SAMPLE_RATE {
-            return Err(format!(
-                "音符组 {} 的 PCM 采样率为 {} Hz，混音要求所有音符组使用 48000 Hz",
-                owner.owner.0,
-                owner.audio.sample_rate()
-            ));
+            return Err(trf!("音符组 {} 的 PCM 采样率为 {} Hz，混音要求所有音符组使用 48000 Hz", owner.owner.0, owner.audio.sample_rate()));
         }
         let controls = Controls::read(&owner.controls.mixer)
-            .map_err(|error| format!("音轨 {}：{error}", owner.controls.track_id))?;
+            .map_err(|error| trf!("音轨 {}：{}", owner.controls.track_id, error))?;
         if controls.solo != solo_tracks.contains(&owner.controls.track_id) {
-            return Err(format!(
-                "音轨 {} 的独奏状态与项目混音快照不一致",
-                owner.controls.track_id
-            ));
+            return Err(trf!("音轨 {} 的独奏状态与项目混音快照不一致", owner.controls.track_id));
         }
         if owner.controls.reference_muted
             || controls.mute
@@ -225,7 +219,7 @@ fn visit_audible_owners<'a>(
         let end = span
             .output_start
             .checked_add(span.frames)
-            .ok_or("混音结束位置溢出")?;
+            .ok_or(tr!("混音结束位置溢出"))?;
         output_frames = Some(output_frames.map_or(end, |prev| prev.max(end)));
         visit(span);
     }
@@ -239,7 +233,7 @@ fn prepare_span(
 ) -> Result<Option<Span<'_>>, String> {
     let coverage = owner.coverage;
     if coverage.sample_rate == 0 || coverage.sample_end.0 < coverage.sample_start.0 {
-        return Err(format!("音符组 {} 的音频覆盖范围无效", owner.owner.0));
+        return Err(trf!("音符组 {} 的音频覆盖范围无效", owner.owner.0));
     }
     // Select native sample timestamps inside the half-open project interval.
     // Integer arithmetic avoids drift when a project uses, for example, 44100 Hz.
@@ -249,15 +243,12 @@ fn prepare_span(
     // `as usize` saturates; check before conversion rather than accepting a
     // silently truncated placement. Vec's signed address limit is stricter.
     if !origin.is_finite() || origin < 0.0 || origin >= isize::MAX as f64 {
-        return Err(format!(
-            "音符组 {} 的 PCM 开始位置超出地址范围",
-            owner.owner.0
-        ));
+        return Err(trf!("音符组 {} 的 PCM 开始位置超出地址范围", owner.owner.0));
     }
     let origin = origin as usize;
     let end = origin
         .checked_add(owner.audio.frames())
-        .ok_or("音符组 PCM 结束位置溢出")?;
+        .ok_or(tr!("音符组 PCM 结束位置溢出"))?;
     let output_start = first.max(origin);
     let output_end = last.min(end);
     if output_end <= output_start {
@@ -281,7 +272,7 @@ fn prepare_span(
                 .ok()
                 .and_then(|start| start.checked_add(frames).map(|end| start..end))
                 .and_then(|range| source.get(range));
-            from.ok_or("分离气声与已发布人声的时间范围不一致")?
+            from.ok_or(tr!("分离气声与已发布人声的时间范围不一致"))?
         }
     };
     let (left, right) = controls.gains(owner.audio.layout());
@@ -315,7 +306,7 @@ fn native_bound(project_sample: i64, project_rate: u32) -> Result<usize, String>
     let numerator = i128::from(project_sample.max(0)) * i128::from(NATIVE_SAMPLE_RATE);
     let denominator = i128::from(project_rate);
     let frame = (numerator + denominator - 1) / denominator;
-    usize::try_from(frame).map_err(|_| "音符组覆盖范围超出地址范围".into())
+    usize::try_from(frame).map_err(|_| tr!("音符组覆盖范围超出地址范围").into())
 }
 
 #[cfg(any(feature = "gui", target_arch = "wasm32"))]
@@ -331,11 +322,11 @@ impl Controls {
         let decibels = number(extra, "gainDecibel")?;
         let pan = number(extra, "pan")?;
         if !(-1.0..=1.0).contains(&pan) {
-            return Err("声像 pan 必须在 -1 到 1 之间".into());
+            return Err(tr!("声像 pan 必须在 -1 到 1 之间").into());
         }
         let gain = 10.0_f64.powf(decibels / 20.0);
         if !(gain as f32).is_finite() {
-            return Err("gainDecibel 产生了非有限增益".into());
+            return Err(tr!("gainDecibel 产生了非有限增益").into());
         }
         Ok(Self {
             mute,
@@ -350,7 +341,7 @@ fn boolean(extra: &Extra, field: &str) -> Result<bool, String> {
     extra
         .get(field)
         .and_then(serde_json::Value::as_bool)
-        .ok_or_else(|| format!("混音字段 {field} 缺失或不是布尔值"))
+        .ok_or_else(|| trf!("混音字段 {} 缺失或不是布尔值", field))
 }
 
 fn number(extra: &Extra, field: &str) -> Result<f64, String> {
@@ -358,5 +349,5 @@ fn number(extra: &Extra, field: &str) -> Result<f64, String> {
         .get(field)
         .and_then(serde_json::Value::as_f64)
         .filter(|number| number.is_finite())
-        .ok_or_else(|| format!("混音字段 {field} 缺失或不是有限数值"))
+        .ok_or_else(|| trf!("混音字段 {} 缺失或不是有限数值", field))
 }

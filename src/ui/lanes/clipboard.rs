@@ -1,3 +1,4 @@
+use crate::{tr, trf};
 use serde::{Deserialize, Serialize};
 
 const CLIPBOARD_KIND: &str = "RynthV parameter points";
@@ -24,7 +25,7 @@ impl ParameterClipboard {
             point.0 = point
                 .0
                 .checked_sub(first)
-                .ok_or("所选参数控制点的时间跨度超出可用范围。")?;
+                .ok_or(tr!("所选参数控制点的时间跨度超出可用范围。"))?;
         }
         let clipboard = Self {
             kind: CLIPBOARD_KIND.into(),
@@ -37,15 +38,16 @@ impl ParameterClipboard {
 
     fn validate(&self) -> Result<(), String> {
         if self.kind != CLIPBOARD_KIND {
-            return Err("剪贴板中没有 RynthV 参数控制点，请先复制参数控制点。".into());
+            return Err(tr!("剪贴板中没有 RynthV 参数控制点，请先复制参数控制点。").into());
         }
         let (low, high) = self.range;
         if !low.is_finite() || !high.is_finite() || low >= high || !(high - low).is_finite() {
-            return Err("参数控制点剪贴板的取值范围无效。".into());
+            return Err(tr!("参数控制点剪贴板的取值范围无效。").into());
         }
         if self.points.is_empty() || self.points.len() > MAX_CLIPBOARD_POINTS {
-            return Err(format!(
-                "参数剪贴板须包含 1 到 {MAX_CLIPBOARD_POINTS} 个控制点。"
+            return Err(trf!(
+                "参数剪贴板须包含 1 到 {} 个控制点。",
+                MAX_CLIPBOARD_POINTS
             ));
         }
         if self.points[0].0 != 0
@@ -54,26 +56,26 @@ impl ParameterClipboard {
             })
             || self.points.windows(2).any(|pair| pair[0].0 >= pair[1].0)
         {
-            return Err("参数控制点剪贴板的时间顺序或数值无效。".into());
+            return Err(tr!("参数控制点剪贴板的时间顺序或数值无效。").into());
         }
         Ok(())
     }
 
     pub(super) fn to_text(&self) -> Result<String, String> {
         let text =
-            serde_json::to_string(self).map_err(|error| format!("无法复制参数控制点：{error}"))?;
+            serde_json::to_string(self).map_err(|error| trf!("无法复制参数控制点：{}", error))?;
         if text.len() > MAX_CLIPBOARD_BYTES {
-            return Err("所选参数控制点数据过大，无法复制。".into());
+            return Err(tr!("所选参数控制点数据过大，无法复制。").into());
         }
         Ok(text)
     }
 
     pub(super) fn from_text(text: &str) -> Result<Self, String> {
         if text.len() > MAX_CLIPBOARD_BYTES {
-            return Err("剪贴板数据过大，无法粘贴参数控制点。".into());
+            return Err(tr!("剪贴板数据过大，无法粘贴参数控制点。").into());
         }
         let clipboard: Self = serde_json::from_str(text)
-            .map_err(|error| format!("剪贴板中没有有效的 RynthV 参数控制点：{error}"))?;
+            .map_err(|error| trf!("剪贴板中没有有效的 RynthV 参数控制点：{}", error))?;
         clipboard.validate()?;
         Ok(clipboard)
     }

@@ -1,0 +1,64 @@
+# en catalog fragment: piano
+# format: <simplified-chinese msgid> TAB <translation>
+网格	Grid
+显示音高曲线	Show pitch curve
+显示渲染波形	Show rendered waveform
+显示 AI 重录小部件	Show AI retake widget
+{} 分三连音	1/{} triplet
+对齐网格	Snap to grid
+展开 / 折叠钢琴卷帘	Expand / collapse piano roll
+编辑音符（Alt+1）	Edit notes (Alt+1)
+创建音符（Alt+2）	Create notes (Alt+2)
+编辑音高控制点（Alt+3）	Edit pitch control points (Alt+3)
+手绘音高（Alt+4）	Draw pitch (Alt+4)
+工具	Tools
+选项	Options
+显示调式音阶	Show scale
+请在音符组范围内创建音符，或在编排中插入新的音符组	Create notes inside a note group, or insert a new note group in the arrangement
+移出选择	Remove from selection
+加入选择	Add to selection
+编辑歌词	Edit lyrics
+在播放游标处粘贴音符	Paste notes at the playhead
+删除所选音符	Delete selected notes
+拖动音符	Drag notes
+创建音符	Create notes
+按住试听钢琴音，拖动切换琴键	Hold to audition piano notes; drag to change keys
+歌词	Lyrics
+完成	Done
+主音符组	Main note group
+{} · 点击切换此音符的采样	{} · Click to switch this note's take
+剪切音高控制点	Cut pitch control points
+粘贴音高控制点	Paste pitch control points
+复制音高控制点	Copy pitch control points
+音高控制点升八度	Shift pitch control points up an octave
+音高控制点降八度	Shift pitch control points down an octave
+缩放音高控制点	Scale pitch control points
+移动音高控制点	Move pitch control points
+请先点击音符组标题，再添加音高控制点	Click a note group header first, then add pitch control points
+创建音高控制点	Create pitch control point
+删除所选音高控制点	Delete selected pitch control points
+全选音高控制点	Select all pitch control points
+当前声库暂不支持音高控制点，请使用手绘音高模式	The current voicebank does not support pitch control points yet; use the draw-pitch tool instead
+删除音高控制点	Delete pitch control points
+请先点击音符组标题，再绘制音高曲线	Click a note group header first, then draw a pitch curve
+请在当前音符组范围内绘制音高，点击标题可切换音符组	Draw pitch within the current note group; click a header to switch groups
+手绘音高	Draw pitch
+擦除手绘音高	Erase drawn pitch
+音素时值 · 等待当前音符组合成准备结果	Phoneme timing · Waiting for the current note group to become ready
+拖动音素块调整强度 · 拖动边界调整时值 · 双击重置	Drag a phoneme block to adjust strength · Drag a boundary to adjust timing · Double-click to reset
+尾部边界随音符长度调整	The tail boundary follows the note length
+当前声库暂不支持音素时值编辑	The current voicebank does not support phoneme timing editing yet
+无法重置当前音素的强度和爆破设置	Cannot reset the strength and impulse settings of the current phoneme
+此音素没有可独立编辑的右边界	This phoneme has no independently editable right boundary
+音素边界的顺序无效	The order of the phoneme boundaries is invalid
+音素源音符不存在	The phoneme's source note does not exist
+音素源音符起点超出范围	The phoneme's source note onset is out of range
+当前音素没有可编辑的强度	The current phoneme has no editable strength
+当前音素没有可编辑的爆破位置	The current phoneme has no editable impulse position
+当前音素没有可编辑的爆破强度	The current phoneme has no editable impulse strength
+无法更新当前音素，请重新选择音符组	Cannot update the current phoneme; reselect the note group
+重置音素时值	Reset phoneme timing
+重置音素强度	Reset phoneme strength
+重置辅音爆破	Reset consonant impulse
+重置此音素全部属性	Reset all attributes of this phoneme
+无法重置辅音爆破	Cannot reset the consonant impulse

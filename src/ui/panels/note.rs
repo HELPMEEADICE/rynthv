@@ -5,6 +5,7 @@ use super::controls::*;
 use crate::{
     app::App,
     model::{Language, Note, database_language},
+    tr, trf,
 };
 use eframe::egui::*;
 pub(crate) use performance::end_frame as end_performance_frame;
@@ -20,9 +21,9 @@ pub struct PhonemeDraft {
 }
 
 pub(super) fn show(app: &mut App, ui: &mut Ui) {
-    section(ui, "模式", |ui| performance::mode(app, ui));
-    section(ui, "演绎", |ui| performance::expression(app, ui));
-    section(ui, "AI 重录", |ui| retakes::show(app, ui));
+    section(ui, tr!("模式"), |ui| performance::mode(app, ui));
+    section(ui, tr!("演绎"), |ui| performance::expression(app, ui));
+    section(ui, tr!("AI 重录"), |ui| retakes::show(app, ui));
     let notes: Vec<_> = app
         .editor
         .notes()
@@ -30,13 +31,13 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
         .filter(|n| app.editor.selected.contains(&n.id))
         .cloned()
         .collect();
-    section(ui, "语言", |ui| {
+    section(ui, tr!("语言"), |ui| {
         ui.add_enabled_ui(!notes.is_empty(), |ui| language(app, ui, &notes));
     });
-    section(ui, "音素", |ui| {
+    section(ui, tr!("音素"), |ui| {
         ui.add_enabled_ui(!notes.is_empty(), |ui| phonemes(app, ui));
         if notes.is_empty() {
-            ui.weak("在钢琴卷帘中选择音符");
+            ui.weak(tr!("在钢琴卷帘中选择音符"));
         }
     });
 }
@@ -71,11 +72,11 @@ fn language(app: &mut App, ui: &mut Ui, notes: &[Note]) {
     let mixed = notes.iter().any(|n| override_value(n) != original);
     let mut selected = original.clone();
     let default_label = inherited.map_or_else(
-        || "继承歌声语言".into(),
-        |lang| format!("{}（继承歌声）", lang.label()),
+        || tr!("继承歌声语言").into(),
+        |lang| trf!("{}（继承歌声）", lang.label()),
     );
     let label = if mixed {
-        "多个值".into()
+        tr!("多个值").into()
     } else if selected.is_empty() {
         default_label.clone()
     } else {
@@ -166,12 +167,12 @@ fn phonemes(app: &mut App, ui: &mut Ui) {
         };
     }
     let mixed = draft.source.windows(2).any(|pair| pair[0] != pair[1]);
-    ui.weak("音素");
+    ui.weak(tr!("音素"));
     let response = ui.add_sized(
         vec2(ui.available_width(), 28.0),
         TextEdit::singleline(&mut draft.text)
             .id(id.with("input"))
-            .hint_text(if mixed { "多个值" } else { "自动" })
+            .hint_text(if mixed { tr!("多个值") } else { tr!("自动") })
             .vertical_align(Align::Center)
             .margin(vec2(7.0, 5.0))
             .background_color(crate::ui::theme::border_color()),
@@ -197,9 +198,9 @@ fn phonemes(app: &mut App, ui: &mut Ui) {
         draft.dirty = false;
         response.surrender_focus();
     }
-    response.on_hover_text(
-        "音素以空格分隔；回车或移开焦点应用到所选音符，清空恢复自动发音。Esc 取消输入。",
-    );
+    response.on_hover_text(tr!(
+        "音素以空格分隔；回车或移开焦点应用到所选音符，清空恢复自动发音。Esc 取消输入。"
+    ));
     let even = |note: &Note| {
         note.attributes
             .get("evenSyllableDuration")
@@ -210,7 +211,7 @@ fn phonemes(app: &mut App, ui: &mut Ui) {
     let mixed = notes.iter().any(|note| even(note) != value);
     app.phoneme_draft = draft;
     if ui
-        .add(Checkbox::new(&mut value, "按音符时值均匀分配音节").indeterminate(mixed))
+        .add(Checkbox::new(&mut value, tr!("按音符时值均匀分配音节")).indeterminate(mixed))
         .changed()
     {
         app.commit_lyric();

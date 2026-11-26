@@ -6,6 +6,7 @@ use crate::{
         voice::{Result, VoiceError, VoiceFamily},
     },
 };
+use crate::{tr, trf};
 
 impl PreparedVoiceControls {
     pub fn sample_styles(
@@ -31,10 +32,7 @@ impl PreparedVoiceControls {
         let mut configured = false;
         for name in fixed.chain(curves) {
             if !names.contains(name) {
-                return Err(VoiceError::new(format!(
-                    "当前声库不支持唱法 {name} 的{}参数。",
-                    component.label()
-                )));
+                return Err(VoiceError::new(trf!("当前声库不支持唱法 {} 的{}参数。", name, component.label())));
             }
             configured = true;
         }
@@ -68,7 +66,7 @@ impl PreparedVoiceControls {
                 .as_ref()
                 .is_some_and(|sampled| sampled.len() != frames)
             {
-                return Err(VoiceError::new("唱法曲线的帧数与音频时间线不一致。"));
+                return Err(VoiceError::new(tr!("唱法曲线的帧数与音频时间线不一致。")));
             }
             for row in 0..frames {
                 let offset = sampled
@@ -81,7 +79,7 @@ impl PreparedVoiceControls {
                     value.clamp(0.0, 1.5) as f32
                 };
                 if !value.is_finite() {
-                    return Err(VoiceError::new("唱法曲线产生了无效数值。"));
+                    return Err(VoiceError::new(tr!("唱法曲线产生了无效数值。")));
                 }
                 values[row * names.len() + column] = value;
                 active |= value != 0.0;

@@ -1,6 +1,7 @@
 use crate::{
     app::App,
     model::{AutomationTarget, Interpolation, Parameter},
+    tr,
     ui::{
         icons::{Icon, IconButton},
         state::{DragPayload, Lane, ParameterTool},
@@ -23,7 +24,7 @@ fn contents(app: &mut App, ui: &mut Ui, lane: &mut Lane) {
     ui.spacing_mut().item_spacing.x = 3.0;
     let (rect, drag) = ui.allocate_exact_size(vec2(24.0, 24.0), Sense::drag());
     Icon::Curve.paint(ui, rect.shrink(5.0), muted_color());
-    drag.on_hover_text("拖动以调整参数区域顺序")
+    drag.on_hover_text(tr!("拖动以调整参数区域顺序"))
         .dnd_set_drag_payload(DragPayload::Lane(lane.id));
     let mut styles = app
         .voice_inventory()
@@ -37,10 +38,10 @@ fn contents(app: &mut App, ui: &mut Ui, lane: &mut Lane) {
         }
     }
     parameter_combo(ui, ("foreground", lane.id), &mut lane.foreground, &styles)
-        .on_hover_text("设置要在前景中编辑的参数");
+        .on_hover_text(tr!("设置要在前景中编辑的参数"));
     if ui
         .add(
-            IconButton::new(Icon::Swap, "交换前景与背景参数")
+            IconButton::new(Icon::Swap, tr!("交换前景与背景参数"))
                 .size(vec2(24.0, 24.0))
                 .icon_size(14.0),
         )
@@ -49,23 +50,23 @@ fn contents(app: &mut App, ui: &mut Ui, lane: &mut Lane) {
         std::mem::swap(&mut lane.foreground, &mut lane.background);
     }
     parameter_combo(ui, ("background", lane.id), &mut lane.background, &styles)
-        .on_hover_text("设置要在背景中显示的参数");
+        .on_hover_text(tr!("设置要在背景中显示的参数"));
     ui.add_space(7.0);
     for (tool, glyph, description) in [
         (
             ParameterTool::ControlPoints,
             Glyph::ControlPoints,
-            "控制点工具：添加、选择和移动控制点",
+            tr!("控制点工具：添加、选择和移动控制点"),
         ),
         (
             ParameterTool::Freehand,
             Glyph::Freehand,
-            "自由绘制工具：手绘参数曲线；右键拖动擦除",
+            tr!("自由绘制工具：手绘参数曲线；右键拖动擦除"),
         ),
         (
             ParameterTool::Line,
             Glyph::Line,
-            "直线工具：绘制直线，替换重叠范围内的控制点",
+            tr!("直线工具：绘制直线，替换重叠范围内的控制点"),
         ),
     ] {
         if icon_button(ui, glyph, lane.tool == tool, description).clicked() {
@@ -85,24 +86,24 @@ fn contents(app: &mut App, ui: &mut Ui, lane: &mut Lane) {
                 (
                     Interpolation::Linear,
                     Glyph::Linear,
-                    "线性插值：用直线连接控制点",
+                    tr!("线性插值：用直线连接控制点"),
                 ),
                 (
                     Interpolation::Cosine,
                     Glyph::Cosine,
-                    "余弦插值：用余弦曲线连接控制点",
+                    tr!("余弦插值：用余弦曲线连接控制点"),
                 ),
                 (
                     Interpolation::Cubic,
                     Glyph::Cubic,
-                    "三次样条插值：平滑连接控制点",
+                    tr!("三次样条插值：平滑连接控制点"),
                 ),
             ] {
                 if icon_button(ui, glyph, mode == interpolation.key(), description).clicked()
                     && mode != interpolation.key()
                 {
                     app.commit_lyric();
-                    app.editor.begin("参数插值模式");
+                    app.editor.begin(tr!("参数插值模式"));
                     match app
                         .editor
                         .set_automation_mode(&lane.foreground, interpolation)
@@ -118,7 +119,7 @@ fn contents(app: &mut App, ui: &mut Ui, lane: &mut Lane) {
         },
     );
     ui.add_space(9.0);
-    ui.label(RichText::new("缩放").color(muted_color()));
+    ui.label(RichText::new(tr!("缩放")).color(muted_color()));
     let mut percent = lane.zoom * 100.0;
     let zoom = ui
         .add(
@@ -128,7 +129,7 @@ fn contents(app: &mut App, ui: &mut Ui, lane: &mut Lane) {
                 .suffix("%")
                 .max_decimals(0),
         )
-        .on_hover_text("垂直显示缩放；双击输入，右键恢复 100%");
+        .on_hover_text(tr!("垂直显示缩放；双击输入，右键恢复 100%"));
     if zoom.changed() {
         lane.zoom = (percent / 100.0).clamp(0.25, 16.0);
     }
@@ -156,7 +157,7 @@ fn parameter_combo(
             }
             if !styles.is_empty() {
                 ui.separator();
-                ui.label(RichText::new("唱法").color(muted_color()));
+                ui.label(RichText::new(tr!("唱法")).color(muted_color()));
                 for name in styles {
                     ui.selectable_value(target, AutomationTarget::VocalMode(name.clone()), name);
                 }

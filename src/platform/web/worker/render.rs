@@ -47,7 +47,7 @@ impl Worker {
                         pump_events();
                         return;
                     }
-                    Progress::VoiceLoaded { .. } => "声库已加载",
+                    Progress::VoiceLoaded { .. } => crate::tr!("声库已加载"),
                     Progress::Stage { stage, .. } => stage.label(),
                     Progress::Phase(stage) => stage,
                     Progress::Counts(stats) => {
@@ -107,7 +107,7 @@ impl Worker {
                         }
                     }
                     if paths.is_empty() {
-                        return Err("所选音轨没有可导出的音频".into());
+                        return Err(crate::tr!("所选音轨没有可导出的音频").into());
                     }
                     Ok(paths)
                 },

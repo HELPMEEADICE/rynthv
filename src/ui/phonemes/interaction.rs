@@ -1,6 +1,7 @@
 mod edit;
 
 use super::*;
+use crate::tr;
 use std::sync::Arc;
 
 pub(super) struct Capture {
@@ -122,9 +123,9 @@ pub(super) fn show(
         });
         if !enabled {
             response.clone().on_hover_text(if handle == Handle::Right {
-                "尾部边界随音符长度调整"
+                tr!("尾部边界随音符长度调整")
             } else {
-                "当前声库暂不支持音素时值编辑"
+                tr!("当前声库暂不支持音素时值编辑")
             });
         }
     }
@@ -197,14 +198,14 @@ fn reset(
     attributes.activity = None;
     attributes.position = None;
     if !app.editor.begin_phoneme_edit(source) {
-        return Err("无法编辑当前音素".into());
+        return Err(tr!("无法编辑当前音素").into());
     }
     if app.editor.update_phoneme_attributes(source, attributes) {
         app.editor.finish_phoneme_edit();
         Ok(())
     } else {
         app.editor.cancel_phoneme_edit();
-        Err("无法重置当前音素的强度和爆破设置".into())
+        Err(tr!("无法重置当前音素的强度和爆破设置").into())
     }
 }
 

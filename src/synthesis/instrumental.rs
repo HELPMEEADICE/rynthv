@@ -14,6 +14,7 @@ use std::{
         mpsc,
     },
 };
+use crate::{tr, trf};
 
 pub struct AudioAsset {
     pub audio: Arc<RenderedAudio>,
@@ -129,7 +130,7 @@ impl AudioLibrary {
                         self.generation = self.generation.wrapping_add(1);
                         continue;
                     }
-                    Err("音频加载任务意外停止".into())
+                    Err(tr!("音频加载任务意外停止").into())
                 }
             };
             *entry = match result {
@@ -221,7 +222,7 @@ impl AudioLibrary {
                                     waveforms,
                                 })
                             })
-                            .ok_or_else(|| "无效的伴奏波形".into());
+                            .ok_or_else(|| tr!("无效的伴奏波形").into());
                         let _ = tx.send(asset);
                         ctx.wake();
                     }
@@ -240,7 +241,7 @@ impl AudioLibrary {
                     #[cfg(target_arch = "wasm32")]
                     web: _task,
                 },
-                Err(error) => Entry::Failed(format!("无法加载音频：{error}")),
+                Err(error) => Entry::Failed(trf!("无法加载音频：{}", error)),
             },
         );
     }

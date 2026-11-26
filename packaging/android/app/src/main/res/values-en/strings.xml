@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">RynthV</string>
+    <string name="app_name_test">RynthV (Test)</string>
+    <!-- DocumentStore -->
+    <string name="document_name_unreadable">Unable to read the document name.</string>
+    <string name="file_type_unsupported">Unsupported file type: %1$s</string>
+    <string name="resource_directory_too_deep">The resource directory is nested too deeply.</string>
+    <string name="resource_directory_unreadable">Unable to read the resource directory.</string>
+    <string name="resource_directory_duplicate_entry">Duplicate entry in the resource directory: %1$s</string>
+    <string name="document_cannot_open">Cannot open the document: %1$s</string>
+    <string name="document_changed_while_reading">The document changed while it was being read: %1$s</string>
+    <string name="document_target_cannot_open">Cannot open the target document.</string>
+    <string name="storage_insufficient">Not enough app storage space.</string>
+    <string name="document_name_invalid">Invalid document name.</string>
+    <!-- RynthVActivity -->
+    <string name="graphics_device_lost_title">Graphics Device Needs Recovery</string>
+    <string name="graphics_device_lost_message">%1$s\nReopen RynthV to recover the latest autosave.</string>
+    <string name="graphics_recovery_action">Recover Workspace</string>
+    <string name="picker_no_document_returned">The document provider returned no document.</string>
+    <string name="picker_error_message">%1$s: %2$s</string>
+    <string name="file_operation_failed">File operation failed: %1$s</string>
+    <string name="share_failed">Sharing failed: %1$s</string>
+    <!-- GraphicsRecoveryActivity -->
+    <string name="graphics_recovery_progress">Recovering the graphics device and workspace…</string>
+</resources>

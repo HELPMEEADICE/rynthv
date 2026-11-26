@@ -2,6 +2,7 @@ use super::geometry::Mapping;
 use crate::{
     app::App,
     model::{Automation, AutomationTarget, Parameter},
+    tr,
     ui::{state::Lane, theme::*, track_color::TrackColors},
 };
 use eframe::egui::*;
@@ -161,10 +162,10 @@ fn nice_step(value: f64) -> f64 {
 fn axis_label(target: &AutomationTarget, value: f64, step: f64) -> String {
     if matches!(target, AutomationTarget::Parameter(Parameter::Tension)) {
         if (value - 1.0).abs() < 1e-6 {
-            return "紧张".into();
+            return tr!("紧张").into();
         }
         if (value + 1.0).abs() < 1e-6 {
-            return "放松".into();
+            return tr!("放松").into();
         }
     }
     let decimals = if step >= 1.0 {

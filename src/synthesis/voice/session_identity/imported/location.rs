@@ -1,6 +1,7 @@
 //! Prevent explicit imports from being saved to a packaged host's private copy.
 
 use crate::platform::fs::{File, OpenOptions};
+use crate::{tr};
 use std::{io, path::Path};
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -66,13 +67,13 @@ pub(super) fn verify(file: &File, expected: &Path) -> Result<()> {
         )
     };
     if length == 0 || length as usize >= buffer.len() {
-        return Err(VoiceError::new("无法核对模型上下文的实际保存路径。"));
+        return Err(VoiceError::new(tr!("无法核对模型上下文的实际保存路径。")));
     }
     let actual = normalize(&String::from_utf16_lossy(&buffer[..length as usize]));
     let expected = normalize(&expected.to_string_lossy());
     if !actual.eq_ignore_ascii_case(&expected) {
         return Err(VoiceError::new(
-            "模型上下文路径被宿主程序重定向。请从桌面启动 RynthV 后执行导入。",
+            tr!("模型上下文路径被宿主程序重定向。请从桌面启动 RynthV 后执行导入。"),
         ));
     }
     Ok(())
@@ -95,22 +96,22 @@ pub(super) fn verify(file: &File, expected: &Path) -> Result<()> {
     let metadata = file.metadata()?;
     if !metadata.is_file() || metadata.nlink() != 1 {
         return Err(VoiceError::new(
-            "模型上下文必须是普通文件，不能使用硬链接。",
+            tr!("模型上下文必须是普通文件，不能使用硬链接。"),
         ));
     }
     let expected = std::path::absolute(expected)?;
     let parent = expected
         .parent()
-        .ok_or_else(|| VoiceError::new("模型上下文路径缺少父目录。"))?;
+        .ok_or_else(|| VoiceError::new(tr!("模型上下文路径缺少父目录。")))?;
     let filename = expected
         .file_name()
-        .ok_or_else(|| VoiceError::new("模型上下文路径缺少文件名。"))?;
+        .ok_or_else(|| VoiceError::new(tr!("模型上下文路径缺少文件名。")))?;
     // Resolve only the parent: normal XDG directories may be symlinked, while
     // open_read/open_lock/create_temporary reject links to the file itself.
     let expected = parent.canonicalize()?.join(filename);
     let actual = std::fs::read_link(format!("/proc/self/fd/{}", file.as_raw_fd()))?;
     if actual != expected {
-        return Err(VoiceError::new("模型上下文的实际路径与预期路径不一致。"));
+        return Err(VoiceError::new(tr!("模型上下文的实际路径与预期路径不一致。")));
     }
     Ok(())
 }
@@ -123,6 +124,6 @@ pub(super) fn verify(file: &File, expected: &Path) -> Result<()> {
 )))]
 pub(super) fn verify(_file: &File, _expected: &Path) -> Result<()> {
     Err(VoiceError::new(
-        "模型上下文导入当前仅支持 Windows 和 Linux。",
+        tr!("模型上下文导入当前仅支持 Windows 和 Linux。"),
     ))
 }

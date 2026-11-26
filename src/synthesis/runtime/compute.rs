@@ -4,6 +4,7 @@ use std::{
     sync::mpsc::{self, Receiver, TryRecvError},
     thread,
 };
+use crate::{tr, trf};
 
 pub(super) enum State {
     Loading(Backend, Receiver<Session>),
@@ -29,7 +30,7 @@ impl State {
             Ok(_) => Self::Loading(backend, receiver),
             Err(error) => Self::Ready(Session::unavailable(
                 backend,
-                format!("无法启动推理设备初始化线程：{error}"),
+                trf!("无法启动推理设备初始化线程：{}", error),
             )),
         }
     }
@@ -50,7 +51,7 @@ impl State {
             Err(TryRecvError::Empty) => return false,
             Err(TryRecvError::Disconnected) => Self::Ready(Session::unavailable(
                 *backend,
-                "推理设备初始化线程意外退出。".into(),
+                tr!("推理设备初始化线程意外退出。").into(),
             )),
         };
         true

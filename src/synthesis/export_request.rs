@@ -6,6 +6,7 @@ use crate::model::Project;
 #[cfg(not(target_arch = "wasm32"))]
 use std::path::Path;
 use std::path::PathBuf;
+use crate::{tr, trf};
 
 pub struct ExportRequest {
     pub(crate) outputs: Vec<Output>,
@@ -42,7 +43,7 @@ impl ExportRequest {
         )?;
         for track in &project.tracks {
             crate::synthesis::mixing_options::validate_mixer(&track.mixer)
-                .map_err(|error| format!("音轨 {}：{error}", track.name))?;
+                .map_err(|error| trf!("音轨 {}：{}", track.name, error))?;
         }
         let text = |key: &str| {
             config
@@ -58,11 +59,11 @@ impl ExportRequest {
         };
         let directory = directory.unwrap_or_else(|| PathBuf::from(text("destination")));
         if directory.as_os_str().is_empty() {
-            return Err("请选择有效的目标文件夹".into());
+            return Err(tr!("请选择有效的目标文件夹").into());
         }
         #[cfg(not(target_arch = "wasm32"))]
         if directory.exists() && !directory.is_dir() {
-            return Err("请选择有效的目标文件夹".into());
+            return Err(tr!("请选择有效的目标文件夹").into());
         }
         let name = text("filename").trim();
         let stem = name
@@ -77,25 +78,25 @@ impl ExportRequest {
                 .chars()
                 .any(|c| c.is_control() || "<>:\"/\\|?*".contains(c))
         {
-            return Err("文件名称为空或含有无效字符".into());
+            return Err(tr!("文件名称为空或含有无效字符").into());
         }
         if reserved_name(stem) {
-            return Err("请使用有效的文件名称".into());
+            return Err(tr!("请使用有效的文件名称").into());
         }
         let sample_rate = number("sampleRate");
         let bit_depth = number("bitDepth");
         if ![44100, 48000, 96000].contains(&sample_rate) || ![16, 24, 32].contains(&bit_depth) {
-            return Err("请选择有效的采样率和位深度".into());
+            return Err(tr!("请选择有效的采样率和位深度").into());
         }
         let layout = match number("numChannels") {
             1 => ChannelLayout::Mono,
             2 => ChannelLayout::Stereo,
-            _ => return Err("请选择有效的声道数".into()),
+            _ => return Err(tr!("请选择有效的声道数").into()),
         };
         let separate_aspiration = match text("aspirationFormat") {
             "noAspiration" => false,
             "asFiles" => true,
-            _ => return Err("请选择有效的气声输出格式".into()),
+            _ => return Err(tr!("请选择有效的气声输出格式").into()),
         };
         let mut outputs = Vec::new();
         let mut add_output = |name: String, track: Option<u64>, vocal: bool| {
@@ -159,7 +160,7 @@ impl ExportRequest {
             );
         }
         if outputs.is_empty() {
-            return Err("请勾选混音导出或至少一条音轨".into());
+            return Err(tr!("请勾选混音导出或至少一条音轨").into());
         }
         Ok(Self {
             outputs,

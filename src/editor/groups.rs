@@ -1,5 +1,6 @@
 use super::Editor;
 use crate::model::*;
+use crate::tr;
 
 #[derive(Clone, Copy)]
 pub enum GroupEdit {
@@ -49,7 +50,7 @@ impl Editor {
         {
             return;
         }
-        self.begin("插入音符组");
+        self.begin(tr!("插入音符组"));
         self.insert_group(track, at, 32 * QUARTER);
         self.finish();
     }
@@ -160,7 +161,7 @@ impl Editor {
         else {
             return;
         };
-        self.begin("删除音符组");
+        self.begin(tr!("删除音符组"));
         for track in &mut self.project.tracks {
             track.groups.retain(|r| r.id != id);
         }
@@ -180,13 +181,13 @@ impl Editor {
             .find(|r| r.id == id)
             .map(|r| r.group_id.clone());
         if let Some(group_id) = group_id {
-            self.begin("重命名音符组");
+            self.begin(tr!("重命名音符组"));
             self.project.group_mut(&group_id).unwrap().name = name;
             self.finish();
         }
     }
     pub fn rename_track(&mut self, id: EntityId, name: String) {
-        self.begin("重命名音轨");
+        self.begin(tr!("重命名音轨"));
         if let Some(track) = self.project.tracks.iter_mut().find(|t| t.id == id) {
             track.name = name;
         }
@@ -199,7 +200,7 @@ impl Editor {
         let Some(index) = self.project.tracks.iter().position(|t| t.id == id) else {
             return;
         };
-        self.begin("删除音轨");
+        self.begin(tr!("删除音轨"));
         let track = self.project.tracks.remove(index);
         let affected: Vec<_> = track.groups.iter().map(|r| r.group_id.clone()).collect();
         if self
@@ -224,7 +225,7 @@ impl Editor {
         if index == target {
             return;
         }
-        self.begin("调整音轨顺序");
+        self.begin(tr!("调整音轨顺序"));
         let track = self.project.tracks.remove(index);
         self.project.tracks.insert(target, track);
         self.update_track_order();

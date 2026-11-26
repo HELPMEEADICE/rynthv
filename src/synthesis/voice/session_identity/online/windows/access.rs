@@ -1,4 +1,5 @@
 use std::{ffi::c_void, mem::size_of, ptr};
+use crate::{tr};
 
 use zeroize::Zeroizing;
 
@@ -54,7 +55,7 @@ fn session_id(token: &Handle) -> Result<u32> {
         return Err(api_error("GetTokenInformation session"));
     }
     if size != size_of::<u32>() as u32 {
-        return Err(VoiceError::new("无法验证所选进程的 Windows 会话。"));
+        return Err(VoiceError::new(tr!("无法验证所选进程的 Windows 会话。")));
     }
     Ok(session)
 }
@@ -83,7 +84,7 @@ fn user(token: &Handle) -> Result<Zeroizing<Vec<usize>>> {
         return Err(api_error("GetTokenInformation user"));
     }
     if written > bytes || written < size_of::<usize>() as u32 || buffer[0] == 0 {
-        return Err(VoiceError::new("无法验证所选进程的 Windows 用户。"));
+        return Err(VoiceError::new(tr!("无法验证所选进程的 Windows 用户。")));
     }
     Ok(buffer)
 }

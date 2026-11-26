@@ -1,3 +1,4 @@
+use crate::{tr, trf};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -16,7 +17,7 @@ impl Interpolation {
             "linear" => Ok(Self::Linear),
             "cosine" => Ok(Self::Cosine),
             "cubic" => Ok(Self::Cubic),
-            _ => Err(format!("未知参数插值模式：{value}")),
+            _ => Err(trf!("未知参数插值模式：{}", value)),
         }
     }
 
@@ -30,9 +31,9 @@ impl Interpolation {
 
     pub fn label(self) -> &'static str {
         match self {
-            Self::Linear => "线性",
-            Self::Cosine => "余弦",
-            Self::Cubic => "三次样条",
+            Self::Linear => tr!("线性"),
+            Self::Cosine => tr!("余弦"),
+            Self::Cubic => tr!("三次样条"),
         }
     }
 }

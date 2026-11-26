@@ -1,5 +1,6 @@
 use crate::{
     app::App,
+    tr,
     ui::{
         icons::{Icon, IconButton},
         scale::{Scale, ScaleGuide, Tonic},
@@ -12,7 +13,7 @@ use serde_json::Value;
 pub(super) fn toggle(app: &mut App, ui: &mut Ui) {
     if ui
         .add(
-            IconButton::new(Icon::Scale, "显示调式音阶")
+            IconButton::new(Icon::Scale, tr!("显示调式音阶"))
                 .framed()
                 .size(vec2(32.0, 24.0))
                 .selected(app.view.scale.enabled),

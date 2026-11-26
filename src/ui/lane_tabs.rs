@@ -1,7 +1,7 @@
 #[cfg(not(target_os = "android"))]
 use super::icons::IconButton;
 use super::{icons::Icon, piano::Gesture, state::Lane, theme::*};
-use crate::app::App;
+use crate::{app::App, tr, trf};
 use eframe::egui::*;
 
 pub(super) fn show(app: &mut App, ui: &mut Ui) {
@@ -31,7 +31,7 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
 }
 
 fn tabs(app: &mut App, ui: &mut Ui, close: &mut Option<u64>) {
-    if tab(ui, Icon::Phonemes, "音素时值", app.view.phonemes, None)
+    if tab(ui, Icon::Phonemes, tr!("音素时值"), app.view.phonemes, None)
         .0
         .clicked()
     {
@@ -58,14 +58,14 @@ fn tabs(app: &mut App, ui: &mut Ui, close: &mut Option<u64>) {
     let added = ui
         .add_enabled(
             app.view.lanes.len() < 16,
-            IconButton::new(Icon::Plus, "新增参数区域")
+            IconButton::new(Icon::Plus, tr!("新增参数区域"))
                 .size(vec2(30.0, 26.0))
                 .icon_size(14.0),
         )
         .clicked();
     #[cfg(target_os = "android")]
     let added = ui
-        .add_enabled(app.view.lanes.len() < 16, Button::new("新增参数区域"))
+        .add_enabled(app.view.lanes.len() < 16, Button::new(tr!("新增参数区域")))
         .clicked();
     if added {
         app.view.lanes.push(Lane::new());
@@ -105,7 +105,7 @@ fn tab(ui: &mut Ui, icon: Icon, text: &str, active: bool, lane: Option<u64>) -> 
             .shrink2(vec2(2.0, 3.0));
         // The close hit area is disjoint from the label's show/hide hit area.
         let close = ui.interact(close_rect, id.with("close"), Sense::click());
-        close.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, format!("关闭{text}")));
+        close.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, trf!("关闭{}", text)));
         if close.hovered() {
             ui.painter()
                 .rect_filled(close_rect, 3, button_hover_color());
@@ -122,7 +122,7 @@ fn tab(ui: &mut Ui, icon: Icon, text: &str, active: bool, lane: Option<u64>) -> 
         closed = close.clicked();
         close
             .on_hover_cursor(CursorIcon::Default)
-            .on_hover_text("关闭参数区域");
+            .on_hover_text(tr!("关闭参数区域"));
     }
     ui.painter().vline(
         rect.right(),

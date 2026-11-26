@@ -1,6 +1,8 @@
 use super::{super::language_name, CARD, INK, Sort, State, resource_import};
 use crate::{
     app::App,
+    tr,
+    trf,
     ui::{
         child,
         icons::{Icon, IconButton},
@@ -55,7 +57,7 @@ fn search(ui: &mut Ui, query: &mut String, width: f32) {
         TextEdit::singleline(query)
             .frame(Frame::NONE)
             .font(FontId::proportional(14.0))
-            .hint_text("搜索歌声")
+            .hint_text(tr!("搜索歌声"))
             .vertical_align(Align::Center)
             .margin(vec2(0.0, 9.0)),
     );
@@ -67,7 +69,7 @@ fn search(ui: &mut Ui, query: &mut String, width: f32) {
         );
         if clear
             .add(
-                IconButton::new(Icon::Close, "清除搜索")
+                IconButton::new(Icon::Close, tr!("清除搜索"))
                     .size(Vec2::splat(24.0))
                     .icon_size(12.0),
             )
@@ -84,9 +86,9 @@ fn filters(app: &App, ui: &mut Ui, state: &mut State) {
         + usize::from(state.flat_only);
     let filter = ui.add(
         Button::new(if count == 0 {
-            "筛选".into()
+            tr!("筛选").to_owned()
         } else {
-            format!("筛选 · {count}")
+            trf!("筛选 · {}", count)
         })
         .min_size(vec2(76.0, 36.0))
         .corner_radius(14),
@@ -107,38 +109,38 @@ fn filters(app: &App, ui: &mut Ui, state: &mut State) {
                         }
                     }
                 }
-                ui.label(RichText::new("筛选歌声").strong().color(INK));
-                ui.checkbox(&mut state.flat_only, "仅显示 SynthV Flat");
-                ui.weak("声库语言");
+                ui.label(RichText::new(tr!("筛选歌声")).strong().color(INK));
+                ui.checkbox(&mut state.flat_only, tr!("仅显示 SynthV Flat"));
+                ui.weak(tr!("声库语言"));
                 ComboBox::from_id_salt("manager-language-filter")
                     .width(ui.available_width())
                     .selected_text(if state.language.is_empty() {
-                        "全部语言"
+                        tr!("全部语言")
                     } else {
                         language_name(&state.language)
                     })
                     .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut state.language, String::new(), "全部语言");
+                        ui.selectable_value(&mut state.language, String::new(), tr!("全部语言"));
                         for language in languages {
                             let label = language_name(&language).to_owned();
                             ui.selectable_value(&mut state.language, language, label);
                         }
                     });
-                ui.weak("厂商");
+                ui.weak(tr!("厂商"));
                 ComboBox::from_id_salt("manager-vendor-filter")
                     .width(ui.available_width())
                     .selected_text(if state.vendor.is_empty() {
-                        "全部厂商"
+                        tr!("全部厂商")
                     } else {
                         &state.vendor
                     })
                     .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut state.vendor, String::new(), "全部厂商");
+                        ui.selectable_value(&mut state.vendor, String::new(), tr!("全部厂商"));
                         for vendor in vendors {
                             ui.selectable_value(&mut state.vendor, vendor.clone(), vendor);
                         }
                     });
-                if ui.button("清除筛选").clicked() {
+                if ui.button(tr!("清除筛选")).clicked() {
                     state.language.clear();
                     state.vendor.clear();
                     state.flat_only = false;
@@ -146,7 +148,7 @@ fn filters(app: &App, ui: &mut Ui, state: &mut State) {
             });
         });
     if count > 0 {
-        filter.on_hover_text("已启用筛选").highlight();
+        filter.on_hover_text(tr!("已启用筛选")).highlight();
     }
 }
 
@@ -167,7 +169,7 @@ fn actions(app: &mut App, ui: &mut Ui, state: &mut State) {
 
 fn sorting(ui: &mut Ui, state: &mut State, reverse: bool) {
     if !reverse {
-        ui.label(RichText::new("排序方式").color(muted_color()));
+        ui.label(RichText::new(tr!("排序方式")).color(muted_color()));
     }
     ComboBox::from_id_salt("voice-manager-sort")
         .width(90.0)
@@ -178,7 +180,7 @@ fn sorting(ui: &mut Ui, state: &mut State, reverse: bool) {
             }
         });
     if reverse {
-        ui.label(RichText::new("排序方式").color(muted_color()));
+        ui.label(RichText::new(tr!("排序方式")).color(muted_color()));
     }
 }
 
@@ -188,7 +190,7 @@ fn refresh(app: &mut App, ui: &mut Ui) {
             !app.synthesis.library.is_scanning()
                 && !app.synthesis.library.resource_busy()
                 && app.synthesis.library.has_databases(),
-            Button::new("刷新").min_size(vec2(52.0, 36.0)),
+            Button::new(tr!("刷新")).min_size(vec2(52.0, 36.0)),
         )
         .clicked()
     {

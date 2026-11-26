@@ -13,6 +13,7 @@ use super::theme::*;
 use crate::{
     app::App,
     synthesis::voice::{VoiceCatalogEntry, VoiceFamily},
+    tr,
 };
 use eframe::egui::*;
 
@@ -31,10 +32,10 @@ fn family_name(entry: &VoiceCatalogEntry) -> &'static str {
         return "SynthV Flat";
     }
     match entry.family {
-        Some(VoiceFamily::Sv1) => "SV1 原生",
-        Some(VoiceFamily::Sv2Compatible) => "SV2 · 版本 1 兼容",
+        Some(VoiceFamily::Sv1) => tr!("SV1 原生"),
+        Some(VoiceFamily::Sv2Compatible) => tr!("SV2 · 版本 1 兼容"),
         Some(VoiceFamily::Sv2) => "SV2",
-        None => "未知格式",
+        None => tr!("未知格式"),
     }
 }
 
@@ -55,12 +56,12 @@ fn error_label(ui: &mut Ui, value: impl Into<String>) {
 
 fn language_name(language: &str) -> &str {
     match language {
-        "mandarin" | "mandarin-xsampa" | "zh" | "ZH" => "普通话",
-        "english" | "english-arpabet" | "en" | "EN" => "英语",
-        "japanese" | "japanese-romaji" | "ja" | "JA" => "日语",
-        "spanish" | "spanish-xsampa" | "es" | "ES" => "西班牙语",
-        "cantonese" | "cantonese-xsampa" | "yue" | "YUE" => "粤语",
-        "korean" | "korean-xsampa" | "ko" | "KO" => "韩语",
+        "mandarin" | "mandarin-xsampa" | "zh" | "ZH" => tr!("普通话"),
+        "english" | "english-arpabet" | "en" | "EN" => tr!("英语"),
+        "japanese" | "japanese-romaji" | "ja" | "JA" => tr!("日语"),
+        "spanish" | "spanish-xsampa" | "es" | "ES" => tr!("西班牙语"),
+        "cantonese" | "cantonese-xsampa" | "yue" | "YUE" => tr!("粤语"),
+        "korean" | "korean-xsampa" | "ko" | "KO" => tr!("韩语"),
         other => other,
     }
 }

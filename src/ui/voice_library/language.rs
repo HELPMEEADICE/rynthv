@@ -2,6 +2,8 @@ use super::{error_label, widgets};
 use crate::{
     app::App,
     model::{Language, database_language},
+    tr,
+    trf,
     ui::theme::*,
 };
 use eframe::egui::*;
@@ -11,13 +13,13 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
         .voice_inventory()
         .and_then(|voice| voice.configuration.as_ref())
     else {
-        widgets::field(ui, "未加载歌声", true, "加载声库后可选择其支持的语言");
+        widgets::field(ui, tr!("未加载歌声"), true, tr!("加载声库后可选择其支持的语言"));
         return;
     };
     let Some(native) = Language::parse(&config.default_language) else {
         error_label(
             ui,
-            format!("无法识别声库默认语言：{}", config.default_language),
+            trf!("无法识别声库默认语言：{}", config.default_language),
         );
         return;
     };
@@ -45,8 +47,8 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
     }
     let default = inherited.and_then(|inherited| database_language(&default_database, inherited));
     let default_label = match &default {
-        Ok(language) => format!("{}（默认）", language.label()),
-        Err(_) => "默认语言不可用".into(),
+        Ok(language) => trf!("{}（默认）", language.label()),
+        Err(_) => tr!("默认语言不可用").to_owned(),
     };
     let selected_label = if selected.is_empty() {
         default_label.clone()
@@ -77,9 +79,9 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
             })
             .response
             .on_hover_text(if app.editor.active_ref().is_some() {
-                "应用于当前音符组；默认项使用其继承的歌声语言"
+                tr!("应用于当前音符组；默认项使用其继承的歌声语言")
             } else {
-                "应用于当前音轨，新建音符组继承此设置"
+                tr!("应用于当前音轨，新建音符组继承此设置")
             });
     });
     if selected != original {
@@ -92,11 +94,11 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
 
 fn input_hint(language: Language) -> &'static str {
     match language {
-        Language::Mandarin => "可输入汉字、拼音或显式音素；多音字可用拼音指定读音",
-        Language::English => "支持发音词典覆盖的单词；生词或多读音单词需填写显式音素",
-        Language::Japanese => "可输入假名、罗马音或词典覆盖的汉字；多读音词可用假名指定",
-        Language::Spanish => "支持词典覆盖的音节与字母组合；未覆盖的读音需填写显式音素",
-        Language::Cantonese => "可输入粤拼或词典覆盖的汉字；多读音字可用粤拼指定",
-        Language::Korean => "当前支持按音节分隔的罗马音或显式音素；韩文整句自动注音尚未接入",
+        Language::Mandarin => tr!("可输入汉字、拼音或显式音素；多音字可用拼音指定读音"),
+        Language::English => tr!("支持发音词典覆盖的单词；生词或多读音单词需填写显式音素"),
+        Language::Japanese => tr!("可输入假名、罗马音或词典覆盖的汉字；多读音词可用假名指定"),
+        Language::Spanish => tr!("支持词典覆盖的音节与字母组合；未覆盖的读音需填写显式音素"),
+        Language::Cantonese => tr!("可输入粤拼或词典覆盖的汉字；多读音字可用粤拼指定"),
+        Language::Korean => tr!("当前支持按音节分隔的罗马音或显式音素；韩文整句自动注音尚未接入"),
     }
 }

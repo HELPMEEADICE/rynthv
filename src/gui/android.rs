@@ -45,7 +45,7 @@ pub fn run_android(app: AndroidApp) {
         }),
     );
     if let Err(error) = result {
-        let message = format!("RynthV 图形初始化失败：{error}");
+        let message = crate::trf!("RynthV 图形初始化失败：{}", error);
         let _ = android::with_activity(|env, activity| {
             let message = env.new_string(&message)?;
             env.call_method(
@@ -69,7 +69,11 @@ fn monitor_graphics_device(device: &wgpu::Device) {
         if reason == wgpu::DeviceLostReason::Destroyed {
             return;
         }
-        let message = format!("Android 图形设备已丢失（{reason:?}）：{message}");
+        let message = crate::trf!(
+            "Android 图形设备已丢失（{}）：{}",
+            format!("{reason:?}"),
+            message
+        );
         log::error!("{message}");
         let _: jni::errors::Result<()> = vm.attach_current_thread(|env| {
             let message = env.new_string(&message)?;

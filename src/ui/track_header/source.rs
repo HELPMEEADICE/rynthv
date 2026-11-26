@@ -1,5 +1,6 @@
 use crate::{
     app::App,
+    tr,
     ui::{icons::Icon, theme::*},
 };
 use eframe::egui::*;
@@ -16,7 +17,7 @@ pub(super) fn show(app: &mut App, ui: &mut Ui, rect: Rect, text_rect: Rect, trac
                 Some(
                     track
                         .audio_clip()
-                        .map_or("导入伴奏…", |clip| clip.name())
+                        .map_or(tr!("导入伴奏…"), |clip| clip.name())
                         .to_owned(),
                 ),
                 None,
@@ -28,7 +29,7 @@ pub(super) fn show(app: &mut App, ui: &mut Ui, rect: Rect, text_rect: Rect, trac
                 .get("name")
                 .and_then(serde_json::Value::as_str)
                 .filter(|s| !s.is_empty())
-                .unwrap_or("未指定歌声")
+                .unwrap_or(tr!("未指定歌声"))
                 .to_owned();
             (track.id, None, Some(voice))
         }
@@ -57,7 +58,7 @@ pub(super) fn show(app: &mut App, ui: &mut Ui, rect: Rect, text_rect: Rect, trac
                 Sense::click(),
             )
             .on_hover_cursor(CursorIcon::Default)
-            .on_hover_text("导入 / 替换伴奏音频")
+            .on_hover_text(tr!("导入 / 替换伴奏音频"))
             .clicked()
         {
             app.import_audio(Some(track_id), ui.ctx());
@@ -87,7 +88,7 @@ pub(super) fn show(app: &mut App, ui: &mut Ui, rect: Rect, text_rect: Rect, trac
             Sense::click(),
         )
         .on_hover_cursor(CursorIcon::Default)
-        .on_hover_text("选择歌声");
+        .on_hover_text(tr!("选择歌声"));
     if voice_response.clicked() {
         app.commit_lyric();
         app.editor.select_track(track_id);

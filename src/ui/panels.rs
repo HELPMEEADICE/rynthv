@@ -5,7 +5,7 @@ mod render;
 pub(crate) use note::{PhonemeDraft, end_performance_frame};
 
 use super::{child, state::Column, theme::*};
-use crate::app::App;
+use crate::{app::App, tr};
 use eframe::egui::*;
 
 pub fn show(app: &mut App, ui: &mut Ui, column: Column) {
@@ -64,7 +64,7 @@ pub fn show(app: &mut App, ui: &mut Ui, column: Column) {
                 && matches!(column, Column::Note | Column::Voice | Column::Dictionary)
             {
                 controls::padded(ui, |ui| {
-                    ui.weak("当前选择的是伴奏轨，请选择歌声音轨以编辑此项。");
+                    ui.weak(tr!("当前选择的是伴奏轨，请选择歌声音轨以编辑此项。"));
                 });
                 return;
             }
@@ -74,7 +74,7 @@ pub fn show(app: &mut App, ui: &mut Ui, column: Column) {
                 Column::Render => render::show(app, ui),
                 Column::Dictionary => dictionary::show(app, ui, rect.height() - header.height()),
                 Column::Script => controls::padded(ui, |ui| {
-                    ui.weak("脚本运行环境尚未接入");
+                    ui.weak(tr!("脚本运行环境尚未接入"));
                 }),
                 Column::Editor => {}
             }

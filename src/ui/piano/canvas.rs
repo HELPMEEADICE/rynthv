@@ -6,6 +6,7 @@ use super::{
 use crate::{
     app::App,
     model::*,
+    tr,
     ui::{theme::*, timeline::*},
 };
 use eframe::egui::*;
@@ -233,14 +234,14 @@ fn interaction(
             app.editor.selected = BTreeSet::from([note.id]);
             app.edit_lyric();
         } else {
-            app.editor.begin("创建音符");
+            app.editor.begin(tr!("创建音符"));
             let at = ticks(app.view.snap_beat(beat_at(canvas, &app.view.piano, p.x))).max(0);
             if app
                 .editor
                 .add_note(at, QUARTER, pitch_at(app, canvas, p.y))
                 .is_none()
             {
-                app.status = "请在音符组范围内创建音符，或在编排中插入新的音符组".into();
+                app.status = tr!("请在音符组范围内创建音符，或在编排中插入新的音符组").into();
             }
             app.editor.finish();
         }
@@ -261,7 +262,7 @@ fn interaction(
             || cfg!(target_arch = "wasm32") && ui.input(|input| input.has_touch_screen()))
             && app.piano_tool == super::Tool::NoteDraw
         {
-            app.editor.begin("创建音符");
+            app.editor.begin(tr!("创建音符"));
             let at = ticks(app.view.snap_beat(beat_at(canvas, &app.view.piano, p.x))).max(0);
             let duration = ticks(app.view.step());
             app.editor
@@ -301,9 +302,9 @@ fn interaction(
         {
             let was_selected = app.editor.selected.contains(&note);
             let label = if was_selected {
-                "移出选择"
+                tr!("移出选择")
             } else {
-                "加入选择"
+                tr!("加入选择")
             };
             if ui.button(label).clicked() {
                 if was_selected {
@@ -315,18 +316,18 @@ fn interaction(
             }
         }
         #[cfg(target_os = "android")]
-        if ui.add_enabled(selected, Button::new("编辑歌词")).clicked() {
+        if ui.add_enabled(selected, Button::new(tr!("编辑歌词"))).clicked() {
             app.edit_lyric();
             ui.close();
         }
         if ui
-            .add_enabled(selected, Button::new("填入歌词…").shortcut_text("Ctrl+L"))
+            .add_enabled(selected, Button::new(tr!("填入歌词…")).shortcut_text("Ctrl+L"))
             .clicked()
         {
             crate::ui::fill_lyrics::open(app);
             ui.close();
         }
-        if ui.add_enabled(selected, Button::new("静音音符")).clicked() {
+        if ui.add_enabled(selected, Button::new(tr!("静音音符"))).clicked() {
             app.editor.mute_selected();
             ui.close();
         }
@@ -334,14 +335,14 @@ fn interaction(
         crate::ui::retakes::commands(app, ui);
         ui.separator();
         if ui
-            .add_enabled(selected, Button::new("复制").shortcut_text("Ctrl+C"))
+            .add_enabled(selected, Button::new(tr!("复制")).shortcut_text("Ctrl+C"))
             .clicked()
         {
             crate::ui::chrome::edit::copy(app, ui.ctx());
             ui.close();
         }
         if ui
-            .add_enabled(selected, Button::new("剪切").shortcut_text("Ctrl+X"))
+            .add_enabled(selected, Button::new(tr!("剪切")).shortcut_text("Ctrl+X"))
             .clicked()
         {
             crate::ui::chrome::edit::cut(app, ui.ctx());
@@ -350,16 +351,16 @@ fn interaction(
         if ui
             .add_enabled(
                 crate::ui::chrome::edit::can_paste(app),
-                Button::new("粘贴").shortcut_text("Ctrl+V"),
+                Button::new(tr!("粘贴")).shortcut_text("Ctrl+V"),
             )
-            .on_hover_text("在播放游标处粘贴音符")
+            .on_hover_text(tr!("在播放游标处粘贴音符"))
             .clicked()
         {
             crate::ui::chrome::edit::paste(app, ui.ctx());
             ui.close();
         }
         if ui
-            .add_enabled(selected, Button::new("删除所选音符"))
+            .add_enabled(selected, Button::new(tr!("删除所选音符")))
             .clicked()
         {
             app.editor.delete_selected();

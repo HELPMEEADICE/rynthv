@@ -1,3 +1,4 @@
+use crate::tr;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -48,15 +49,15 @@ impl Parameter {
 
     pub fn label(self) -> &'static str {
         match self {
-            Self::Pitch => "音高偏差",
-            Self::Vibrato => "颤音包络",
-            Self::Loudness => "响度",
-            Self::Tension => "张力",
-            Self::Breathiness => "气声",
-            Self::Voicing => "发声",
-            Self::Gender => "性别",
-            Self::ToneShift => "声区转换",
-            Self::Mouth => "口型",
+            Self::Pitch => tr!("音高偏差"),
+            Self::Vibrato => tr!("颤音包络"),
+            Self::Loudness => tr!("响度"),
+            Self::Tension => tr!("张力"),
+            Self::Breathiness => tr!("气声"),
+            Self::Voicing => tr!("发声"),
+            Self::Gender => tr!("性别"),
+            Self::ToneShift => tr!("声区转换"),
+            Self::Mouth => tr!("口型"),
         }
     }
 
@@ -80,7 +81,7 @@ impl Parameter {
 
     pub fn unit(self) -> &'static str {
         match self {
-            Self::Pitch | Self::ToneShift => "音分",
+            Self::Pitch | Self::ToneShift => tr!("音分"),
             Self::Loudness => "dB",
             _ => "",
         }

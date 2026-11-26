@@ -6,6 +6,7 @@ use crate::{
         voice::{Result, VoiceError, VoiceFamily},
     },
 };
+use crate::{tr};
 
 impl PreparedVoiceControls {
     pub fn sample_timbre_controls(
@@ -37,13 +38,13 @@ impl PreparedVoiceControls {
             };
             if self.family != VoiceFamily::Sv2 && mouth != 0.0 {
                 return Err(VoiceError::new(
-                    "一代及一代兼容歌声暂不支持口型参数曲线；请使用二代歌声或清除口型曲线。",
+                    tr!("一代及一代兼容歌声暂不支持口型参数曲线；请使用二代歌声或清除口型曲线。"),
                 ));
             }
             let pitch_ratio = ((cents / 1200.0).exp2() as f32)
                 .clamp(f32::from_bits(0x3f35_0481), f32::from_bits(0x3fb5_0481));
             if !pitch_ratio.is_finite() || !mouth.is_finite() {
-                return Err(VoiceError::new("音色参数曲线产生了无效数值。"));
+                return Err(VoiceError::new(tr!("音色参数曲线产生了无效数值。")));
             }
             active |= pitch_ratio != 1.0 || mouth != 0.0;
             values.push(FrameControl {
@@ -115,7 +116,7 @@ impl PreparedVoiceControls {
             .iter()
             .any(|value| !value.is_finite())
             {
-                return Err(VoiceError::new("歌声参数曲线产生了无效数值。"));
+                return Err(VoiceError::new(tr!("歌声参数曲线产生了无效数值。")));
             }
             active |= value.tension != 0.0
                 || value.primary_gain != 1.0
@@ -149,7 +150,7 @@ impl PreparedVoiceControls {
             .transpose()?;
         if let Some(sampled) = sampled {
             if sampled.len() != frames {
-                return Err(VoiceError::new("参数曲线的帧数与音频时间线不一致。"));
+                return Err(VoiceError::new(tr!("参数曲线的帧数与音频时间线不一致。")));
             }
             Ok(SampledValues::Curve(sampled))
         } else {

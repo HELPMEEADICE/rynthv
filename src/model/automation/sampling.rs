@@ -1,4 +1,5 @@
 use super::{Automation, Interpolation};
+use crate::tr;
 
 /// A validated curve with cubic coefficients prepared once for repeated queries.
 pub struct AutomationSampler<'a> {
@@ -19,7 +20,7 @@ impl<'a> AutomationSampler<'a> {
     pub(super) fn new(curve: &'a Automation, default: f64) -> Result<Self, String> {
         curve.validate()?;
         if !(default as f32).is_finite() {
-            return Err("参数默认值必须为有限数".into());
+            return Err(tr!("参数默认值必须为有限数").into());
         }
         let interpolation = curve.interpolation()?;
         let cubic = if interpolation == Interpolation::Cubic && curve.points.len() >= 3 {
@@ -74,7 +75,7 @@ impl<'a> AutomationSampler<'a> {
             }
         };
         if !value.is_finite() {
-            return Err("参数曲线求值超出有限数范围".into());
+            return Err(tr!("参数曲线求值超出有限数范围").into());
         }
         Ok(f64::from(value))
     }

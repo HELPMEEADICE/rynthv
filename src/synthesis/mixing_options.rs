@@ -2,16 +2,17 @@
 
 use crate::model::Extra;
 use serde_json::Value;
+use crate::{tr, trf};
 
 pub(super) fn validate_project_mixer(value: Option<&Value>) -> Result<(), String> {
     let Some(value) = value else {
         return Ok(());
     };
-    let object = value.as_object().ok_or("工程 projectMixer 必须为对象")?;
+    let object = value.as_object().ok_or(tr!("工程 projectMixer 必须为对象"))?;
     for (key, value) in object {
         match key.as_str() {
             "linkRoomSettings" if value.is_boolean() => {}
-            _ => return Err(format!("暂不支持工程混音设置 projectMixer.{key} = {value}")),
+            _ => return Err(trf!("暂不支持工程混音设置 projectMixer.{} = {}", key, value)),
         }
     }
     Ok(())
@@ -36,28 +37,28 @@ pub(super) fn validate_mixer(mixer: &Extra) -> Result<(), String> {
             _ => false,
         };
         if !supported {
-            return Err(format!("暂不支持混音设置 {key} = {value}"));
+            return Err(trf!("暂不支持混音设置 {} = {}", key, value));
         }
     }
     Ok(())
 }
 
 fn validate_effects(value: &Value) -> Result<(), String> {
-    let effects = value.as_object().ok_or("混音 fxParams 必须为对象")?;
+    let effects = value.as_object().ok_or(tr!("混音 fxParams 必须为对象"))?;
     for (name, value) in effects {
         let label = match name.as_str() {
-            "room" => "空间定位",
-            "postRoomEq" => "均衡器",
-            "compressor" => "压缩器",
-            "reverb" => "混响",
-            _ => return Err(format!("暂不支持混音效果 fxParams.{name}")),
+            "room" => tr!("空间定位"),
+            "postRoomEq" => tr!("均衡器"),
+            "compressor" => tr!("压缩器"),
+            "reverb" => tr!("混响"),
+            _ => return Err(trf!("暂不支持混音效果 fxParams.{}", name)),
         };
         match value.get("enabled").and_then(Value::as_bool) {
             Some(false) => {}
             Some(true) => {
-                return Err(format!("暂不支持已启用的{label}效果（fxParams.{name}）"));
+                return Err(trf!("暂不支持已启用的{}效果（fxParams.{}）", label, name));
             }
-            None => return Err(format!("混音效果 fxParams.{name}.enabled 缺失或不是布尔值")),
+            None => return Err(trf!("混音效果 fxParams.{}.enabled 缺失或不是布尔值", name)),
         }
     }
     Ok(())
@@ -65,14 +66,14 @@ fn validate_effects(value: &Value) -> Result<(), String> {
 
 pub(super) fn validate_export_bypass(config: &Extra) -> Result<(), String> {
     for (key, label) in [
-        ("bypassPan", "绕过声像"),
-        ("bypassGain", "绕过音量"),
-        ("bypassEffects", "绕过效果"),
+        ("bypassPan", tr!("绕过声像")),
+        ("bypassGain", tr!("绕过音量")),
+        ("bypassEffects", tr!("绕过效果")),
     ] {
         match config.get(key) {
             None | Some(Value::Bool(false)) => {}
-            Some(Value::Bool(true)) => return Err(format!("暂不支持导出选项“{label}”（{key}）")),
-            Some(_) => return Err(format!("导出选项 {key} 必须为布尔值")),
+            Some(Value::Bool(true)) => return Err(trf!("暂不支持导出选项“{}”（{}）", label, key)),
+            Some(_) => return Err(trf!("导出选项 {} 必须为布尔值", key)),
         }
     }
     Ok(())

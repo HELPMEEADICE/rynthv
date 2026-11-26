@@ -1,15 +1,19 @@
 import { set_wasm_module } from "./browser.js";
+import { strings } from "./strings.js";
 
 const status = document.querySelector("#status");
 const canvas = document.querySelector("#editor");
 
+canvas.setAttribute("aria-label", strings.canvas);
+status.textContent = strings.loading;
+
 async function start() {
-    if (!isSecureContext) throw new Error("请使用 HTTPS 或 localhost 打开 RynthV。");
+    if (!isSecureContext) throw new Error(strings.insecure);
     if (typeof WebAssembly.Suspending !== "function" || typeof WebAssembly.promising !== "function") {
-        throw new Error("此浏览器缺少 WebAssembly JS Promise Integration（JSPI）。请使用较新版本的 Chromium 浏览器。");
+        throw new Error(strings.jspi);
     }
     if (!navigator.storage?.getDirectory || !globalThis.indexedDB) {
-        throw new Error("需要浏览器的 OPFS 和 IndexedDB 存储权限。");
+        throw new Error(strings.storage);
     }
     const [module, { default: init, BrowserEditor }] = await Promise.all([
         WebAssembly.compileStreaming(fetch(new URL("./rynthv_bg.wasm", import.meta.url))),
@@ -26,5 +30,5 @@ async function start() {
 }
 
 start().catch(error => {
-    status.textContent = `无法启动 RynthV。${error?.message ?? error}`;
+    status.textContent = `${strings.failed}${error?.message ?? error}`;
 });

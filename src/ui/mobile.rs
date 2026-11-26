@@ -1,7 +1,7 @@
 mod toolbar;
 
 use super::{child, state::Column, theme, workspace};
-use crate::app::App;
+use crate::{app::App, tr};
 use eframe::egui::*;
 
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
@@ -25,10 +25,10 @@ impl Page {
 
     fn label(self) -> &'static str {
         match self {
-            Self::Piano => "卷帘",
-            Self::Arrangement => "编排",
+            Self::Piano => tr!("卷帘"),
+            Self::Arrangement => tr!("编排"),
             Self::Panel(column) => column.label(),
-            Self::Mixer => "混音",
+            Self::Mixer => tr!("混音"),
         }
     }
 }

@@ -1,3 +1,4 @@
+use crate::tr;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -28,7 +29,7 @@ impl AudioClip {
         self.path
             .file_stem()
             .and_then(|s| s.to_str())
-            .unwrap_or("伴奏")
+            .unwrap_or(tr!("伴奏"))
     }
 
     pub fn valid(&self) -> bool {

@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use crate::{
     model::Language,
-    synthesis::voice::{Result, VoiceError},
+    synthesis::voice::{Result, VoiceError}, tr, trf,
 };
 
 pub(super) struct Member {
@@ -54,18 +54,15 @@ pub(super) fn select(members: &[Member]) -> Result<BTreeMap<String, &Member>> {
     });
     let files = dictionaries
         .next()
-        .ok_or_else(|| VoiceError::new("压缩包中没有完整的 clf-data 语言词典"))?;
+        .ok_or_else(|| VoiceError::new(tr!("压缩包中没有完整的 clf-data 语言词典")))?;
     if dictionaries.next().is_some() {
-        return Err(VoiceError::new("压缩包包含多套 clf-data 词典"));
+        return Err(VoiceError::new(tr!("压缩包包含多套 clf-data 词典")));
     }
     super::check_size(files.len(), files.iter().map(|(_, member)| member.size))?;
     let mut selected = BTreeMap::new();
     for (name, member) in files {
         if !member.regular || selected.insert(name, member).is_some() {
-            return Err(VoiceError::new(format!(
-                "压缩包中的词典条目无效或重名：{}",
-                member.name
-            )));
+            return Err(VoiceError::new(trf!("压缩包中的词典条目无效或重名：{0}", member.name)));
         }
     }
     Ok(selected)

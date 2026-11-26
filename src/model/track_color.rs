@@ -1,3 +1,4 @@
+use crate::tr;
 use serde::{Deserialize, Serialize};
 
 /// SVP stores track colors as eight hexadecimal digits in ARGB order.
@@ -59,11 +60,11 @@ impl TryFrom<String> for TrackColor {
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         if value.len() != 8 || !value.bytes().all(|b| b.is_ascii_hexdigit()) {
-            return Err("音轨颜色必须是八位 ARGB 十六进制数");
+            return Err(tr!("音轨颜色必须是八位 ARGB 十六进制数"));
         }
         u32::from_str_radix(&value, 16)
             .map(Self)
-            .map_err(|_| "音轨颜色无效")
+            .map_err(|_| tr!("音轨颜色无效"))
     }
 }
 

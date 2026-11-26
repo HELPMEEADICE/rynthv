@@ -1,4 +1,5 @@
 use super::{EntityId, Extra};
+use crate::{tr, trf};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -91,7 +92,7 @@ impl PhonemeAttributes {
             if let Some(value) = self.get(parameter)
                 && !parameter.valid(value)
             {
-                return Err(format!("音素属性 {} 的数值无效", parameter.key()));
+                return Err(trf!("音素属性 {} 的数值无效", parameter.key()));
             }
         }
         Ok(())
@@ -128,23 +129,23 @@ impl PhonemeAttributes {
         let required = index
             .checked_add(1)
             .filter(|&count| count <= MAX_PHONEMES_PER_NOTE)
-            .ok_or("音素索引超出支持范围")?;
+            .ok_or(tr!("音素索引超出支持范围"))?;
         let entries = attributes
             .entry("phonemes".into())
             .or_insert_with(|| Value::Array(Vec::new()))
             .as_array_mut()
-            .ok_or("音符属性 phonemes 必须是数组")?;
+            .ok_or(tr!("音符属性 phonemes 必须是数组"))?;
         if entries.len() < required {
             entries
                 .try_reserve(required - entries.len())
-                .map_err(|_| "音素属性数量超出支持范围")?;
+                .map_err(|_| tr!("音素属性数量超出支持范围"))?;
             entries.resize_with(required, || {
                 Value::Object(Map::from_iter([("strength".into(), 0.0.into())]))
             });
         }
         let entry = entries[index]
             .as_object_mut()
-            .ok_or_else(|| format!("音素属性第 {} 项必须是对象", index + 1))?;
+            .ok_or_else(|| trf!("音素属性第 {} 项必须是对象", (index + 1)))?;
         for parameter in PhonemeParameter::ALL {
             let number = value
                 .get(parameter)
@@ -196,7 +197,7 @@ impl PhonemeAttributes {
     fn from_entry(entry: &Value, index: usize) -> Result<Self, String> {
         let object = entry
             .as_object()
-            .ok_or_else(|| format!("音素属性第 {} 项必须是对象", index + 1))?;
+            .ok_or_else(|| trf!("音素属性第 {} 项必须是对象", (index + 1)))?;
         let mut attributes = Self::default();
         for parameter in PhonemeParameter::ALL {
             let number = object
@@ -204,7 +205,7 @@ impl PhonemeAttributes {
                 .map(|value| {
                     value
                         .as_f64()
-                        .ok_or_else(|| format!("音素属性 {} 必须是有限数值", parameter.key()))
+                        .ok_or_else(|| trf!("音素属性 {} 必须是有限数值", parameter.key()))
                 })
                 .transpose()?;
             attributes.set(parameter, number);
@@ -221,7 +222,7 @@ fn entries(attributes: &Extra) -> Result<Option<&[Value]>, String> {
             value
                 .as_array()
                 .map(Vec::as_slice)
-                .ok_or_else(|| "音符属性 phonemes 必须是数组".into())
+                .ok_or_else(|| tr!("音符属性 phonemes 必须是数组").into())
         })
         .transpose()
 }

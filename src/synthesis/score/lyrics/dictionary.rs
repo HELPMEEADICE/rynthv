@@ -6,6 +6,7 @@ use crate::{
     synthesis::voice::{Result, VoiceError},
 };
 use std::{collections::HashMap, path::Path};
+use crate::{trf};
 
 pub(super) type Phones = Vec<String>;
 
@@ -53,7 +54,7 @@ impl PhoneTable {
             }
         }
         if table.entries.is_empty() {
-            return Err(VoiceError::new(format!("词典为空：{}", path.display())));
+            return Err(VoiceError::new(trf!("词典为空：{}", path.display())));
         }
         Ok(table)
     }
@@ -73,9 +74,7 @@ impl PhoneTable {
     pub(super) fn get(&self, key: &str) -> Result<Phones> {
         let alternatives = self.entries.get(key).ok_or_else(|| unknown(key))?;
         if alternatives.len() != 1 {
-            return Err(VoiceError::new(format!(
-                "{key:?} 有多个词典读音，请填写显式音素"
-            )));
+            return Err(VoiceError::new(trf!("{} 有多个词典读音，请填写显式音素", format!("{:?}", key))));
         }
         Ok(alternatives[0].clone())
     }
@@ -231,11 +230,7 @@ impl WordReadings {
                 .split_once('[')
                 .and_then(|(keys, rest)| Some((keys, rest.strip_suffix(']')?)))
                 .ok_or_else(|| {
-                    VoiceError::new(format!(
-                        "{}:{}: 词典读音格式错误",
-                        path.display(),
-                        index + 1
-                    ))
+                    VoiceError::new(trf!("{}:{}: 词典读音格式错误", path.display(), index + 1))
                 })?;
             // Ignore Cantonese tone-only alternatives in a sung score.
             let reading = reading
@@ -264,10 +259,7 @@ impl WordReadings {
             .ok_or_else(|| unknown(rest))?;
             let readings = &self.entries[&rest[..end]];
             if readings.len() != 1 {
-                return Err(VoiceError::new(format!(
-                    "{:?} 有多个读音，请使用注音或显式音素",
-                    &rest[..end]
-                )));
+                return Err(VoiceError::new(trf!("{} 有多个读音，请使用注音或显式音素", format!("{:?}", &rest[..end]))));
             }
             result.extend(readings[0].split_whitespace().map(str::to_owned));
             rest = &rest[end..];
@@ -278,11 +270,9 @@ impl WordReadings {
 
 pub(super) fn read(path: &Path) -> Result<String> {
     fs::read_to_string(path)
-        .map_err(|error| VoiceError::new(format!("无法读取发音词典 {}：{error}", path.display())))
+        .map_err(|error| VoiceError::new(trf!("无法读取发音词典 {}：{}", path.display(), error)))
 }
 
 pub(super) fn unknown(text: &str) -> VoiceError {
-    VoiceError::new(format!(
-        "词典未覆盖歌词 {text:?}，请使用对应语言的注音或显式音素"
-    ))
+    VoiceError::new(trf!("词典未覆盖歌词 {}，请使用对应语言的注音或显式音素", format!("{:?}", text)))
 }

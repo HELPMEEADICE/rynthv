@@ -6,6 +6,7 @@ use rynthv::synthesis::{
     score::ExplicitScore,
     voice::{PreparedVoice, VoiceInventory, flat::FlatModelRegistry, session_identity},
 };
+use rynthv::{tr, trf};
 use serde_json::{Value, json};
 use std::time::Instant;
 
@@ -53,7 +54,7 @@ pub fn run(
                 .map_err(|error| error.to_string())?,
         })
     } else if args.duration_identity.is_some() {
-        return Err("原生 SV1 时长模型不接受 --duration-identity 条件。".into());
+        return Err(tr!("原生 SV1 时长模型不接受 --duration-identity 条件。").into());
     } else {
         None
     };
@@ -75,7 +76,7 @@ pub fn run(
             .scope(|| {
                 let checkpoint = |stage: engine::RenderStage| {
                     if iteration == 0 && last_stage != Some(stage.label()) {
-                        eprintln!("合成：{}", stage.label());
+                        eprintln!("{}", trf!("合成：{}", stage.label()));
                         last_stage = Some(stage.label());
                     }
                     Ok(())

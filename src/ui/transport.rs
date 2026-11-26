@@ -5,7 +5,7 @@ use super::{
     icons::{Icon, IconButton},
     theme::*,
 };
-use crate::app::App;
+use crate::{app::App, tr};
 use eframe::egui::*;
 
 pub fn show(app: &mut App, ui: &mut Ui) {
@@ -33,7 +33,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
                     } else {
                         Icon::Play
                     },
-                    "播放 / 暂停（Space）",
+                    tr!("播放 / 暂停（Space）"),
                 ),
             )
             .on_disabled_hover_text(recording_error.unwrap_or_default())
@@ -41,19 +41,19 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         {
             transport.toggle();
         }
-        if ui.add(button(Icon::Stop, "停止（Ctrl+Space）")).clicked() {
+        if ui.add(button(Icon::Stop, tr!("停止（Ctrl+Space）"))).clicked() {
             transport.stop();
         }
-        ui.add_enabled(false, button(Icon::Record, "录制（尚未接入）"));
-        if ui.add(button(Icon::Rewind, "跳到开头")).clicked() {
+        ui.add_enabled(false, button(Icon::Record, tr!("录制（尚未接入）")));
+        if ui.add(button(Icon::Rewind, tr!("跳到开头"))).clicked() {
             transport.position = 0;
         }
-        if ui.add(button(Icon::Forward, "跳到结尾")).clicked() {
+        if ui.add(button(Icon::Forward, tr!("跳到结尾"))).clicked() {
             transport.position = app.editor.project.end();
         }
         if ui
             .add(
-                button(Icon::Loop, "显示循环标记 / 循环播放")
+                button(Icon::Loop, tr!("显示循环标记 / 循环播放"))
                     .selected(transport.looping)
                     .background(background_color()),
             )
@@ -71,7 +71,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
             &format!("{}/{}", meter.numerator, meter.denominator),
             46.0,
         )
-        .on_hover_text("编辑当前拍号")
+        .on_hover_text(tr!("编辑当前拍号"))
         .clicked()
         {
             super::time_edit::open(app, super::time_edit::Target::Meter(meter_index));
@@ -84,7 +84,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
             &format!("{:.2}", app.editor.project.time.bpm_at(position)),
             super::tempo_input::WIDTH,
         )
-        .on_hover_text("编辑当前曲速")
+        .on_hover_text(tr!("编辑当前曲速"))
         .clicked()
         {
             super::tempo_input::open(app, position, ui.ctx());
@@ -94,7 +94,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         if toggle::show(
             ui,
             Icon::Metronome,
-            "节拍器：播放时打拍，仅用于试听",
+            tr!("节拍器：播放时打拍，仅用于试听"),
             metronome,
             38.0,
             21.0,
@@ -119,7 +119,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         if toggle::show(
             ui,
             Icon::Return,
-            "暂停播放时返回起播位置",
+            tr!("暂停播放时返回起播位置"),
             app.editor.transport.return_on_pause,
             34.0,
             20.0,

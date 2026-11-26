@@ -1,6 +1,9 @@
 //! Explicit model-context imports, shared by Windows and Linux CLI entry points.
 
-use rynthv::synthesis::voice::{VoiceInventory, session_identity};
+use rynthv::{
+    synthesis::voice::{VoiceInventory, session_identity},
+    tr,
+};
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, ffi::OsString, path::PathBuf};
 
@@ -69,7 +72,7 @@ impl ContextImport {
             .as_ref()
             .ok_or("Voice configuration is missing")?;
         if !configuration.family.requires_identity() {
-            return Err("原生 SV1 声库不需要导入模型上下文。".into());
+            return Err(tr!("原生 SV1 声库不需要导入模型上下文。").into());
         }
         let name = &configuration.name;
         let version = configuration.model_version;

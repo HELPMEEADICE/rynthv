@@ -14,6 +14,7 @@ use std::{
     },
     thread,
 };
+use crate::{tr, trf};
 
 pub struct VoiceLibrary {
     pub settings: SynthesisSettings,
@@ -114,7 +115,7 @@ impl VoiceLibrary {
                 let _ = sender.send(result);
             }) {
             Ok(_) => self.scan = Some(rx),
-            Err(error) => self.catalog_error = Some(format!("无法启动声库扫描：{error}")),
+            Err(error) => self.catalog_error = Some(trf!("无法启动声库扫描：{}", error)),
         }
     }
 
@@ -132,7 +133,7 @@ impl VoiceLibrary {
             }
             Err(TryRecvError::Disconnected) => {
                 self.scan = None;
-                self.catalog_error = Some("声库扫描线程意外终止。".into());
+                self.catalog_error = Some(tr!("声库扫描线程意外终止。").into());
                 true
             }
             Err(TryRecvError::Empty) => false,

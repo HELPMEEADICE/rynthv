@@ -2,6 +2,7 @@ use super::controls::*;
 use crate::{
     app::App,
     model::{Language, dictionary_name},
+    tr, trf,
     ui::theme::*,
 };
 use eframe::egui::*;
@@ -54,17 +55,17 @@ pub(super) fn show(app: &mut App, ui: &mut Ui, viewport_height: f32) {
         state.error = None;
     }
     padded(ui, |ui| {
-        ui.weak("当前词典");
+        ui.weak(tr!("当前词典"));
         let mut selected = original.clone();
         ComboBox::from_id_salt("dictionary-select")
             .width(ui.available_width())
             .selected_text(if original.is_empty() {
-                "（继承音轨默认值）"
+                tr!("（继承音轨默认值）")
             } else {
                 &original
             })
             .show_ui(ui, |ui| {
-                ui.selectable_value(&mut selected, String::new(), "（继承音轨默认值）");
+                ui.selectable_value(&mut selected, String::new(), tr!("（继承音轨默认值）"));
                 for (name, dictionary) in &app.editor.project.dictionaries {
                     ui.selectable_value(&mut selected, name.clone(), name)
                         .on_hover_text(dictionary.language.label());
@@ -75,18 +76,18 @@ pub(super) fn show(app: &mut App, ui: &mut Ui, viewport_height: f32) {
             app.editor.select_dictionary(&selected);
         }
         pair(ui, |ui, width| {
-            let create = ui.add_sized(vec2(width, 28.0), Button::new("新建…"));
+            let create = ui.add_sized(vec2(width, 28.0), Button::new(tr!("新建…")));
             Popup::from_toggle_button_response(&create)
                 .width(240.0)
                 .close_behavior(PopupCloseBehavior::CloseOnClickOutside)
                 .show(|ui| {
                     ui.spacing_mut().item_spacing.y = 10.0;
-                    ui.label("新建发音词典");
+                    ui.label(tr!("新建发音词典"));
                     field(ui, &mut state.new_name);
                     let options: Vec<_> =
                         Language::ALL.into_iter().map(|l| (l, l.label())).collect();
                     combo(ui, "dictionary-language", &mut state.language, &options);
-                    if ui.button("创建").clicked() {
+                    if ui.button(tr!("创建")).clicked() {
                         app.commit_lyric();
                         match app
                             .editor
@@ -107,7 +108,7 @@ pub(super) fn show(app: &mut App, ui: &mut Ui, viewport_height: f32) {
             if ui
                 .add_enabled(
                     !name.is_empty(),
-                    Button::new("移除").min_size(vec2(width, 28.0)),
+                    Button::new(tr!("移除")).min_size(vec2(width, 28.0)),
                 )
                 .clicked()
             {
@@ -116,7 +117,7 @@ pub(super) fn show(app: &mut App, ui: &mut Ui, viewport_height: f32) {
             }
         });
         if let Some(dictionary) = app.editor.project.dictionaries.get(&name) {
-            ui.weak(format!("{} · 保存在当前工程", dictionary.language.label()));
+            ui.weak(trf!("{} · 保存在当前工程", dictionary.language.label()));
         }
     });
     ui.painter().hline(
@@ -127,16 +128,16 @@ pub(super) fn show(app: &mut App, ui: &mut Ui, viewport_height: f32) {
     padded(ui, |ui| {
         let dictionary = app.editor.project.dictionaries.get(&name).cloned();
         ui.add_enabled_ui(dictionary.is_some(), |ui| {
-            ui.weak("字词");
+            ui.weak(tr!("字词"));
             field(ui, &mut state.word);
-            ui.weak("音素");
+            ui.weak(tr!("音素"));
             field(ui, &mut state.phones)
-                .on_hover_text("以空格分隔音素；只覆盖与词典语言相同的音符，手动填写的音素优先");
+                .on_hover_text(tr!("以空格分隔音素；只覆盖与词典语言相同的音符，手动填写的音素优先"));
             pair(ui, |ui, width| {
                 if ui
                     .add_enabled(
                         !state.word.trim().is_empty() && !state.phones.trim().is_empty(),
-                        Button::new("设置").min_size(vec2(width, 28.0)),
+                        Button::new(tr!("设置")).min_size(vec2(width, 28.0)),
                     )
                     .clicked()
                 {
@@ -150,7 +151,7 @@ pub(super) fn show(app: &mut App, ui: &mut Ui, viewport_height: f32) {
                     .as_ref()
                     .is_some_and(|dict| dict.entries.contains_key(state.word.trim()));
                 if ui
-                    .add_enabled(exists, Button::new("移除").min_size(vec2(width, 28.0)))
+                    .add_enabled(exists, Button::new(tr!("移除")).min_size(vec2(width, 28.0)))
                     .clicked()
                 {
                     app.commit_lyric();
@@ -180,9 +181,9 @@ pub(super) fn show(app: &mut App, ui: &mut Ui, viewport_height: f32) {
                 ui.horizontal(|ui| {
                     ui.add_sized(
                         vec2(half, 24.0),
-                        Label::new(RichText::new("字词").color(muted_color())),
+                        Label::new(RichText::new(tr!("字词")).color(muted_color())),
                     );
-                    ui.weak("发音");
+                    ui.weak(tr!("发音"));
                 });
                 ScrollArea::vertical()
                     .id_salt("dictionary-entries")

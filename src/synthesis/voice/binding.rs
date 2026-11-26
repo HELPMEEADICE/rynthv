@@ -1,5 +1,5 @@
 use super::{VoiceAvailability, VoiceCatalog, VoiceCatalogEntry, VoiceFamily};
-use crate::{model::singer_database, synthesis::settings::VoiceSelection};
+use crate::{model::singer_database, synthesis::settings::VoiceSelection, tr, trf};
 use serde_json::Value;
 
 impl VoiceCatalogEntry {
@@ -25,12 +25,12 @@ impl VoiceCatalog {
     ) -> Result<Option<VoiceSelection>, String> {
         let database = singer_database(track, instance)
             .as_object()
-            .ok_or("歌声 database 必须是对象")?;
+            .ok_or(tr!("歌声 database 必须是对象"))?;
         let text = |key| -> Result<&str, String> {
             match database.get(key) {
                 None => Ok(""),
                 Some(Value::String(s)) => Ok(s),
-                _ => Err(format!("歌声 database.{key} 必须是字符串")),
+                _ => Err(trf!("歌声 database.{0} 必须是字符串", key)),
             }
         };
         let id = text("id")?;
@@ -47,7 +47,7 @@ impl VoiceCatalog {
             Some(
                 version
                     .parse::<u32>()
-                    .map_err(|_| format!("歌声版本无效：{version}"))?,
+                    .map_err(|_| trf!("歌声版本无效：{0}", version))?,
             )
         };
         let matches: Vec<_> = self
@@ -65,11 +65,11 @@ impl VoiceCatalog {
             .copied()
             .max_by_key(|e| (e.availability.is_loadable(), e.revision))
             .ok_or_else(|| {
-                format!(
-                    "找不到歌声 {}（版本 {}），请检查 databases 目录",
+                trf!(
+                    "找不到歌声 {0}（版本 {1}），请检查 databases 目录",
                     if name.is_empty() { id } else { name },
                     if version.is_empty() {
-                        "默认"
+                        tr!("默认")
                     } else {
                         version
                     }
@@ -85,13 +85,10 @@ impl VoiceCatalog {
                                 == entry.availability.is_loadable()))
             })
         {
-            return Err(format!("存在多个同名歌声 {name}，请为音轨重新选择歌手"));
+            return Err(trf!("存在多个同名歌声 {0}，请为音轨重新选择歌手", name));
         }
         if let VoiceAvailability::Unsupported(reason) = &entry.availability {
-            return Err(format!(
-                "歌声 {}（版本 {}）不可用：{reason}",
-                entry.display_name, entry.revision,
-            ));
+            return Err(trf!("歌声 {0}（版本 {1}）不可用：{2}", entry.display_name, entry.revision, reason));
         }
         Ok(Some(entry.selection()))
     }

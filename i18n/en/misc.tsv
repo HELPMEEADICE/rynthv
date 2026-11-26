@@ -1,0 +1,24 @@
+# en catalog fragment: misc
+# format: <simplified-chinese msgid> TAB <translation>
+编辑器	Editor
+音符	Notes
+词典	Dictionary
+红色	Red
+橙色	Orange
+赭黄	Ochre
+黄色	Yellow
+绿色	Green
+翠绿	Emerald
+青色	Teal
+天蓝	Sky Blue
+蓝色	Blue
+靛蓝	Indigo
+紫色	Purple
+品红	Magenta
+界面语言	Interface language
+无法读取界面设置：{}	Cannot read the interface settings: {}
+界面缩放必须为 75% 至 200%	Interface scale must be between 75% and 200%
+无法加载界面字体：系统中缺少中文字体	Cannot load the interface font: no Chinese font is installed
+原生 SV1 时长模型不接受 --duration-identity 条件。	The native SV1 duration model does not accept --duration-identity conditioning.
+原生 SV1 声库不需要导入模型上下文。	The native SV1 voicebank does not need an imported model context.
+合成：{}	Synthesis: {}

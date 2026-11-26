@@ -10,6 +10,7 @@ use crate::{
         plan::OwnerId,
         rendered::{PhonemeSnapshot, RenderedPhoneme},
     },
+    tr,
     ui::{theme::*, timeline::*},
 };
 use eframe::egui::*;
@@ -139,7 +140,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         ui.painter().text(
             canvas.center(),
             Align2::CENTER_CENTER,
-            "音素时值 · 等待当前音符组合成准备结果",
+            tr!("音素时值 · 等待当前音符组合成准备结果"),
             FontId::proportional(12.0),
             muted_color(),
         );
@@ -165,7 +166,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
     menu::show(app, ui, &response, &mapping, &phones);
     playhead_line(ui, canvas, &app.view.piano, app.editor.transport.position);
     if response.hovered() {
-        app.status = "拖动音素块调整强度 · 拖动边界调整时值 · 双击重置".into();
+        app.status = tr!("拖动音素块调整强度 · 拖动边界调整时值 · 双击重置").into();
     }
 }
 

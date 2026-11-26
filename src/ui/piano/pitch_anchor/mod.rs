@@ -16,6 +16,7 @@ use super::{Gesture, Tool};
 use crate::{
     app::App,
     model::{EntityId, GroupRef, PitchControl, PitchPoint},
+    tr,
 };
 use eframe::egui::*;
 use std::collections::BTreeSet;
@@ -155,7 +156,7 @@ fn can_add_points(app: &mut App) -> bool {
             .and_then(|entry| entry.family)
     });
     if family.is_some_and(|family| family != crate::synthesis::voice::VoiceFamily::Sv2) {
-        app.status = "当前声库暂不支持音高控制点，请使用手绘音高模式".into();
+        app.status = tr!("当前声库暂不支持音高控制点，请使用手绘音高模式").into();
         false
     } else {
         true
@@ -192,7 +193,7 @@ pub fn anchor_delete(app: &mut App) {
         return;
     }
     let selected = app.piano_anchor.ids.clone();
-    app.editor.begin("删除音高控制点");
+    app.editor.begin(tr!("删除音高控制点"));
     if let Some(group) = app.editor.group_mut() {
         group
             .pitch_controls

@@ -1,6 +1,6 @@
 use super::widgets::{row, section};
 use crate::{
-    app::App,
+    app::App, tr,
     synthesis::inference::compute::{AdapterId, Backend},
 };
 use eframe::egui::{ComboBox, Label, Ui};
@@ -12,10 +12,10 @@ const BACKENDS: [(Backend, &str); 3] = [
 ];
 
 pub(super) fn settings(app: &mut App, ui: &mut Ui) {
-    section(ui, "模型推理");
+    section(ui, tr!("模型推理"));
     let current = app.synthesis.library.settings.compute_backend;
     let mut selected = current;
-    row(ui, "推理计算设备", |ui| {
+    row(ui, tr!("推理计算设备"), |ui| {
         let label = BACKENDS
             .iter()
             .find(|(backend, _)| *backend == current)
@@ -23,10 +23,10 @@ pub(super) fn settings(app: &mut App, ui: &mut Ui) {
             .1;
         ComboBox::from_id_salt("inference-device")
             .width(ui.available_width())
-            .selected_text(label)
+            .selected_text(tr!(label))
             .show_ui(ui, |ui| {
                 for (value, label) in BACKENDS {
-                    ui.selectable_value(&mut selected, value, label);
+                    ui.selectable_value(&mut selected, value, tr!(label));
                 }
             });
     });
@@ -34,7 +34,7 @@ pub(super) fn settings(app: &mut App, ui: &mut Ui) {
     app.synthesis.set_compute_settings(selected, adapter);
 
     let Some(diagnostics) = app.synthesis.compute_diagnostics() else {
-        ui.weak("正在初始化推理设备…");
+        ui.weak(tr!("正在初始化推理设备…"));
         return;
     };
     let status = &diagnostics.status;
@@ -46,9 +46,9 @@ pub(super) fn settings(app: &mut App, ui: &mut Ui) {
         "cpu" => "CPU",
         "webgpu" => "WebGPU",
         "mixed" => "WebGPU + CPU",
-        _ => "尚未执行推理",
+        _ => tr!("尚未执行推理"),
     };
-    row(ui, "实际执行", |ui| {
+    row(ui, tr!("实际执行"), |ui| {
         ui.label(execution);
     });
     #[cfg(target_arch = "wasm32")]
@@ -67,15 +67,15 @@ pub(super) fn settings(app: &mut App, ui: &mut Ui) {
                 .and_then(serde_json::Value::as_f64)
                 .unwrap_or_default()
         };
-        ui.weak(format!(
-            "GPU 提交 {}/{} 次／{:.1} ms · 回读 {} 次／{:.1} ms",
+        ui.weak(trf!(
+            "GPU 提交 {}/{} 次／{} ms · 回读 {} 次／{} ms",
             count("completed_gpu_submissions"),
             count("gpu_submissions"),
-            milliseconds("submit_ms"),
+            format!("{:.1}", milliseconds("submit_ms")),
             count("readback_count"),
-            milliseconds("readback_ms"),
+            format!("{:.1}", milliseconds("readback_ms")),
         ));
-        ui.collapsing("算子与缓存诊断", |ui| {
+        ui.collapsing(tr!("算子与缓存诊断"), |ui| {
             for key in [
                 "gpu_dispatches",
                 "cpu_operators",
@@ -90,24 +90,24 @@ pub(super) fn settings(app: &mut App, ui: &mut Ui) {
         });
     }
     if let Some(device) = &status.device {
-        row(ui, "当前显卡", |ui| {
+        row(ui, tr!("当前显卡"), |ui| {
             ui.add(Label::new(device.id.to_string()).truncate());
         });
         #[cfg(target_os = "android")]
-        ui.weak(format!(
-            "{} {} · {:.0} MiB / 存储缓冲区",
+        ui.weak(trf!(
+            "{} {} · {} MiB / 存储缓冲区",
             device.driver,
             device.driver_info,
-            device.max_storage_binding_bytes as f64 / (1024.0 * 1024.0),
+            format!("{:.0}", device.max_storage_binding_bytes as f64 / (1024.0 * 1024.0)),
         ));
     }
     let initialization = match (status.requested, &status.device, &status.error) {
-        (_, Some(_), None) => "已就绪 · 支持计算",
-        (Backend::Cpu, _, _) => "CPU 已就绪",
-        (Backend::Auto, _, Some(_)) => "GPU 不可用 · 使用 CPU",
-        _ => "WebGPU 计算失败",
+        (_, Some(_), None) => tr!("已就绪 · 支持计算"),
+        (Backend::Cpu, _, _) => tr!("CPU 已就绪"),
+        (Backend::Auto, _, Some(_)) => tr!("GPU 不可用 · 使用 CPU"),
+        _ => tr!("WebGPU 计算失败"),
     };
-    row(ui, "推理设备状态", |ui| {
+    row(ui, tr!("推理设备状态"), |ui| {
         ui.label(initialization);
     });
     if let Some(error) = &status.error {
@@ -120,17 +120,17 @@ fn adapter_picker(app: &App, ui: &mut Ui, backend: Backend) -> Option<AdapterId>
 
     let mut selected = app.synthesis.library.settings.compute_adapter.clone();
     let adapters = app.synthesis.compute_adapters();
-    row(ui, "WebGPU 显卡", |ui| {
+    row(ui, tr!("WebGPU 显卡"), |ui| {
         ui.add_enabled_ui(backend != Backend::Cpu && adapters.is_some(), |ui| {
             let label = selected
                 .as_ref()
-                .map_or_else(|| DEFAULT.into(), ToString::to_string);
+                .map_or_else(|| tr!(DEFAULT).to_string(), ToString::to_string);
             ComboBox::from_id_salt("inference-adapter")
                 .width(ui.available_width())
                 .truncate()
                 .selected_text(&label)
                 .show_ui(ui, |ui| {
-                    ui.selectable_value(&mut selected, None, DEFAULT);
+                    ui.selectable_value(&mut selected, None, tr!(DEFAULT));
                     for info in adapters
                         .unwrap_or_default()
                         .iter()

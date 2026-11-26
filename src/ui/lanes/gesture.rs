@@ -2,6 +2,7 @@ mod create;
 mod edits;
 
 use super::{geometry::Mapping, *};
+use crate::tr;
 use std::collections::BTreeMap;
 
 pub struct ParameterGesture {
@@ -227,9 +228,9 @@ fn start(
     let transaction = !matches!(kind, Kind::Select { .. });
     if transaction {
         app.editor.begin(match kind {
-            Kind::Move => "移动参数控制点",
-            Kind::Erase { .. } => "擦除参数控制点",
-            _ => "绘制参数曲线",
+            Kind::Move => tr!("移动参数控制点"),
+            Kind::Erase { .. } => tr!("擦除参数控制点"),
+            _ => tr!("绘制参数曲线"),
         });
     }
     let selected = app.parameter_lane.selected.clone();

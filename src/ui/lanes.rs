@@ -22,7 +22,7 @@ use super::{
     theme::*,
     timeline::*,
 };
-use crate::{app::App, model::*};
+use crate::{app::App, model::*, tr};
 use eframe::egui::*;
 use geometry::Mapping;
 use std::collections::BTreeSet;
@@ -134,43 +134,46 @@ pub fn show(app: &mut App, ui: &mut Ui, id: u64) {
         focus(app, &lane);
         let selected = parameter_has_selection(app);
         if ui
-            .add_enabled(selected, Button::new("复制控制点"))
+            .add_enabled(selected, Button::new(tr!("复制控制点")))
             .clicked()
         {
             parameter_copy(app, ui.ctx());
             ui.close();
         }
         if ui
-            .add_enabled(selected, Button::new("剪切控制点"))
+            .add_enabled(selected, Button::new(tr!("剪切控制点")))
             .clicked()
         {
             parameter_cut(app, ui.ctx());
             ui.close();
         }
         if ui
-            .add_enabled(parameter_can_paste(app), Button::new("粘贴控制点"))
+            .add_enabled(parameter_can_paste(app), Button::new(tr!("粘贴控制点")))
             .clicked()
         {
             parameter_paste(app, ui.ctx());
             ui.close();
         }
         if ui
-            .add_enabled(selected, Button::new("删除控制点"))
+            .add_enabled(selected, Button::new(tr!("删除控制点")))
             .clicked()
         {
             parameter_delete(app);
             ui.close();
         }
-        if ui.button("选择全部控制点").clicked() {
+        if ui.button(tr!("选择全部控制点")).clicked() {
             parameter_select_all(app);
             ui.close();
         }
         ui.separator();
         if ui
-            .add_enabled(!app.editor.is_editing(), Button::new("清空此参数的控制点"))
+            .add_enabled(
+                !app.editor.is_editing(),
+                Button::new(tr!("清空此参数的控制点")),
+            )
             .clicked()
         {
-            app.editor.begin("清空参数控制点");
+            app.editor.begin(tr!("清空参数控制点"));
             match app
                 .editor
                 .replace_automation_points(&lane.foreground, Vec::new())
@@ -188,16 +191,18 @@ pub fn show(app: &mut App, ui: &mut Ui, id: u64) {
     if response.hovered() {
         app.status = match lane.tool {
             ParameterTool::ControlPoints => {
-                "双击添加控制点 · 拖动移动 / 框选 · Ctrl+点击切换选择 · Shift+拖动选择时间范围"
+                tr!("双击添加控制点 · 拖动移动 / 框选 · Ctrl+点击切换选择 · Shift+拖动选择时间范围")
             }
             ParameterTool::Freehand => {
-                "左键拖动手绘曲线 · 右键拖动擦除控制点 · Esc 取消 · Ctrl+Z 撤销"
+                tr!("左键拖动手绘曲线 · 右键拖动擦除控制点 · Esc 取消 · Ctrl+Z 撤销")
             }
-            ParameterTool::Line => "左键拖动绘制直线 · 右键拖动擦除控制点 · Esc 取消 · Ctrl+Z 撤销",
+            ParameterTool::Line => {
+                tr!("左键拖动绘制直线 · 右键拖动擦除控制点 · Esc 取消 · Ctrl+Z 撤销")
+            }
         }
         .into();
         if !editable(app, &lane.foreground) {
-            app.status = "当前声库不支持口型参数；已导入的曲线仍可查看与清空".into();
+            app.status = tr!("当前声库不支持口型参数；已导入的曲线仍可查看与清空").into();
         }
     }
 }

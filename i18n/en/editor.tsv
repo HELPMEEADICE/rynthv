@@ -1,0 +1,164 @@
+# en catalog fragment: editor
+# format: <simplified-chinese msgid> TAB <translation>
+MIDI 音符的时间或音高超出支持范围	The MIDI note's time or pitch is outside the supported range
+MIDI 音轨 {}	MIDI Track {}
+database.{} 必须是字符串	database.{} must be a string
+{} · 声部 {}	{} · Voice {}
+三次样条	Cubic Spline
+不支持的歌声语言：{}	Unsupported singing language: {}
+不支持的音符模式：{}	Unsupported note mode: {}
+伴奏	Instrumental
+伴奏 {}	Instrumental {}
+伴奏轨不能设置唱法	Instrumental tracks have no vocal modes
+伴奏轨不能设置歌手	Instrumental tracks cannot have a singer
+余弦	Cosine
+修改音轨颜色	Change Track Color
+切换歌声语言	Switch Singing Language
+切换说唱声调	Switch Rap Accent
+切换重录采样	Switch Retake Sample
+切换音符模式	Switch Note Mode
+切换音符语言	Switch Note Language
+切换音轨歌手	Switch Track Singer
+删除拍号	Delete Time Signature
+删除曲速	Delete Tempo
+删除音符组	Delete Note Group
+删除音轨	Delete Track
+剪贴板中没有 RynthV 音符，请先复制音符。	The clipboard has no RynthV notes; copy some notes first.
+剪贴板数据过大，无法粘贴音符。	The clipboard data is too large to paste notes.
+半音	Semitone
+参数控制点必须为 time/value 对	Automation points must be time/value pairs
+参数控制点的值必须为有限数	Automation point values must be finite numbers
+参数控制点的时间必须严格递增	Automation point times must increase strictly
+参数曲线替换范围无效	The automation curve replacement range is invalid
+参数曲线求值超出有限数范围	Automation curve evaluation left the finite range
+参数默认值必须为有限数	The automation default value must be finite
+发声	Voicing
+口型	Mouth
+合并音符组实例	Merge Group Instances
+响度	Loudness
+唱法 {} 的{}必须为 0 到 150	Vocal mode {}: {} must be between 0 and 150
+唱法 {} 的参数必须是对象	The parameters of vocal mode {} must be an object
+唱法参数名称不能为空	The vocal mode parameter name cannot be empty
+唱法参数必须为 0 到 150 之间的有限数值	Vocal mode values must be finite numbers between 0 and 150
+唱法参数必须是对象	Vocal mode parameters must be an object
+唱法继承标记必须是布尔值	The vocal mode inheritance flag must be a boolean
+唱法预设必须是字符串	The vocal mode preset must be a string
+声区转换	Register Shift
+复制音符组实例	Copy Group Instance
+复制音轨	Copy Track
+导入 MIDI 音轨	Import MIDI Tracks
+导入伴奏	Import Instrumental
+已有同名词典	A pronunciation dictionary with that name already exists
+张力	Tension
+当前重录采样不存在	The current retake sample does not exist
+当前音符组中没有此音素的源音符	No source note for this phoneme in the current note group
+性别	Gender
+所选 MIDI 音轨不存在，请重新打开导入窗口	The selected MIDI track does not exist; reopen the import dialog
+所选 MIDI 音轨没有可导入的音符	The selected MIDI tracks have no notes to import
+所选音符数据过大，无法复制。	The selected note data is too large to copy.
+所选音符的时间跨度超出可用范围。	The selected notes' time span is outside the available range.
+所选音符的结束时间超出可用范围。	The selected notes' end time is outside the available range.
+所选音符的音高超出可用范围。	The selected notes' pitch is outside the available range.
+拆分音符组实例	Split Group Instance
+拍号分子须为 1–64，分母须为 1、2、4、8、16、32 或 64	The numerator must be 1–64 and the denominator must be 1, 2, 4, 8, 16, 32, or 64
+控制点值必须为有限数	Control point values must be finite numbers
+插入拍号	Insert Time Signature
+插入曲速	Insert Tempo
+插入音符组	Insert Note Group
+无法复制音符：{}	Cannot copy notes: {}
+无法编辑当前音素	Cannot edit the current phoneme
+无法重置当前音素	Cannot reset the current phoneme
+日语	Japanese
+曲速位置必须非负，BPM 必须使每拍时长为有限正数	The tempo position must be non-negative and the BPM must make each beat a finite positive duration
+未命名音轨 {}	Untitled Track {}
+未知参数插值模式：{}	Unknown parameter interpolation mode: {}
+歌声参数 voice 必须是对象	The voice parameter voice must be an object
+歌声参数 {} 超出有效范围	Voice parameter {} is out of range
+歌声的 database 字段必须是对象	The singing database field must be an object
+气声	Breathiness
+汉语广东话	Cantonese
+汉语普通话	Mandarin Chinese
+演绎坐标必须为 -1 到 1 之间的有限数值	Expression coordinates must be finite numbers between -1 and 1
+独立化音符组实例	Make Group Instance Independent
+目标音符组不存在，无法粘贴。	The target note group does not exist, so nothing can be pasted.
+目标音符组的移调使粘贴音高超出 MIDI 范围。	The target group's transpose pushes the pasted pitch outside the MIDI range.
+移动音符组实例	Move Group Instance
+移调	Transpose
+移除伴奏	Remove Instrumental
+移除发音词典	Remove Pronunciation Dictionary
+粘贴位置不能早于项目起点。	The paste position cannot be earlier than the project start.
+粘贴后的组内时间超出可用范围。	The pasted in-group time is outside the available range.
+粘贴后的组内结束时间超出可用范围。	The pasted in-group end time is outside the available range.
+粘贴后的音符时间超出可用范围。	The pasted note time is outside the available range.
+粘贴后的音符结束时间超出可用范围。	The pasted note end time is outside the available range.
+粘贴音符	Paste Notes
+线性	Linear
+编辑发音词典	Edit Pronunciation Dictionary
+编辑拍号	Edit Time Signature
+编辑曲速	Edit Tempo
+编辑音素	Edit Phonemes
+英语	English
+西班牙语	Spanish
+说唱声调必须为空字符串或 1 到 5 的字符串	The rap accent must be an empty string or a string from 1 to 5
+说唱语调必须为 -0.5 到 0.5 之间的有限数值	Rap intonation must be a finite number between -0.5 and 0.5
+说唱音调必须为 -5 到 1 之间的有限数值	Rap tone must be a finite number between -5 and 1
+请先完成当前编辑	Finish the current edit first
+请先新建或选择词典	Create or select a dictionary first
+请先选择歌声音轨再粘贴音符。	Select a vocal track before pasting notes.
+请先选择音符。	Select notes first.
+请先选择音符组	Select a note group first
+请先选择音符组。	Select a note group first.
+请输入字词	Enter a word
+请输入词典名称	Enter a dictionary name
+请输入音素，以空格分隔	Enter phonemes separated by spaces
+请选择至少一条包含音符的 MIDI 音轨	Select at least one MIDI track that contains notes
+调性转换	Key Shift
+调整唱法	Adjust Vocal Mode
+调整歌声参数	Adjust Voice Parameter
+调整说唱语调	Adjust Rap Intonation
+调整说唱音调	Adjust Rap Tone
+调整调音参数	Adjust Tuning Parameter
+调整音符演绎	Adjust Note Expression
+调整音素时值	Adjust Phoneme Timing
+调整音节分配	Adjust Syllable Split
+调整音轨顺序	Reorder Tracks
+调整颤音调制	Adjust Vibrato Modulation
+选择发音词典	Select Pronunciation Dictionary
+采样 {} 不存在	Sample {} does not exist
+采样编号 {} 已存在	Sample number {} already exists
+重录时值采样	Retake New Duration Sample
+重录采样列表为空或采样编号重复	The retake list is empty or repeats a sample number
+重录采样数据无效：{}	Retake sample data is invalid: {}
+重录采样编号已用尽	Retake sample numbers are exhausted
+重录采样编号超出范围	The retake sample number is out of range
+重录采样缺少默认采样	The retake set has no default sample
+重录音色采样	Retake New Timbre Sample
+重录音高和音色采样	Retake New Pitch and Timbre Samples
+重录音高采样	Retake New Pitch Sample
+重置不支持的唱法参数	Reset Unsupported Vocal Mode Parameters
+韩语	Korean
+音分	Cents
+音符剪贴板包含无效的起始时间或时长。	The note clipboard contains an invalid onset or duration.
+音符剪贴板数据无效：{}	The note clipboard data is invalid: {}
+音符剪贴板的时间超出可用范围。	The note clipboard's time is outside the available range.
+音符剪贴板的演绎参数无效：{}	The note clipboard's performance parameters are invalid: {}
+音符剪贴板的起始时间无效。	The note clipboard's onset is invalid.
+音符剪贴板的重录采样无效：{}	The note clipboard's retake samples are invalid: {}
+音符剪贴板的音高超出 MIDI 范围。	The note clipboard's pitch is outside the MIDI range.
+音符剪贴板须包含 1 到 {} 个音符。	The note clipboard must contain between 1 and {} notes.
+音符属性 phonemes 必须是数组	The note attribute phonemes must be an array
+音符属性 {} 必须是有限数值	The note attribute {} must be a finite number
+音素属性 {} 必须是有限数值	The phoneme attribute {} must be a finite number
+音素属性 {} 的数值无效	The phoneme attribute {} has an invalid value
+音素属性数量超出支持范围	The phoneme attribute count is outside the supported range
+音素属性第 {} 项必须是对象	Phoneme attribute entry {} must be an object
+音素索引超出支持范围	The phoneme index is outside the supported range
+音轨的歌声 database 字段必须是对象	The track's singing database field must be an object
+音轨颜色必须是八位 ARGB 十六进制数	A track color must be eight hexadecimal ARGB digits
+音轨颜色无效	Invalid track color
+音高偏差	Pitch Deviation
+音高转换	Pitch Shift
+颤音包络	Vibrato Envelope
+颤音调制必须为 0 到 2 之间的有限数值	Vibrato modulation must be a finite number between 0 and 2
+默认采样的随机种子必须为零	The default sample's seeds must be zero
+导入后最多支持 1024 条音轨（含重叠音符拆分的声部），请减少所选音轨或拆分 MIDI 文件	After importing, at most 1024 tracks are supported (including the lanes split out of overlapping notes); select fewer tracks or split the MIDI file

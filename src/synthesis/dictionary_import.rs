@@ -1,5 +1,6 @@
 mod members;
 
+use crate::{tr, trf};
 use std::{io, path::Path};
 
 use crate::platform::{
@@ -23,7 +24,7 @@ pub fn prepare(input: &Path, dry_run: bool) -> Result<TempDir> {
     let extract = match extension.map(str::to_ascii_lowercase).as_deref() {
         Some("zip") => unpack_zip,
         Some("7z") => unpack_7z,
-        _ => return Err(VoiceError::new("请选择 clf-data 的 ZIP 或 7z 压缩包")),
+        _ => return Err(VoiceError::new(tr!("请选择 clf-data 的 ZIP 或 7z 压缩包"))),
     };
     let directory = if dry_run {
         temporary::create(None, "import-")?
@@ -112,7 +113,7 @@ fn unpack_7z(input: &Path, directory: &Path) -> Result<()> {
         })
         .map_err(seven_zip_error)?;
     if !files.is_empty() {
-        return Err(VoiceError::new("7z 压缩包缺少声明的词典文件"));
+        return Err(VoiceError::new(tr!("7z 压缩包缺少声明的词典文件")));
     }
     Ok(())
 }
@@ -127,11 +128,11 @@ fn check_size(entries: usize, mut sizes: impl Iterator<Item = u64>) -> Result<()
             })
             .is_none()
     {
-        return Err(VoiceError::new("词典压缩包解包后超出大小或条目数限制"));
+        return Err(VoiceError::new(tr!("词典压缩包解包后超出大小或条目数限制")));
     }
     Ok(())
 }
 
 fn seven_zip_error(error: sevenz_rust2::Error) -> VoiceError {
-    VoiceError::new(format!("7z 读取失败：{error}"))
+    VoiceError::new(trf!("7z 读取失败：{0}", error))
 }

@@ -2,6 +2,7 @@ use super::{
     settings::SynthesisSettings,
     voice::{Result, VoiceAvailability, VoiceCatalog, flat::FlatModelRegistry, svpk},
 };
+use crate::{trf};
 use crate::platform::fs;
 use std::{path::Path, sync::Arc};
 
@@ -22,13 +23,10 @@ pub fn scan_roots(settings: &SynthesisSettings) -> LibraryScan {
                 found
                     .warnings
                     .into_iter()
-                    .map(|warning| format!("{label} {}：{warning}", root.display())),
+                    .map(|warning| trf!("{0} {1}：{2}", label, root.display(), warning)),
             );
         }
-        Err(error) => errors.push(format!(
-            "无法扫描 {label} 声库目录 {}：{error}",
-            root.display()
-        )),
+        Err(error) => errors.push(trf!("无法扫描 {0} 声库目录 {1}：{2}", label, root.display(), error)),
     };
     for (label, root) in settings.database_roots() {
         append(label, root, VoiceCatalog::scan(root));
@@ -53,10 +51,7 @@ pub fn scan_roots(settings: &SynthesisSettings) -> LibraryScan {
         left.database_id == right.database_id && left.revision == right.revision
     }) {
         if duplicates.len() > 1 {
-            let message = format!(
-                "声库 {}/{} 对应多个文件，请检查声库目录配置。",
-                duplicates[0].database_id, duplicates[0].revision
-            );
+            let message = trf!("声库 {0}/{1} 对应多个文件，请检查声库目录配置。", duplicates[0].database_id, duplicates[0].revision);
             errors.push(message.clone());
             for entry in duplicates {
                 entry.availability = VoiceAvailability::Unsupported(message.clone());

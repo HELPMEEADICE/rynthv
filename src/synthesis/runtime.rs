@@ -34,6 +34,7 @@ use std::{
     sync::mpsc::{Receiver, TryRecvError},
     time::Duration,
 };
+use crate::{tr};
 
 pub enum VoiceState {
     Unloaded,
@@ -142,7 +143,7 @@ impl Runtime {
                     self.export = None;
                 }
                 Err(TryRecvError::Disconnected) => {
-                    self.export_result = Some(Err("音频导出线程意外终止。".into()));
+                    self.export_result = Some(Err(tr!("音频导出线程意外终止。").into()));
                     self.export = None;
                 }
                 Err(TryRecvError::Empty) => {}
@@ -261,35 +262,35 @@ impl Runtime {
     }
     pub fn status(&self) -> &'static str {
         if self.recording_error.is_some() {
-            "伴奏不可用 · 查看渲染面板"
+            tr!("伴奏不可用 · 查看渲染面板")
         } else if !self.recordings.pending.is_empty() {
-            "伴奏未就绪 · 查看伴奏轨"
+            tr!("伴奏未就绪 · 查看伴奏轨")
         } else if self.library.is_scanning() {
-            "正在扫描声库目录"
+            tr!("正在扫描声库目录")
         } else if self.is_loading() {
-            "正在加载声库"
+            tr!("正在加载声库")
         } else if self.voices.values().any(|voice| voice.context_required) {
-            "歌声需要导入模型上下文"
+            tr!("歌声需要导入模型上下文")
         } else if self.desired_playing && self.playback.snapshot().buffering {
-            "正在准备播放位置的音频"
+            tr!("正在准备播放位置的音频")
         } else if self.stats.running > 0 || self.stats.queued > 0 {
-            "正在合成歌声"
+            tr!("正在合成歌声")
         } else if self.error.is_some() || self.stats.failed > 0 {
-            "歌声合成失败 · 查看渲染面板"
+            tr!("歌声合成失败 · 查看渲染面板")
         } else if !self.recordings.failures.is_empty() {
-            "部分伴奏不可用 · 查看渲染面板"
+            tr!("部分伴奏不可用 · 查看渲染面板")
         } else if self.has_audio() {
-            "音频已就绪"
+            tr!("音频已就绪")
         } else if self.voices.values().any(|v| v.ready) {
-            "等待音符"
+            tr!("等待音符")
         } else if self
             .voices
             .values()
             .any(|v| matches!(v.state, VoiceState::Loaded(_)))
         {
-            "正在准备合成环境"
+            tr!("正在准备合成环境")
         } else {
-            "音轨尚未指定歌声"
+            tr!("音轨尚未指定歌声")
         }
     }
 }

@@ -1,6 +1,7 @@
 //! Original SV1 AI database resources. Only public metadata and model payloads
 //! are accessed; unrelated registration records have no synthesis role.
 
+use crate::{tr, trf};
 use crate::platform::fs;
 mod container;
 
@@ -75,7 +76,7 @@ pub(super) fn describe(archive: &mut NofsArchive) -> Result<Description> {
                 types::F0_WRAPPER_TYPE_ID => "f0",
                 types::TIMBRE_TYPE_ID => "timbre",
                 types::VOCODER_TYPE_ID => "vocoder",
-                _ => return Err(VoiceError::new("不支持的 SV1 模型类型")),
+                _ => return Err(VoiceError::new(tr!("不支持的 SV1 模型类型"))),
             };
             if (key == b"f0model-dds") != (role == "f0") || models.insert(role, index).is_some() {
                 return Err(VoiceError::new(
@@ -89,9 +90,9 @@ pub(super) fn describe(archive: &mut NofsArchive) -> Result<Description> {
         .filter(|role| !models.contains_key(role))
         .collect::<Vec<_>>();
     if !missing.is_empty() {
-        return Err(VoiceError::new(format!(
-            "SV1 声库缺少受支持的本地模型：{}",
-            missing.join("、")
+        return Err(VoiceError::new(trf!(
+            "SV1 声库缺少受支持的本地模型：{0}",
+            missing.join(tr!("、"))
         )));
     }
     Ok(Description {

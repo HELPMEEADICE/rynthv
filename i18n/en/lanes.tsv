@@ -1,0 +1,58 @@
+# en catalog fragment: lanes
+# format: <simplified-chinese msgid> TAB <translation>
+复制控制点	Copy Control Points
+剪切控制点	Cut Control Points
+粘贴控制点	Paste Control Points
+删除控制点	Delete Control Points
+选择全部控制点	Select All Control Points
+清空此参数的控制点	Clear This Parameter's Control Points
+清空参数控制点	Clear Parameter Control Points
+双击添加控制点 · 拖动移动 / 框选 · Ctrl+点击切换选择 · Shift+拖动选择时间范围	Double-click to add a control point · Drag to move / box-select · Ctrl+click to toggle selection · Shift+drag to select a time range
+左键拖动手绘曲线 · 右键拖动擦除控制点 · Esc 取消 · Ctrl+Z 撤销	Drag with the left button to draw a curve · Drag with the right button to erase control points · Esc to cancel · Ctrl+Z to undo
+左键拖动绘制直线 · 右键拖动擦除控制点 · Esc 取消 · Ctrl+Z 撤销	Drag with the left button to draw a straight line · Drag with the right button to erase control points · Esc to cancel · Ctrl+Z to undo
+当前声库不支持口型参数；已导入的曲线仍可查看与清空	The current voicebank does not support mouth-shape parameters; imported curves can still be viewed and cleared
+所选参数控制点的时间跨度超出可用范围。	The selected control points span more time than is available.
+剪贴板中没有 RynthV 参数控制点，请先复制参数控制点。	The clipboard has no RynthV control points; copy control points first.
+参数控制点剪贴板的取值范围无效。	The value range in the control point clipboard is invalid.
+参数剪贴板须包含 1 到 {} 个控制点。	The parameter clipboard must contain 1 to {} control points.
+参数控制点剪贴板的时间顺序或数值无效。	The control point clipboard's time order or values are invalid.
+无法复制参数控制点：{}	Cannot copy control points: {}
+所选参数控制点数据过大，无法复制。	The selected control points hold too much data to copy.
+剪贴板数据过大，无法粘贴参数控制点。	The clipboard data is too large to paste control points.
+剪贴板中没有有效的 RynthV 参数控制点：{}	The clipboard has no valid RynthV control points: {}
+已复制 {} 个参数控制点	Copied {} control points
+剪切参数控制点	Cut Control Points
+已剪切 {} 个参数控制点	Cut {} control points
+删除参数控制点	Delete Control Points
+播放位置超出参数控制点的可用时间范围。	The playhead is outside the available time range of the control points.
+粘贴参数控制点	Paste Control Points
+复制位置超出参数控制点的可用时间范围。	The duplicate position is outside the available time range of the control points.
+重复参数控制点	Duplicate Control Points
+所选参数控制点的取值跨度超出可编辑范围。	The selected control points span a value range beyond the editable range.
+移动后会与未选中的参数控制点重合。	Moving would overlap control points that are not selected.
+移动参数控制点	Move Control Points
+粘贴的参数控制点超出当前音符组的可编辑范围。	The pasted control points are outside the editable range of the current note group.
+参数控制点剪贴板包含无效的数值。	The control point clipboard contains invalid values.
+已粘贴 {} 个参数控制点	Pasted {} control points
+擦除参数控制点	Erase Control Points
+绘制参数曲线	Draw Parameter Curve
+添加参数控制点	Add Control Point
+控制点不能覆盖未选中的控制点	Control points cannot cover unselected control points
+拖动以调整参数区域顺序	Drag to reorder parameter lanes
+设置要在前景中编辑的参数	Set the parameter to edit in the foreground
+交换前景与背景参数	Swap foreground and background parameters
+设置要在背景中显示的参数	Set the parameter shown in the background
+控制点工具：添加、选择和移动控制点	Control point tool: add, select, and move control points
+自由绘制工具：手绘参数曲线；右键拖动擦除	Freehand tool: draw parameter curves by hand; drag with the right button to erase
+直线工具：绘制直线，替换重叠范围内的控制点	Line tool: draw straight lines, replacing control points in the overlapping range
+线性插值：用直线连接控制点	Linear interpolation: connect control points with straight lines
+余弦插值：用余弦曲线连接控制点	Cosine interpolation: connect control points with a cosine curve
+三次样条插值：平滑连接控制点	Cubic spline interpolation: connect control points smoothly
+参数插值模式	Parameter Interpolation Mode
+缩放	Zoom
+垂直显示缩放；双击输入，右键恢复 100%	Vertical display zoom; double-click to type a value, right-click to reset to 100%
+唱法	Vocal Modes
+紧张	Tense
+放松	Relaxed
+将循环开始标记移至此处	Move Loop Start Marker Here
+将循环结束标记移至此处	Move Loop End Marker Here

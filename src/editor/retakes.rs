@@ -1,5 +1,6 @@
 use super::Editor;
 use crate::model::{EntityId, RetakeComponent, TakeSet};
+use crate::tr;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub struct RetakeChoice {
@@ -118,22 +119,22 @@ impl Editor {
             .max()
             .unwrap_or(0)
             .checked_add(1)
-            .ok_or("重录采样编号已用尽")?;
+            .ok_or(tr!("重录采样编号已用尽"))?;
         for (_, set) in &mut sets {
             set.append(id, component)?;
         }
         let label = match component {
-            RetakeComponent::All => "重录新的采样",
-            RetakeComponent::PitchAndTimbre => "重录音高和音色采样",
-            RetakeComponent::Duration => "重录时值采样",
-            RetakeComponent::Pitch => "重录音高采样",
-            RetakeComponent::Timbre => "重录音色采样",
+            RetakeComponent::All => tr!("重录新的采样"),
+            RetakeComponent::PitchAndTimbre => tr!("重录音高和音色采样"),
+            RetakeComponent::Duration => tr!("重录时值采样"),
+            RetakeComponent::Pitch => tr!("重录音高采样"),
+            RetakeComponent::Timbre => tr!("重录音色采样"),
         };
         Ok(self.write_take_sets(label, &group, sets))
     }
 
     pub fn select_retake(&mut self, id: u32) -> Result<usize, String> {
-        self.edit_retakes("切换重录采样", |set| set.select(id))
+        self.edit_retakes(tr!("切换重录采样"), |set| set.select(id))
     }
 
     pub fn select_note_retake(
@@ -143,7 +144,7 @@ impl Editor {
         id: u32,
     ) -> Result<usize, String> {
         let sets = self.note_take_set(group_id, note_id)?;
-        self.edit_take_sets("切换重录采样", sets, |set| set.select(id))
+        self.edit_take_sets(tr!("切换重录采样"), sets, |set| set.select(id))
     }
 
     pub fn step_retake(&mut self, direction: i32) -> Result<usize, String> {
@@ -157,7 +158,7 @@ impl Editor {
     }
 
     pub fn prune_retakes(&mut self) -> Result<usize, String> {
-        self.edit_retakes("裁剪保留使用采样", |set| {
+        self.edit_retakes(tr!("裁剪保留使用采样"), |set| {
             set.retain_current();
             Ok(())
         })
@@ -169,7 +170,7 @@ impl Editor {
         note_id: EntityId,
     ) -> Result<usize, String> {
         let sets = self.note_take_set(group_id, note_id)?;
-        self.edit_take_sets("裁剪保留使用采样", sets, |set| {
+        self.edit_take_sets(tr!("裁剪保留使用采样"), sets, |set| {
             set.retain_current();
             Ok(())
         })

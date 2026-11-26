@@ -1,5 +1,5 @@
 use super::{Gesture, NoteDrag, canvas::note_rect};
-use crate::{app::App, model::*, ui::timeline::*};
+use crate::{app::App, model::*, tr, ui::timeline::*};
 use eframe::egui::*;
 use std::collections::BTreeSet;
 pub(super) fn pitch_at(app: &App, rect: Rect, y: f32) -> i32 {
@@ -61,7 +61,7 @@ pub(super) fn start_gesture(
         } else {
             NoteDrag::Move
         };
-        app.editor.begin("拖动音符");
+        app.editor.begin(tr!("拖动音符"));
         let mut selected: Vec<_> = app
             .editor
             .notes()
@@ -90,7 +90,7 @@ pub(super) fn start_gesture(
             },
         });
     } else if app.piano_tool == super::Tool::NoteDraw || modifiers.ctrl {
-        app.editor.begin("创建音符");
+        app.editor.begin(tr!("创建音符"));
         let beat = beat_at(rect, &app.view.piano, origin.x);
         let at = ticks(if app.view.snap && !(modifiers.ctrl && modifiers.alt) {
             app.view.snap_beat(beat)

@@ -24,6 +24,7 @@ use crate::platform::web::{
     protocol::{ComputeDiagnostics, Export, ExportMetrics, Inventory},
 };
 use std::{collections::BTreeMap, path::PathBuf, time::Duration};
+use crate::{tr};
 
 pub enum VoiceState {
     Unloaded,
@@ -110,7 +111,7 @@ impl Runtime {
     pub fn voice_error(&self, key: &VoiceSelection) -> Option<&str> {
         match self.voice_state(key) {
             VoiceState::Failed(error) => Some(error),
-            VoiceState::Loaded(info) if info.needs_context => Some("该声库需要便携模型上下文"),
+            VoiceState::Loaded(info) if info.needs_context => Some(tr!("该声库需要便携模型上下文")),
             _ => None,
         }
     }
@@ -160,19 +161,19 @@ impl Runtime {
 
     pub fn status(&self) -> &'static str {
         if self.library.is_scanning() {
-            "正在扫描浏览器声库"
+            tr!("正在扫描浏览器声库")
         } else if self.stats.running > 0 || self.stats.queued > 0 {
-            "正在合成歌声"
+            tr!("正在合成歌声")
         } else if self.preview.is_pending() {
-            "正在准备预览"
+            tr!("正在准备预览")
         } else if !self.voice_jobs.is_empty() {
-            "正在加载声库"
+            tr!("正在加载声库")
         } else if self.error.is_some() {
-            "歌声合成失败 · 查看渲染面板"
+            tr!("歌声合成失败 · 查看渲染面板")
         } else if self.preview.duration.is_some() {
-            "音频已就绪"
+            tr!("音频已就绪")
         } else {
-            "等待音符或伴奏"
+            tr!("等待音符或伴奏")
         }
     }
 }

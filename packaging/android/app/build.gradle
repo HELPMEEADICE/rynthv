@@ -16,7 +16,7 @@ android {
         targetSdk = 36
         versionCode = providers.environmentVariable("ANDROID_VERSION_CODE").get().toInteger()
         versionName = providers.environmentVariable("ANDROID_VERSION_NAME").get()
-        manifestPlaceholders = [appLabel: official ? "RynthV" : "RynthV (Test)"]
+        manifestPlaceholders = [appLabel: official ? "@string/app_name" : "@string/app_name_test"]
         if (!official) applicationIdSuffix = ".test"
         ndk {
             abiFilters.add(abi)

@@ -12,6 +12,7 @@ use crate::synthesis::{
     },
 };
 use std::sync::Arc;
+use crate::{trf};
 
 impl<'network, 'tree> WorkState<'network, 'tree> {
     pub fn publish(&mut self, events: &Events) {
@@ -50,7 +51,7 @@ impl<'network, 'tree> WorkState<'network, 'tree> {
                     self.live = None;
                     let _ = events.send(Event::Error {
                         revision: Some(self.revision),
-                        error: format!("预览混音准备失败：{error}"),
+                        error: trf!("预览混音准备失败：{}", error),
                     });
                 }
             }
@@ -73,7 +74,7 @@ impl<'network, 'tree> WorkState<'network, 'tree> {
                 if let Err(error) = live.complete(owner.owner, Arc::clone(&owner.audio)) {
                     let _ = events.send(Event::Error {
                         revision: Some(self.revision),
-                        error: format!("预览混音失败：{error}"),
+                        error: trf!("预览混音失败：{}", error),
                     });
                 }
             }
@@ -94,7 +95,7 @@ impl<'network, 'tree> WorkState<'network, 'tree> {
                     Err(error) => {
                         let _ = events.send(Event::Error {
                             revision: Some(self.revision),
-                            error: format!("音轨混音失败：{error}"),
+                            error: trf!("音轨混音失败：{}", error),
                         });
                         None
                     }

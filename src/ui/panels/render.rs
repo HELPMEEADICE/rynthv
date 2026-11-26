@@ -4,6 +4,7 @@ use crate::synthesis::runtime::ExportRequest;
 use crate::{
     app::App,
     model::Extra,
+    tr, trf,
     ui::{theme::*, track_color::TrackColors},
 };
 use eframe::egui::*;
@@ -17,7 +18,7 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
     padded(ui, |ui| {
         #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
         let directory = directory_field(app, ui, editable);
-        ui.weak("文件名称");
+        ui.weak(tr!("文件名称"));
         let name = string(&app.editor.project.render_config, "filename");
         let name_id = ui.make_persistent_id(("render-field", "filename"));
         let mut name_draft = ui
@@ -34,13 +35,13 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
         export_clicked = ui
             .add_enabled(
                 ready,
-                Button::new("导出为文件").min_size(vec2(ui.available_width(), 28.0)),
+                Button::new(tr!("导出为文件")).min_size(vec2(ui.available_width(), 28.0)),
             )
             .on_disabled_hover_text(
                 app.synthesis
                     .recording_error
                     .as_deref()
-                    .unwrap_or("等待伴奏加载和当前歌声合成完成后导出"),
+                    .unwrap_or(tr!("等待伴奏加载和当前歌声合成完成后导出")),
             )
             .clicked();
         #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
@@ -60,7 +61,7 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
         if app.synthesis.is_exporting() {
             ui.horizontal(|ui| {
                 ui.spinner();
-                ui.label("正在导出…");
+                ui.label(tr!("正在导出…"));
             });
         }
         #[cfg(target_os = "android")]
@@ -68,14 +69,14 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
             for path in paths {
                 ui.label(path.file_name().unwrap_or_default().to_string_lossy());
                 ui.horizontal_wrapped(|ui| {
-                    if ui.button("保存 WAV…").clicked() {
+                    if ui.button(tr!("保存 WAV…")).clicked() {
                         app.pick(
                             ui.ctx(),
                             crate::app::picker::Picker::publish(path.clone(), "audio/wav"),
-                            |app, _, _| app.status = "WAV 已保存".into(),
+                            |app, _, _| app.status = tr!("WAV 已保存").into(),
                         );
                     }
-                    if ui.button("分享 WAV…").clicked()
+                    if ui.button(tr!("分享 WAV…")).clicked()
                         && let Err(error) = crate::platform::android::share(&path, "audio/wav")
                     {
                         app.error = Some(error);
@@ -86,14 +87,17 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
         #[cfg(target_arch = "wasm32")]
         if let Some(Ok(paths)) = &app.synthesis.export_result {
             if let Some(metrics) = &app.synthesis.export_metrics {
-                ui.weak(format!(
-                    "Worker {:.0} ms · 渲染 {:.0} ms · 混音 {:.0} ms · WAV 转换和写入 {:.0} ms",
-                    metrics.worker_ms, metrics.render_ms, metrics.mix_ms, metrics.wav_ms,
+                ui.weak(trf!(
+                    "Worker {} ms · 渲染 {} ms · 混音 {} ms · WAV 转换和写入 {} ms",
+                    format!("{:.0}", metrics.worker_ms),
+                    format!("{:.0}", metrics.render_ms),
+                    format!("{:.0}", metrics.mix_ms),
+                    format!("{:.0}", metrics.wav_ms),
                 ));
             }
             for path in paths {
                 if ui
-                    .button(format!(
+                    .button(trf!(
                         "下载 {}",
                         path.file_name().unwrap_or_default().to_string_lossy()
                     ))
@@ -106,7 +110,7 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
         if let Some(result) = &app.synthesis.export_result {
             match result {
                 Ok(paths) => {
-                    ui.label(format!("已导出 {} 个文件", paths.len()))
+                    ui.label(trf!("已导出 {} 个文件", paths.len()))
                         .on_hover_text(
                             paths
                                 .iter()
@@ -119,7 +123,7 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
             }
         }
     });
-    section(ui, "音轨", |ui| {
+    section(ui, tr!("音轨"), |ui| {
         let current_mix = app
             .editor
             .project
@@ -154,7 +158,7 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
                 ui.set_min_height(190.0);
                 ui.set_width(ui.available_width());
                 ui.spacing_mut().item_spacing.y = 3.0;
-                if track_row(ui, &mut mix, "混音导出", text_color()) {
+                if track_row(ui, &mut mix, tr!("混音导出"), text_color()) {
                     mix_changed = true;
                 }
                 for (id, name, _, enabled, color) in &mut tracks {
@@ -168,7 +172,7 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
         }
         pair(ui, |ui, width| {
             if ui
-                .add_sized(vec2(width, 28.0), Button::new("全选"))
+                .add_sized(vec2(width, 28.0), Button::new(tr!("全选")))
                 .clicked()
             {
                 if current_mix != Some(true) {
@@ -181,7 +185,7 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
                 }
             }
             if ui
-                .add_sized(vec2(width, 28.0), Button::new("取消全选"))
+                .add_sized(vec2(width, 28.0), Button::new(tr!("取消全选")))
                 .clicked()
             {
                 if current_mix != Some(false) {
@@ -195,25 +199,25 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
             }
         });
     });
-    section(ui, "格式", |ui| {
+    section(ui, tr!("格式"), |ui| {
         if let Some((key, value)) = numeric(
             ui,
             &app.editor.project.render_config,
             "numChannels",
-            "声道",
-            &[(1, "单声道"), (2, "立体声")],
+            tr!("声道"),
+            &[(1, tr!("单声道")), (2, tr!("立体声"))],
         ) {
             pending_config.push((key, value.into()));
         }
-        ui.weak("气声输出");
+        ui.weak(tr!("气声输出"));
         let mut aspiration = string(&app.editor.project.render_config, "aspirationFormat");
         if combo(
             ui,
             "aspiration-format",
             &mut aspiration,
             &[
-                ("noAspiration".to_owned(), "与人声合并"),
-                ("asFiles".to_owned(), "单独导出气声文件"),
+                ("noAspiration".to_owned(), tr!("与人声合并")),
+                ("asFiles".to_owned(), tr!("单独导出气声文件")),
             ],
         ) {
             pending_config.push(("aspirationFormat", aspiration.into()));
@@ -222,8 +226,8 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
             ui,
             &app.editor.project.render_config,
             "bitDepth",
-            "位深度",
-            &[(16, "16 位"), (24, "24 位"), (32, "32 位浮点")],
+            tr!("位深度"),
+            &[(16, tr!("16 位")), (24, tr!("24 位")), (32, tr!("32 位浮点"))],
         ) {
             pending_config.push((key, value.into()));
         }
@@ -231,7 +235,7 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
             ui,
             &app.editor.project.render_config,
             "sampleRate",
-            "采样率",
+            tr!("采样率"),
             &[
                 (44100, "44100 Hz"),
                 (48000, "48000 Hz"),
@@ -242,7 +246,7 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
         }
     });
     if editable && (!pending_config.is_empty() || !pending_tracks.is_empty()) {
-        app.editor.begin("渲染设置");
+        app.editor.begin(tr!("渲染设置"));
         for (key, value) in pending_config {
             app.editor.project.render_config.insert(key.into(), value);
         }
@@ -256,7 +260,7 @@ pub(super) fn show(app: &mut App, ui: &mut Ui) {
     if export_clicked {
         start_export(app);
     }
-    section(ui, "合成状态", |ui| {
+    section(ui, tr!("合成状态"), |ui| {
         super::super::synthesis::render_status(app, ui)
     });
 }
@@ -319,8 +323,8 @@ fn confirm_overwrite(request: &ExportRequest) -> bool {
         .collect();
     existing.is_empty()
         || rfd::MessageDialog::new()
-            .set_title("覆盖音频文件")
-            .set_description(format!(
+            .set_title(tr!("覆盖音频文件"))
+            .set_description(trf!(
                 "以下文件已存在，是否覆盖？\n{}",
                 existing.join("\n")
             ))
@@ -400,7 +404,7 @@ fn folder_button(ui: &mut Ui) -> Response {
         points.into_iter().map(|(x, y)| c + vec2(x, y)).collect(),
         Stroke::new(1.1, muted_color()),
     ));
-    response.on_hover_text("选择目标文件夹")
+    response.on_hover_text(tr!("选择目标文件夹"))
 }
 
 #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
@@ -438,7 +442,7 @@ impl DirectoryField {
 
 #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
 fn directory_field(app: &App, ui: &mut Ui, editable: bool) -> DirectoryField {
-    ui.weak("目标文件夹");
+    ui.weak(tr!("目标文件夹"));
     let directory = string(&app.editor.project.render_config, "destination");
     let dir_id = ui.make_persistent_id(("render-field", "destination"));
     let mut dir_draft = ui
@@ -464,7 +468,7 @@ fn directory_field(app: &App, ui: &mut Ui, editable: bool) -> DirectoryField {
             dir_commit = true;
         }
         if folder_button(ui).clicked() && editable {
-            let mut picker = rfd::FileDialog::new().set_title("选择导出文件夹");
+            let mut picker = rfd::FileDialog::new().set_title(tr!("选择导出文件夹"));
             if !dir_draft.text.is_empty() {
                 picker = picker.set_directory(&dir_draft.text);
             }

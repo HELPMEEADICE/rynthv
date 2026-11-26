@@ -25,7 +25,7 @@ impl<T> Pending<T> {
         match self.receiver.try_recv() {
             Ok(result) => Some(result),
             Err(TryRecvError::Empty) => None,
-            Err(TryRecvError::Disconnected) => Some(Err("合成 Worker 已停止".into())),
+            Err(TryRecvError::Disconnected) => Some(Err(crate::tr!("合成 Worker 已停止").into())),
         }
     }
 
@@ -72,7 +72,9 @@ pub fn submit<T: DeserializeOwned + 'static>(
             .await
             .map_err(js_error)
             .and_then(|value| {
-                let value = value.as_string().ok_or("合成 Worker 返回了无效回复")?;
+                let value = value
+                    .as_string()
+                    .ok_or(crate::tr!("合成 Worker 返回了无效回复"))?;
                 serde_json::from_str(&value).map_err(|error| error.to_string())
             });
         drop(listener);

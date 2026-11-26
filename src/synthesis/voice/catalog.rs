@@ -1,5 +1,6 @@
 //! Lightweight discovery of installed voice revisions, without loading model weights.
 
+use crate::{tr, trf};
 use crate::platform::fs;
 mod dnni;
 mod flat;
@@ -75,17 +76,14 @@ impl VoiceCatalog {
                 Err(error) => {
                     catalog
                         .warnings
-                        .push(format!("无法读取声库目录 {}：{error}", root.display()));
+                        .push(trf!("无法读取声库目录 {0}：{1}", root.display(), error));
                     continue;
                 }
             };
             let is_dir = match database.file_type() {
                 Ok(kind) => kind.is_dir(),
                 Err(error) => {
-                    catalog.warnings.push(format!(
-                        "无法读取声库目录 {}：{error}",
-                        database.path().display()
-                    ));
+                    catalog.warnings.push(trf!("无法读取声库目录 {0}：{1}", database.path().display(), error));
                     continue;
                 }
             };
@@ -102,10 +100,7 @@ impl VoiceCatalog {
                         catalog.entries.push(nofs::entry(&path)?);
                     }
                 }
-                Err(error) => catalog.warnings.push(format!(
-                    "无法读取声库目录 {}：{error}",
-                    database.path().display()
-                )),
+                Err(error) => catalog.warnings.push(trf!("无法读取声库目录 {0}：{1}", database.path().display(), error)),
             }
         }
         let mut counts = std::collections::BTreeMap::new();
@@ -117,7 +112,7 @@ impl VoiceCatalog {
         for entry in &mut catalog.entries {
             if counts[&(entry.database_id.clone(), entry.revision)] > 1 {
                 entry.availability = VoiceAvailability::Unsupported(
-                    "相同声库版本存在多个文件，请移除重复项后刷新".to_owned(),
+                    tr!("相同声库版本存在多个文件，请移除重复项后刷新").to_owned(),
                 );
             }
         }

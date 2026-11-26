@@ -8,6 +8,8 @@ use crate::{
     editor::{VoiceEditParameter, VoiceParameterState},
     model::{VocalModeValues, VoiceParameter},
     synthesis::voice::VoiceFamily,
+    tr,
+    trf,
 };
 use eframe::egui::*;
 
@@ -18,7 +20,7 @@ pub(super) fn styles(app: &mut App, ui: &mut Ui) {
         .and_then(|voice| voice.configuration.as_ref())
         .map(|configuration| configuration.styles.clone())
     else {
-        weak(ui, "加载歌声后显示支持的唱法");
+        weak(ui, tr!("加载歌声后显示支持的唱法"));
         return;
     };
     let mut current = state(app, ui);
@@ -35,7 +37,7 @@ pub(super) fn styles(app: &mut App, ui: &mut Ui) {
         current = state(app, ui);
     }
     if styles.is_empty() {
-        weak(ui, "此歌声没有可用的唱法");
+        weak(ui, tr!("此歌声没有可用的唱法"));
         return;
     }
     let enabled = current.is_some() && interaction::editable(app, ui);
@@ -83,11 +85,11 @@ fn unsupported_styles(
     if !unsupported {
         return false;
     }
-    weak(ui, "当前设置包含此歌声不支持的唱法参数。");
+    weak(ui, tr!("当前设置包含此歌声不支持的唱法参数。"));
     let enabled = interaction::editable(app, ui) && !app.editor.is_editing();
     let clicked = ui
-        .add_enabled(enabled, Button::new("重置不支持的唱法"))
-        .on_hover_text("仅重置不支持的唱法设置，保留其余参数；可撤销。")
+        .add_enabled(enabled, Button::new(tr!("重置不支持的唱法")))
+        .on_hover_text(tr!("仅重置不支持的唱法设置，保留其余参数；可撤销。"))
         .clicked();
     ui.add_space(8.0);
     if !clicked {
@@ -122,9 +124,9 @@ pub(super) fn tuning(app: &mut App, ui: &mut Ui) {
             let frequency = 440.0 * (state.values.tuning_semitones() / 12.0).exp2();
             let frequency = format!("{frequency:.2}");
             let frequency = frequency.trim_end_matches('0').trim_end_matches('.');
-            format!("调性: {}，A4 = {frequency} Hz", names[key])
+            trf!("调性: {}，A4 = {} Hz", names[key], frequency)
         }
-        _ => "调性: —，A4 = — Hz".into(),
+        _ => tr!("调性: —，A4 = — Hz").to_owned(),
     };
     widgets::readout(ui, &summary);
     ui.add_space(10.0);
@@ -165,11 +167,11 @@ fn state(app: &App, ui: &mut Ui) -> Option<VoiceParameterState> {
     match app.editor.voice_parameter_state() {
         Ok(Some(state)) => Some(state),
         Ok(None) => {
-            weak(ui, "请选择歌声音轨以调整参数");
+            weak(ui, tr!("请选择歌声音轨以调整参数"));
             None
         }
         Err(error) => {
-            error_label(ui, format!("无法读取当前歌声参数：{error}"));
+            error_label(ui, trf!("无法读取当前歌声参数：{}", error));
             None
         }
     }

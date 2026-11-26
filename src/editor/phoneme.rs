@@ -1,5 +1,6 @@
 use super::{Editor, SelectionState};
 use crate::model::{Note, PhonemeAttributes, PhonemeParameter, SourcePhone};
+use crate::tr;
 
 pub(super) struct PhonemeEdit {
     selection: SelectionState,
@@ -10,7 +11,7 @@ impl Editor {
     pub fn phoneme_attributes(&self, source: SourcePhone) -> Result<PhonemeAttributes, String> {
         let note = self
             .phoneme_note(source)
-            .ok_or("当前音符组中没有此音素的源音符")?;
+            .ok_or(tr!("当前音符组中没有此音素的源音符"))?;
         PhonemeAttributes::get_at(&note.attributes, source.phone_index)
     }
 
@@ -24,7 +25,7 @@ impl Editor {
         else {
             return false;
         };
-        self.begin("调整音素时值");
+        self.begin(tr!("调整音素时值"));
         self.phoneme_edit = Some(PhonemeEdit {
             selection: self.selection(),
             group,
@@ -62,7 +63,7 @@ impl Editor {
         parameter: Option<PhonemeParameter>,
     ) -> Result<(), String> {
         if self.is_editing() {
-            return Err("请先完成当前编辑".into());
+            return Err(tr!("请先完成当前编辑").into());
         }
         let mut attributes = self.phoneme_attributes(source)?;
         if let Some(parameter) = parameter {
@@ -71,14 +72,14 @@ impl Editor {
             attributes = PhonemeAttributes::default();
         }
         if !self.begin_phoneme_edit(source) {
-            return Err("无法编辑当前音素".into());
+            return Err(tr!("无法编辑当前音素").into());
         }
         if self.update_phoneme_attributes(source, attributes) {
             self.finish_phoneme_edit();
             Ok(())
         } else {
             self.cancel_phoneme_edit();
-            Err("无法重置当前音素".into())
+            Err(tr!("无法重置当前音素").into())
         }
     }
 

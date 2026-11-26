@@ -1,6 +1,7 @@
 use crate::model::{
     Extra, GroupRef, Note, PhonemeAttributes, PhonemeParameter, Sv1Pitch, VocalModeComponent,
 };
+use crate::trf;
 use serde_json::{Map, Value, json};
 
 pub(super) fn import_reference(reference: &mut GroupRef) {
@@ -51,7 +52,7 @@ pub(super) fn import_note(note: &mut Note) -> Result<(), String> {
     let generated = match note.extra.remove("systemAttributes") {
         Some(Value::Object(fields)) => fields,
         None => Map::new(),
-        Some(_) => return Err("系统音符参数必须为对象".into()),
+        Some(_) => return Err(crate::tr!("系统音符参数必须为对象").into()),
     };
     let instant = note
         .extra
@@ -66,7 +67,7 @@ pub(super) fn import_note(note: &mut Note) -> Result<(), String> {
             .map(|value| {
                 value
                     .as_f64()
-                    .ok_or_else(|| format!("音高参数 {key} 必须为数值"))
+                    .ok_or_else(|| trf!("音高参数 {} 必须为数值", key))
             })
             .transpose()
     };
@@ -113,9 +114,9 @@ fn import_phoneme_scales(
 ) -> Result<(), String> {
     if let Some(value) = attributes.remove(key) {
         let scales: Vec<f64> = serde_json::from_value(value)
-            .map_err(|error| format!("音素参数 {key} 无效：{error}"))?;
+            .map_err(|error| trf!("音素参数 {} 无效：{}", key, error))?;
         if scales.len() > 4096 {
-            return Err("音素参数数量超出支持范围".into());
+            return Err(crate::tr!("音素参数数量超出支持范围").into());
         }
         for (index, scale) in scales.into_iter().enumerate() {
             if scale != 1.0 {

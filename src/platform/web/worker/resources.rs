@@ -57,9 +57,10 @@ impl Worker {
             self.remove_staged(&path);
             match result {
                 Ok(voices) => imported.extend(voices),
-                Err(error) => failures.push(format!(
-                    "{}：{error}",
-                    path.file_name().unwrap_or_default().to_string_lossy()
+                Err(error) => failures.push(crate::trf!(
+                    "{}：{}",
+                    path.file_name().unwrap_or_default().to_string_lossy(),
+                    error
                 )),
             }
         }
@@ -67,10 +68,10 @@ impl Worker {
             return Err(failures.join("\n"));
         }
         self.offline.refresh();
-        let mut message = format!(
+        let mut message = crate::trf!(
             "已导入 {} 个声库（{}）",
             imported.len(),
-            imported.join("、")
+            imported.join(crate::tr!("、"))
         );
         for failure in failures {
             message.push('\n');
@@ -94,7 +95,7 @@ impl Worker {
         if let Some(previous) = previous.filter(|path| path.parent() == Some(managed.as_path())) {
             let _ = fs::remove_dir_all(previous);
         }
-        self.library(Some("发音词典已导入".into()))
+        self.library(Some(crate::tr!("发音词典已导入").into()))
     }
 
     pub(super) fn remove_voice(&mut self, selection: &VoiceSelection) -> Result<String, String> {
@@ -104,7 +105,7 @@ impl Worker {
             .library(&settings)
             .catalog
             .entry(selection)
-            .ok_or("所选声库不在浏览器存储中")?
+            .ok_or(crate::tr!("所选声库不在浏览器存储中"))?
             .directory
             .clone();
         self.offline.refresh();
@@ -114,7 +115,7 @@ impl Worker {
             flat::remove_import(&settings.flat_voice_directory()?, &path)
         }
         .map_err(|error| error.to_string())?;
-        self.library(Some("声库已删除".into()))
+        self.library(Some(crate::tr!("声库已删除").into()))
     }
 
     pub(super) fn inventory(&mut self, selection: &VoiceSelection) -> Result<String, String> {
@@ -154,14 +155,15 @@ impl Worker {
             self.remove_staged(path);
             result
         } else {
-            let identity = Zeroizing::new(identity.ok_or("请选择模型上下文文件或输入 identity")?);
+            let identity =
+                Zeroizing::new(identity.ok_or(crate::tr!("请选择模型上下文文件或输入 identity"))?);
             session_identity::parse_identity(&identity).and_then(|identity| {
                 session_identity::save_manual_identity(name, version, identity)
             })
         };
         result.map_err(|error| error.to_string())?;
         self.offline.refresh();
-        self.library(Some("模型上下文已保存".into()))
+        self.library(Some(crate::tr!("模型上下文已保存").into()))
     }
 
     pub(super) fn remove_staged(&self, path: &Path) {

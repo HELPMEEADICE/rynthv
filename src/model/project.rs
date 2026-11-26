@@ -1,4 +1,5 @@
 use super::*;
+use crate::{tr, trf};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -227,7 +228,7 @@ impl Track {
         let main_group = Group::new("main");
         Self {
             id: new_id(),
-            name: format!("未命名音轨 {}", index + 1),
+            name: trf!("未命名音轨 {}", (index + 1)),
             disp_color: TrackColor::default(),
             disp_order: index as i32,
             main_ref: GroupRef::new(&main_group, -1),
@@ -288,7 +289,7 @@ impl Default for Project {
             tracks: vec![Track::new(0)],
             render_config: BTreeMap::from([
                 ("destination".into(), json!("")),
-                ("filename".into(), json!("未命名")),
+                ("filename".into(), json!(tr!("未命名"))),
                 ("numChannels".into(), json!(1)),
                 ("aspirationFormat".into(), json!("noAspiration")),
                 ("bitDepth".into(), json!(16)),

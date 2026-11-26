@@ -1,5 +1,5 @@
 use super::App;
-use crate::{model::Project, storage, synthesis::notify::Notify};
+use crate::{model::Project, storage, synthesis::notify::Notify, tr, trf};
 use eframe::egui::Context;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -43,11 +43,11 @@ impl Recovery {
             Ok(file) => {
                 let size = file.metadata().map_err(|error| error.to_string())?.len();
                 if size > MAX_SNAPSHOT_BYTES {
-                    return Err("工程恢复文件超过大小上限".into());
+                    return Err(tr!("工程恢复文件超过大小上限").into());
                 }
                 Some(
                     serde_json::from_reader(file.take(MAX_SNAPSHOT_BYTES))
-                        .map_err(|error| format!("无法读取工程恢复文件：{error}"))?,
+                        .map_err(|error| trf!("无法读取工程恢复文件：{}", error))?,
                 )
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
@@ -108,7 +108,7 @@ impl App {
         self.project_revision = snapshot.revision;
         self.recovered_dirty = snapshot.dirty;
         self.editor.transport.position = snapshot.position.clamp(0, self.editor.project_end());
-        self.status = "已恢复上次工作".into();
+        self.status = tr!("已恢复上次工作").into();
         Ok(())
     }
 
@@ -118,7 +118,7 @@ impl App {
             return;
         };
         if let Ok(error) = errors.try_recv() {
-            self.status = format!("工程自动保存失败：{error}");
+            self.status = trf!("工程自动保存失败：{}", error);
         }
         if self.editor.is_editing() {
             return;

@@ -1,0 +1,201 @@
+# en catalog fragment: synth_engine
+# format: <simplified-chinese msgid> TAB <translation>
+CPU Worker 池已满	CPU worker pool is full
+CPU Worker 消息缺少 PCM 样本	CPU worker message is missing PCM samples
+CPU Worker 消息缺少元数据	CPU worker message is missing metadata
+CPU Worker 消息缺少完成数据	CPU worker message is missing completion data
+CPU Worker 消息缺少完成标记	CPU worker message is missing the completion flag
+CPU Worker 消息缺少槽位	CPU worker message is missing the slot index
+CPU Worker 消息缺少进度数据	CPU worker message is missing progress data
+PCM 开始位置超出地址范围	PCM start position is out of address range
+PCM 结束位置溢出	PCM end position overflowed
+WebGPU 未完成任何模型算子。请检查设备限制，或选择 Auto／CPU。	WebGPU completed no model operators. Check the device limits or choose Auto／CPU.
+gainDecibel 产生了非有限增益	gainDecibel produced a non-finite gain
+{} 有多个词典读音，请填写显式音素	{} has several dictionary readings; specify explicit phonemes
+{} 有多个读音，请使用注音或显式音素	{} has several readings; use a reading annotation or explicit phonemes
+{} 没有可导出的音频，请检查音轨是否为空、静音或被独奏排除	{} has no audio to export; check whether the track is empty, muted, or excluded by solo
+{}:{}: 词典读音格式错误	{}:{}: malformed dictionary reading
+{}歌词没有可合成的音素	{} lyrics have no phonemes to synthesize
+{}的音素集应为 {}，当前为 {}	The phoneme set for {} should be {}, but it is {}
+{}（此前已完成 {} 个文件）	{} ({} files were already written)
+一代及一代兼容歌声仅支持唱法的音色参数；音高与发音参数需使用二代歌声。	SV1 and SV1-compatible voices support only vocal-mode timbre parameters; pitch and pronunciation parameters need an SV2 voice.
+一代及一代兼容歌声暂不支持口型参数曲线；请使用二代歌声或清除口型曲线。	SV1 and SV1-compatible voices have no mouth-shape parameter curve; use an SV2 voice or clear the mouth-shape curve.
+一代音高曲线产生了无效数值	The SV1 pitch curve produced invalid values
+一代音高的音符位置溢出	The SV1 pitch note position overflowed
+一代音高的音符结束位置溢出	The SV1 pitch note end position overflowed
+不支持的导出位深	Unsupported export bit depth
+不支持的导出格式	Unsupported export format
+不支持采样率或声道数在文件中途变化的音频	Audio whose sample rate or channel count changes mid-file is unsupported
+伴奏不可用 · 查看渲染面板	Backing track unavailable · See the render panel
+伴奏未就绪 · 查看伴奏轨	Backing track not ready · See the backing-track lane
+伴奏混音结束位置溢出	Backing-track mix end position overflowed
+伴奏音轨 {} 加载失败：{}	Failed to load backing track {}: {}
+伴奏音轨 {} 的片段时间无效	Backing track {} has an invalid clip time range
+准备声库与模型	Preparing voicebank and models
+分离气声与已发布人声的时间范围不一致	The separated aspiration and published vocal time ranges disagree
+压缩器	Compressor
+原生一代歌声暂不支持二维演绎参数。	Native SV1 voices do not support two-dimensional expression parameters yet.
+参数曲线的帧数与音频时间线不一致。	The parameter curve frame count does not match the audio timeline.
+合成任务已失效	The synthesis job is no longer valid
+合成任务已由更新的编辑替代。	The synthesis job was superseded by a newer edit.
+合成环境准备失败：{}	Failed to prepare the synthesis environment: {}
+合成线程意外终止。	The synthesis thread terminated unexpectedly.
+唱法曲线产生了无效数值。	The vocal-mode curve produced invalid values.
+唱法曲线的帧数与音频时间线不一致。	The vocal-mode curve frame count does not match the audio timeline.
+均衡器	Equalizer
+声像 pan 必须在 -1 到 1 之间	Pan must be between -1 and 1
+声库 {}/{} 不在已配置的声库目录中。	Voicebank {}/{} is not in the configured voicebank directories.
+声库 {}/{} 对应多个文件，请检查声库目录配置。	Voicebank {}/{} matches several files; check the voicebank directory configuration.
+声库不在当前目录中	The voicebank is not in the current directory
+声库加载线程意外终止。	The voicebank loading thread terminated unexpectedly.
+声库扫描线程意外终止。	The voicebank scan thread terminated unexpectedly.
+声库未声明支持其默认语言	The voicebank does not declare support for its default language
+声库缺少合成配置。	The voicebank has no synthesis configuration.
+声库缺少语言配置	The voicebank has no language configuration
+声码器	Vocoder
+实时混音要求 48000 Hz PCM，收到 {} Hz	Live mixing requires 48000 Hz PCM but received {} Hz
+导出选项 {} 必须为布尔值	Export option {} must be a boolean
+导出音频长度溢出	Export audio length overflowed
+尚未设置声库目录。	No voicebank directory has been set.
+尚未选择声库。	No voicebank has been selected.
+工程 projectMixer 必须为对象	The projectMixer project field must be an object
+工程中找不到发音词典：{}	Pronunciation dictionary not found in the project: {}
+已导入 {} 个声库。	Imported {} voicebanks.
+已导入 {} 的模型上下文。	Imported the model context for {}.
+已导入并启用发音词典。	Pronunciation dictionary imported and enabled.
+已移除导入的 Flat 声库。	Removed the imported Flat voicebank.
+应用已进入后台，WAV 渲染已中止。	The app moved to the background, so WAV rendering was cancelled.
+延音前缺少相连的元音，请填写歌词或显式音素。	A connected vowel is missing before the extension; enter lyrics or explicit phonemes.
+当前声库不支持{}	The current voicebank does not support {}
+当前声库不支持唱法 {} 的{}参数。	The current voicebank does not support the {} parameter of vocal mode {}.
+找不到待渲染音频的推理位置	No inference position found for the audio awaiting rendering
+推理设备初始化线程意外退出。	The inference device initialisation thread exited unexpectedly.
+文件不包含可解码的音频	The file contains no decodable audio
+文件名称为空或含有无效字符	The file name is empty or contains invalid characters
+无效的伴奏波形	Invalid backing-track waveform
+无法保存合成设置 {}：{}	Failed to save synthesis settings {}: {}
+无法保存词典设置	Failed to save dictionary settings
+无法分配混音片段：{}	Failed to allocate mix spans: {}
+无法分配立体声混音缓冲区：{}	Failed to allocate the stereo mix buffer: {}
+无法创建合成设置目录 {}：{}	Failed to create the synthesis settings directory {}: {}
+无法创建导出文件夹 {}：{}	Failed to create the export folder {}: {}
+无法加载音频：{}	Failed to load audio: {}
+无法区分具有相同标识的 WebGPU 显卡：{}	Cannot distinguish WebGPU adapters with the same identifier: {}
+无法启动合成线程：{}	Failed to start the synthesis thread: {}
+无法启动声库扫描：{}	Failed to start the voicebank scan: {}
+无法启动推理设备初始化线程：{}	Failed to start the inference device initialisation thread: {}
+无法启动模型上下文任务：{}	Failed to start the model context task: {}
+无法启动资源处理任务：{}	Failed to start the resource task: {}
+无法启动音频导出：{}	Failed to start the audio export: {}
+无法启动音频线程：{}	Failed to start the audio thread: {}
+无法序列化合成设置：{}	Failed to serialize the synthesis settings: {}
+无法打开音频文件：{}	Failed to open the audio file: {}
+无法识别声库语言：{}	Unrecognised voicebank language: {}
+无法读取发音词典 {}：{}	Failed to read the pronunciation dictionary {}: {}
+无法读取合成设置 {}：{}	Failed to read the synthesis settings {}: {}
+无法调度待导出的音符组	Failed to schedule the note group awaiting export
+无法调度待渲染的音符组	Failed to schedule the note group awaiting rendering
+日语读音模型格式无效：{}	Invalid Japanese reading model format: {}
+日语长音前缺少元音，请填写罗马音或显式音素	A vowel is missing before the Japanese long vowel; enter romaji or explicit phonemes
+时值重录仅支持二代歌声；当前歌声可使用音高和音色重录。	Duration retakes require an SV2 voice; the current voice can retake pitch and timbre.
+暂不支持导出选项“{}”（{}）	Export option “{}” ({}) is not supported yet
+暂不支持工程混音设置 projectMixer.{} = {}	Project mixer setting projectMixer.{} = {} is not supported yet
+暂不支持已启用的{}效果（fxParams.{}）	The enabled {} effect is not supported yet (fxParams.{})
+暂不支持混音效果 fxParams.{}	Mixer effect fxParams.{} is not supported yet
+暂不支持混音设置 {} = {}	Mixer setting {} = {} is not supported yet
+暂不支持音符组实例的重录采样，请使用音符重录。	Retaking samples of note-group instances is not supported yet; retake individual notes instead.
+未完成的音符组没有可执行的音频区间	An incomplete note group has no audio range to execute
+未找到所选 WebGPU 显卡：{}	The selected WebGPU adapter was not found: {}
+模型上下文任务意外终止。	The model context task terminated unexpectedly.
+模型开始位置超出地址范围	Model start position is out of address range
+模型结束位置超出地址范围	Model end position is out of address range
+歌声参数曲线产生了无效数值。	The voice parameter curve produced invalid values.
+歌声合成失败 · 查看渲染面板	Voice synthesis failed · See the render panel
+歌声需要导入模型上下文	The voice needs its model context imported
+正在准备合成环境	Preparing the synthesis environment
+正在准备播放位置的音频	Preparing audio for the playback position
+正在准备预览	Preparing preview
+正在加载声库	Loading voicebank
+正在合成歌声	Synthesizing vocals
+正在扫描声库目录	Scanning voicebank directories
+正在扫描浏览器声库	Scanning browser voicebanks
+混响	Reverb
+混音 fxParams 必须为对象	Mixer fxParams must be an object
+混音块超出项目范围	The mix block is outside the project range
+混音字段 {} 缺失或不是布尔值	Mixer field {} is missing or not a boolean
+混音字段 {} 缺失或不是有限数值	Mixer field {} is missing or not a finite number
+混音效果 fxParams.{}.enabled 缺失或不是布尔值	Mixer effect fxParams.{}.enabled is missing or not a boolean
+混音样本数量溢出	Mix sample count overflowed
+混音结束位置溢出	Mix end position overflowed
+混音输出无效：{}	Invalid mix output: {}
+目前支持单声道和立体声音频	Only mono and stereo audio is supported
+空间定位	Room placement
+等待音符	Waiting for notes
+等待音符或伴奏	Waiting for notes or a backing track
+绕过声像	Bypass pan
+绕过效果	Bypass effects
+绕过音量	Bypass gain
+解码失败：{}	Decoding failed: {}
+词典为空：{}	The dictionary is empty: {}
+词典未覆盖歌词 {}，请使用对应语言的注音或显式音素	The dictionary does not cover the lyric {}; use a reading annotation in that language or explicit phonemes
+该声库需要便携模型上下文	This voicebank needs a portable model context
+请使用有效的文件名称	Use a valid file name
+请勾选混音导出或至少一条音轨	Select the mix export or at least one track
+请等待当前工程合成完成后再导出	Wait for the current project to finish synthesizing before exporting
+请等待所选伴奏加载完成后再导出	Wait for the selected backing tracks to load before exporting
+请设置 databases 目录以加载音轨歌手	Set the databases directory to load track singers
+请设置有效的 clf-data 词典目录	Set a valid clf-data dictionary directory
+请选择有效的声道数	Choose a valid channel count
+请选择有效的气声输出格式	Choose a valid aspiration output format
+请选择有效的目标文件夹	Choose a valid destination folder
+请选择有效的采样率和位深度	Choose a valid sample rate and bit depth
+读取伴奏	Reading backing tracks
+资源处理线程意外终止。	The resource thread terminated unexpectedly.
+部分伴奏不可用 · 查看渲染面板	Some backing tracks are unavailable · See the render panel
+钢琴试听失败：{}	Piano audition failed: {}
+音符 {} · {}：{}	Note {} · {}: {}
+音符 {} 的语言无效：{}	Note {} has an invalid language: {}
+音符组 PCM 结束位置溢出	Note group PCM end position overflowed
+音符组 {} · {}	Note group {} · {}
+音符组 {} 的 PCM 开始位置超出地址范围	Note group {} PCM start position is out of address range
+音符组 {} 的 PCM 采样率为 {} Hz，混音要求所有音符组使用 48000 Hz	Note group {} has a PCM sample rate of {} Hz; mixing requires every note group to use 48000 Hz
+音符组 {} 的模型采样范围无效	Note group {} has an invalid model sample range
+音符组 {} 的音频覆盖范围无效	Note group {} has an invalid audio coverage range
+音符组 {} 缺少混音控制	Note group {} has no mixer controls
+音符组合成失败：{}	Note group synthesis failed: {}
+音符组覆盖范围超出地址范围	Note group coverage is out of address range
+音符组采样率无效	Invalid note group sample rate
+音素强度与音色帧的时间线不一致。	The phoneme strength and timbre frame timelines disagree.
+音素强度包含无效的边界或数值。	Phoneme strength contains an invalid boundary or value.
+音素强度帧数过大。	The phoneme strength frame count is too large.
+音素强度控制点数量过大。	The phoneme strength has too many control points.
+音素强度数量过大。	The phoneme strength count is too large.
+音素强度曲线产生了无效数值。	The phoneme strength curve produced invalid values.
+音素强度没有对应的源音符。	The phoneme strength has no matching source note.
+音素强度的原始时值无效。	The phoneme strength's original duration is invalid.
+音素强度的默认活动度无效。	The phoneme strength's default activity is invalid.
+音素强度缺少默认活动度。	The phoneme strength has no default activity.
+音素时长	Phoneme duration
+音素边界缺少原始音符起点。	A phoneme boundary is missing its original note start.
+音色	Timbre
+音色参数曲线产生了无效数值。	The timbre parameter curve produced invalid values.
+音轨 {} 的独奏状态与项目混音快照不一致	Track {} solo state does not match the project mixer snapshot
+音轨 {} 的音量超出有效范围	Track {} gain is out of the valid range
+音轨 {}：{}	Track {}: {}
+音轨尚未指定歌声	No voice is assigned to the track
+音轨混音失败：{}	Track mixing failed: {}
+音频内存不足：{}	Out of memory for audio: {}
+音频加载任务意外停止	The audio loading task stopped unexpectedly
+音频加载已取消	Audio loading was cancelled
+音频导出线程意外终止。	The audio export thread terminated unexpectedly.
+音频已就绪	Audio ready
+音频文件为空	The audio file is empty
+音频编码信息缺失	Audio codec information is missing
+音频解码后超过 2 GiB，请拆分文件后导入	The decoded audio exceeds 2 GiB; split the file before importing
+音频输出线程已停止。	The audio output thread has stopped.
+音频采样率不在 1..=384000 Hz 范围内	The audio sample rate is outside 1..=384000 Hz
+音高	Pitch
+音高控制点仅支持二代歌声；当前歌声请改用手绘音高曲线。	Pitch control points require an SV2 voice; with the current voice, draw a pitch curve instead.
+预览混音产生了非有限的 PCM 样本	Preview mixing produced a non-finite PCM sample
+预览混音准备失败：{}	Preview mix preparation failed: {}
+预览混音失败：{}	Preview mixing failed: {}

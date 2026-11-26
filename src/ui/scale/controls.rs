@@ -1,12 +1,12 @@
 use super::{Scale, Tonic};
-use crate::{app::App, ui::theme::border_color};
+use crate::{app::App, tr, ui::theme::border_color};
 use eframe::egui::*;
 use serde_json::{Value, json};
 
 #[cfg(not(target_os = "android"))]
 pub fn toolbar(app: &mut App, ui: &mut Ui) {
     ui.add_space(15.0);
-    ui.label(RichText::new("调式音阶").color(crate::ui::theme::muted_color()));
+    ui.label(RichText::new(tr!("调式音阶")).color(crate::ui::theme::muted_color()));
     ui.add_space(8.0);
     ui.push_id("scale-toolbar", |ui| controls(app, ui, false));
 }
@@ -129,7 +129,7 @@ fn update(app: &mut App, field: &str, value: &str) {
         return;
     }
     app.commit_lyric();
-    app.editor.begin("修改调式音阶");
+    app.editor.begin(tr!("修改调式音阶"));
     if let Some(group) = app.editor.group_mut() {
         let raw = group
             .extra

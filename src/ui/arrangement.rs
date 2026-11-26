@@ -5,7 +5,7 @@ use super::{
     theme::*,
     timeline::*,
 };
-use crate::{app::App, model::*};
+use crate::{app::App, model::*, tr};
 use eframe::egui::*;
 
 #[cfg(any(target_os = "android", target_arch = "wasm32"))]
@@ -72,7 +72,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
                     } else {
                         Icon::ChevronDown
                     },
-                    "展开 / 折叠编排",
+                    tr!("展开 / 折叠编排"),
                 )
                 .size(vec2(12.0, 24.0))
                 .icon_size(12.0),
@@ -82,10 +82,10 @@ pub fn show(app: &mut App, ui: &mut Ui) {
             app.view.arrangement_collapsed = !app.view.arrangement_collapsed;
         }
         #[cfg(not(target_os = "android"))]
-        super::section_title(ui, "编排", super::state::DragPayload::Arrangement);
+        super::section_title(ui, tr!("编排"), super::state::DragPayload::Arrangement);
         #[cfg(target_os = "android")]
         if gutter >= 104.0 {
-            ui.label(RichText::new("编排").font(section_title_font()));
+            ui.label(RichText::new(tr!("编排")).font(section_title_font()));
         }
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             let size = if mobile {
@@ -94,14 +94,14 @@ pub fn show(app: &mut App, ui: &mut Ui) {
                 vec2(23.0, 24.0)
             };
             let create = ui.add(
-                IconButton::new(Icon::Plus, "创建音轨")
+                IconButton::new(Icon::Plus, tr!("创建音轨"))
                     .size(size)
                     .icon_size(17.0),
             );
             Popup::menu(&create).show(|ui| super::instrumental::create_menu(app, ui));
             if ui
                 .add(
-                    IconButton::new(Icon::TempoTracks, "显示 / 隐藏曲速和拍号轨")
+                    IconButton::new(Icon::TempoTracks, tr!("显示 / 隐藏曲速和拍号轨"))
                         .size(if mobile { size } else { Vec2::splat(24.0) })
                         .icon_size(17.0)
                         .selected(app.show_time_tracks)
@@ -235,7 +235,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         let row_height = super::time_tracks::ROW_HEIGHT;
         let clip = Rect::from_min_max(pos2(rect.left(), body.top()), body.max);
         let mut time_ui = child(ui, clip, "time-tracks");
-        for (index, text) in ["拍号", "曲速"].into_iter().enumerate() {
+        for (index, text) in [tr!("拍号"), tr!("曲速")].into_iter().enumerate() {
             let y = time_y + index as f32 * row_height;
             time_ui.painter().rect_filled(
                 Rect::from_min_size(pos2(rect.left(), y), vec2(gutter, row_height)),

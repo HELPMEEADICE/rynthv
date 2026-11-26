@@ -14,6 +14,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{JsFuture, spawn_local};
 use web_time::Instant;
 
+use crate::{tr, trf};
 pub(crate) use projects::download;
 use projects::{ProjectEntry, Save, Snapshot};
 
@@ -88,7 +89,7 @@ fn poll<T>(task: &Task<T>) -> Option<Result<T, String>> {
     match task.try_recv() {
         Ok(value) => Some(value),
         Err(mpsc::TryRecvError::Empty) => None,
-        Err(mpsc::TryRecvError::Disconnected) => Some(Err("浏览器文件任务已中断".into())),
+        Err(mpsc::TryRecvError::Disconnected) => Some(Err(tr!("浏览器文件任务已中断").into())),
     }
 }
 
@@ -127,7 +128,7 @@ impl App {
                 self.browser.last_recovery = None;
                 self.last_layout.clear();
                 self.last_preferences.clear();
-                self.status = format!("无法自动保存：{error}");
+                self.status = trf!("无法自动保存：{}", error);
             }
         }
         self.poll_drop(ctx);
@@ -135,16 +136,16 @@ impl App {
 
     pub(crate) fn browser_storage_panel(&mut self, ui: &mut eframe::egui::Ui) {
         if let Some(usage) = &self.browser.storage_report {
-            ui.weak(format!(
-                "当前源约占用 {:.1} MiB／配额 {:.1} MiB",
-                usage.usage / 1048576.0,
-                usage.quota / 1048576.0
+            ui.weak(trf!(
+                "当前源约占用 {} MiB／配额 {} MiB",
+                format!("{:.1}", usage.usage / 1048576.0),
+                format!("{:.1}", usage.quota / 1048576.0)
             ));
         }
         ui.horizontal_wrapped(|ui| {
             let idle = self.browser.storage.is_none();
             if ui
-                .add_enabled(idle, eframe::egui::Button::new("估算存储用量"))
+                .add_enabled(idle, eframe::egui::Button::new(tr!("估算存储用量")))
                 .clicked()
             {
                 self.browser.storage = Some(task(ui.ctx(), documents::json(storage_usage())));
@@ -152,7 +153,7 @@ impl App {
             if ui
                 .add_enabled(
                     idle && !self.synthesis.is_exporting(),
-                    eframe::egui::Button::new("清理 WAV 导出缓存"),
+                    eframe::egui::Button::new(tr!("清理 WAV 导出缓存")),
                 )
                 .clicked()
             {
@@ -223,7 +224,7 @@ impl App {
                 let track = self.editor.add_instrumental_track();
                 self.begin_audio_import(track, path, false, ctx);
             }
-            _ => self.error = Some("不支持拖入此文件类型".into()),
+            _ => self.error = Some(tr!("不支持拖入此文件类型").into()),
         }
     }
 
@@ -259,7 +260,7 @@ impl App {
                     self.browser.last_recovery = Some(tag);
                     records.push(("recovery", snapshot));
                 }
-                Err(error) => self.status = format!("无法自动保存：{error}"),
+                Err(error) => self.status = trf!("无法自动保存：{}", error),
             }
         }
         if records.is_empty() {

@@ -74,7 +74,7 @@ pub(super) fn roaming_directory() -> Result<PathBuf, String> {
         unsafe { SHGetKnownFolderPath(&FOLDERID_ROAMING_APP_DATA, 0, ptr::null_mut(), &mut raw) };
     let guard = KnownFolderString(raw);
     if hr != 0 || guard.0.is_null() {
-        return Err("无法定位当前用户的漫游配置目录。".into());
+        return Err(crate::tr!("无法定位当前用户的漫游配置目录。").into());
     }
     let mut len = 0usize;
     // SAFETY: SHGetKnownFolderPath returns a valid NUL-terminated UTF-16 string.
@@ -82,13 +82,13 @@ pub(super) fn roaming_directory() -> Result<PathBuf, String> {
         len += 1;
     }
     if len == 0 {
-        return Err("当前用户的漫游配置目录路径无效。".into());
+        return Err(crate::tr!("当前用户的漫游配置目录路径无效。").into());
     }
     // SAFETY: guard.0 points to len initialized u16 code units.
     let slice = unsafe { std::slice::from_raw_parts(guard.0, len) };
     let path = PathBuf::from(std::ffi::OsString::from_wide(slice));
     if !path.is_absolute() {
-        return Err("当前用户的漫游配置目录路径无效。".into());
+        return Err(crate::tr!("当前用户的漫游配置目录路径无效。").into());
     }
     Ok(path)
 }

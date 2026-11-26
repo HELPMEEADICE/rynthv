@@ -1,12 +1,13 @@
 use super::Editor;
 use crate::model::*;
+use crate::{tr, trf};
 
 impl Editor {
     pub fn add_instrumental_track(&mut self) -> EntityId {
-        self.begin("创建伴奏轨");
+        self.begin(tr!("创建伴奏轨"));
         let mut track = Track::new(self.project.tracks.len());
         track.disp_color = self.project.next_track_color();
-        track.name = format!("伴奏 {}", self.project.tracks.len() + 1);
+        track.name = trf!("伴奏 {}", (self.project.tracks.len() + 1));
         track.instrumental = Some(InstrumentalTrack::default());
         track
             .main_ref
@@ -23,9 +24,9 @@ impl Editor {
             return;
         }
         self.begin(if clip.is_some() {
-            "导入伴奏"
+            tr!("导入伴奏")
         } else {
-            "移除伴奏"
+            tr!("移除伴奏")
         });
         if let Some(track) = self.project.tracks.iter_mut().find(|t| t.id == id)
             && let Some(instrumental) = &mut track.instrumental

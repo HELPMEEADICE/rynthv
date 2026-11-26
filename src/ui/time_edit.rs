@@ -1,4 +1,4 @@
-use crate::{app::App, editor::Editor, model::TimeAxis, ui::theme::*};
+use crate::{app::App, editor::Editor, model::TimeAxis, tr, ui::theme::*};
 use eframe::egui::*;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -39,7 +39,7 @@ impl TimeEdit {
                     .value
                     .trim()
                     .parse::<f64>()
-                    .map_err(|_| "请输入有效的 BPM 数值")?;
+                    .map_err(|_| tr!("请输入有效的 BPM 数值"))?;
                 editor.set_tempo(position, bpm)
             }
             Target::Meter(index) => {
@@ -47,7 +47,7 @@ impl TimeEdit {
                     .value
                     .trim()
                     .parse::<u32>()
-                    .map_err(|_| "拍号分子须为 1–64 的整数")?;
+                    .map_err(|_| tr!("拍号分子须为 1–64 的整数"))?;
                 editor.set_meter(index, numerator, self.denominator)
             }
         }
@@ -83,8 +83,8 @@ pub fn show(app: &mut App, ctx: &Context) {
             super::dialog::body(ui, width, |ui| {
                 ui.spacing_mut().item_spacing.y = 8.0;
                 let (title, label) = match edit.target {
-                    Target::Meter(_) => ("编辑拍号", "分子"),
-                    Target::Tempo(_) => ("编辑曲速标记", "每分钟节拍数 (BPM)"),
+                    Target::Meter(_) => (tr!("编辑拍号"), tr!("分子")),
+                    Target::Tempo(_) => (tr!("编辑曲速标记"), tr!("每分钟节拍数 (BPM)")),
                 };
                 ui.label(
                     RichText::new(title)
@@ -112,7 +112,7 @@ pub fn show(app: &mut App, ctx: &Context) {
                 }
                 if matches!(edit.target, Target::Meter(_)) {
                     ui.add_space(4.0);
-                    ui.label(RichText::new("分母").color(muted_color()));
+                    ui.label(RichText::new(tr!("分母")).color(muted_color()));
                     ComboBox::from_id_salt("time-event-denominator")
                         .width(width)
                         .selected_text(edit.denominator.to_string())
@@ -134,12 +134,12 @@ pub fn show(app: &mut App, ctx: &Context) {
                     ui.spacing_mut().item_spacing.x = 8.0;
                     let size = vec2(((width - 8.0) / 2.0).max(1.0), 32.0);
                     cancel = ui
-                        .add_sized(size, Button::new("取消").fill(button_hover_color()))
+                        .add_sized(size, Button::new(tr!("取消")).fill(button_hover_color()))
                         .clicked();
                     submit |= ui
                         .add_sized(
                             size,
-                            Button::new(RichText::new("确定").color(canvas_color()))
+                            Button::new(RichText::new(tr!("确定")).color(canvas_color()))
                                 .fill(green_color()),
                         )
                         .clicked();

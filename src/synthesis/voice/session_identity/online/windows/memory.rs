@@ -1,4 +1,5 @@
 use std::ffi::c_void;
+use crate::{tr};
 
 use zeroize::Zeroizing;
 
@@ -11,7 +12,7 @@ pub(super) fn session_field(process: &Handle, slot: usize) -> Result<Zeroizing<V
     let object = pointer(process, slot)?;
     let field_pointer = object
         .checked_add(IDENTITY_POINTER_OFFSET)
-        .ok_or_else(|| VoiceError::new("原编辑器的模型上下文地址无效。"))?;
+        .ok_or_else(|| VoiceError::new(tr!("原编辑器的模型上下文地址无效。")))?;
     let text = pointer(process, field_pointer)?;
     // Allocate once: no reallocation or intermediate raw-field copies. This
     // wrapper clears partial reads on every error path, including invalid UTF-8.
@@ -19,7 +20,7 @@ pub(super) fn session_field(process: &Handle, slot: usize) -> Result<Zeroizing<V
     for offset in 0..MAXIMUM_FIELD_BYTES {
         let address = text
             .checked_add(offset)
-            .ok_or_else(|| VoiceError::new("原编辑器的模型上下文地址无效。"))?;
+            .ok_or_else(|| VoiceError::new(tr!("原编辑器的模型上下文地址无效。")))?;
         read(process, address, &mut field[offset..offset + 1])?;
         if field[offset] == 0 {
             // A string can also change in-place without changing its pointer.
@@ -28,28 +29,28 @@ pub(super) fn session_field(process: &Handle, slot: usize) -> Result<Zeroizing<V
             read(process, text, &mut confirmation)?;
             if pointer(process, slot)? != object || pointer(process, field_pointer)? != text {
                 return Err(VoiceError::new(
-                    "原编辑器的在线会话在读取时发生变化，请重试。",
+                    tr!("原编辑器的在线会话在读取时发生变化，请重试。"),
                 ));
             }
             if confirmation[..] != field[..offset + 1] {
                 return Err(VoiceError::new(
-                    "原编辑器的在线上下文在读取时发生变化，请重试。",
+                    tr!("原编辑器的在线上下文在读取时发生变化，请重试。"),
                 ));
             }
             if offset == 0 {
                 return Err(VoiceError::new(
-                    "原编辑器尚未准备好在线模型上下文，请先登录并加载歌声。",
+                    tr!("原编辑器尚未准备好在线模型上下文，请先登录并加载歌声。"),
                 ));
             }
             if std::str::from_utf8(&field[..offset]).is_err() {
-                return Err(VoiceError::new("原编辑器的模型上下文不是有效的 UTF-8。"));
+                return Err(VoiceError::new(tr!("原编辑器的模型上下文不是有效的 UTF-8。")));
             }
             field.truncate(offset);
             return Ok(field);
         }
     }
     Err(VoiceError::new(
-        "原编辑器的模型上下文超过安全读取上限，已停止导入。",
+        tr!("原编辑器的模型上下文超过安全读取上限，已停止导入。"),
     ))
 }
 
@@ -65,7 +66,7 @@ fn read(process: &Handle, address: usize, output: &mut [u8]) -> Result<()> {
             .checked_add(output.len())
             .is_none_or(|end| end >= 0x7fff_ffff_ffff)
     {
-        return Err(VoiceError::new("原编辑器的模型上下文地址不可用。"));
+        return Err(VoiceError::new(tr!("原编辑器的模型上下文地址不可用。")));
     }
     let mut received = 0;
     // SAFETY: ReadProcessMemory validates the remote range; output owns exactly
@@ -81,7 +82,7 @@ fn read(process: &Handle, address: usize, output: &mut [u8]) -> Result<()> {
     };
     if success == 0 || received != output.len() {
         return Err(VoiceError::new(
-            "无法完整读取原编辑器的在线模型上下文，请确认会话仍在运行。",
+            tr!("无法完整读取原编辑器的在线模型上下文，请确认会话仍在运行。"),
         ));
     }
     Ok(())

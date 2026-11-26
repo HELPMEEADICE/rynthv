@@ -4,6 +4,8 @@
 //! condition reaches RynthV's context file; the original field is zeroized.
 
 use std::path::PathBuf;
+#[cfg(any(not(windows), not(target_arch = "x86_64")))]
+use crate::{tr};
 
 use super::{Result, VoiceError};
 
@@ -60,5 +62,5 @@ pub fn import_online_context(
 
 #[cfg(not(all(windows, target_arch = "x86_64")))]
 fn unsupported_platform() -> VoiceError {
-    VoiceError::new("在线模型上下文导入目前仅支持 Windows x64。")
+    VoiceError::new(tr!("在线模型上下文导入目前仅支持 Windows x64。"))
 }

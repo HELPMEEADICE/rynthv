@@ -17,6 +17,8 @@ use crate::{
     editor::Editor,
     model::*,
     synthesis,
+    tr,
+    trf,
     ui::{self, state::ViewState},
 };
 use eframe::egui::*;
@@ -103,9 +105,6 @@ impl App {
     ) -> Self {
         ui::theme::install(&cc.egui_ctx);
         egui_extras::install_image_loaders(&cc.egui_ctx);
-        #[cfg(not(target_arch = "wasm32"))]
-        let mut error = ui::theme::fonts(&cc.egui_ctx).err();
-        #[cfg(target_arch = "wasm32")]
         let mut error = None;
         #[cfg(not(target_arch = "wasm32"))]
         let settings_path = match crate::platform::config_directory() {
@@ -130,8 +129,8 @@ impl App {
                     last_layout = serde_json::to_string_pretty(&v).unwrap_or_default();
                     view = v;
                 }
-                Ok(_) => error = Some("保存的工作区尺寸或结构无效，已重置布局".into()),
-                Err(e) => error = Some(format!("无法读取工作区：{e}")),
+                Ok(_) => error = Some(tr!("保存的工作区尺寸或结构无效，已重置布局").into()),
+                Err(e) => error = Some(trf!("无法读取工作区：{}", e)),
             }
         }
         #[cfg(target_arch = "wasm32")]
@@ -159,9 +158,13 @@ impl App {
             .preferences
             .filter(ui::settings::Preferences::valid)
             .unwrap_or_default();
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Err(message) = ui::theme::fonts(&cc.egui_ctx, preferences.locale) {
+            error = error.or(Some(message));
+        }
         #[cfg(target_arch = "wasm32")]
         if let Err(message) = ui::theme::web_fonts(&cc.egui_ctx, start.font) {
-            error = Some(message);
+            error = error.or(Some(message));
         }
         preferences.apply(&cc.egui_ctx);
         cc.egui_ctx
@@ -178,7 +181,7 @@ impl App {
                 .wgpu_render_state
                 .as_ref()
                 .map(|state| format!("{:?}", state.adapter.get_info().backend))
-                .unwrap_or_else(|| "未初始化".into()),
+                .unwrap_or_else(|| tr!("未初始化").into()),
             view,
             preferences,
             path: None,
@@ -312,8 +315,8 @@ impl App {
             }
             FileAction::Open => self.pick_one(
                 ctx,
-                picker::Picker::new(picker::Selection::File, "打开工程")
-                    .filter("Synthesizer V 工程", &["svp"]),
+                picker::Picker::new(picker::Selection::File, tr!("打开工程"))
+                    .filter(tr!("Synthesizer V 工程"), &["svp"]),
                 |app, _, path| app.open_path(path),
             ),
             #[cfg(any(target_os = "android", target_arch = "wasm32"))]
@@ -383,7 +386,7 @@ impl App {
                 .as_ref()
                 .and_then(|p| p.file_stem())
                 .and_then(|p| p.to_str())
-                .unwrap_or("未命名"),
+                .unwrap_or(tr!("未命名")),
             if self.has_unsaved_changes() { " *" } else { "" }
         );
         if title != self.last_title {
@@ -430,18 +433,18 @@ impl App {
         self.local_project_dialog(ctx);
         if let Some(action) = self.pending {
             Modal::new(Id::new("unsaved")).show(ctx, |ui| {
-                ui.heading("保存工程更改？");
-                ui.label("当前工程包含尚未保存的编辑。");
+                ui.heading(tr!("保存工程更改？"));
+                ui.label(tr!("当前工程包含尚未保存的编辑。"));
                 ui.horizontal(|ui| {
-                    if ui.button("保存").clicked() && self.save_project(false, ctx) {
+                    if ui.button(tr!("保存")).clicked() && self.save_project(false, ctx) {
                         self.pending = None;
                         self.perform_file(action, ctx);
                     }
-                    if ui.button("不保存").clicked() {
+                    if ui.button(tr!("不保存")).clicked() {
                         self.pending = None;
                         self.perform_file(action, ctx);
                     }
-                    if ui.button("取消").clicked() {
+                    if ui.button(tr!("取消")).clicked() {
                         self.pending = None;
                     }
                 });
@@ -450,9 +453,9 @@ impl App {
         if let Some(error) = self.error.clone() {
             Modal::new(Id::new("error")).show(ctx, |ui| {
                 ui.set_max_width(480.0);
-                ui.heading("操作未完成");
+                ui.heading(tr!("操作未完成"));
                 ui.label(error);
-                if ui.button("确定").clicked() {
+                if ui.button(tr!("确定")).clicked() {
                     self.error = None;
                 }
             });
@@ -460,10 +463,10 @@ impl App {
         if self.about {
             Modal::new(Id::new("about")).show(ctx, |ui| {
                 ui.heading(format!("RynthV {}", env!("CARGO_PKG_VERSION")));
-                ui.label("Rust + egui 歌声合成引擎");
-                ui.label("多音轨编辑、歌词与音高调整、MIDI 导入和 WAV 导出。");
-                ui.label("支持 Windows、Linux、Android 和 Web。");
-                if ui.button("关闭").clicked() {
+                ui.label(tr!("Rust + egui 歌声合成引擎"));
+                ui.label(tr!("多音轨编辑、歌词与音高调整、MIDI 导入和 WAV 导出。"));
+                ui.label(tr!("支持 Windows、Linux、Android 和 Web。"));
+                if ui.button(tr!("关闭")).clicked() {
                     self.about = false;
                 }
             });
@@ -477,7 +480,7 @@ impl App {
             Modal::new(Id::new("android-file-operation")).show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.spinner();
-                    ui.label("正在处理文件…");
+                    ui.label(tr!("正在处理文件…"));
                 });
             });
         }

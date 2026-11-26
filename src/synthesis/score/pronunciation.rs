@@ -10,6 +10,7 @@ use crate::{
         voice::{PhoneResolver, Result, VoiceError},
     },
 };
+use crate::{tr, trf};
 
 pub(super) fn resolve_note(
     note: &NoteInput,
@@ -45,7 +46,7 @@ pub(super) fn resolve_note(
                     vec![vec![text.to_owned()]]
                 } else {
                     frontend.resolve(language, text).map_err(|error| {
-                        VoiceError::new(format!("音符 {} · {}：{error}", note.id, language.label()))
+                        VoiceError::new(trf!("音符 {} · {}：{}", note.id, language.label(), error))
                     })?
                 };
                 (language, syllables)
@@ -107,7 +108,7 @@ fn continuation(
         }
     }
     Err(VoiceError::new(
-        "延音前缺少相连的元音，请填写歌词或显式音素。",
+        tr!("延音前缺少相连的元音，请填写歌词或显式音素。"),
     ))
 }
 

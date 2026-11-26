@@ -4,6 +4,7 @@ use super::{
 };
 use crate::{
     model::{PitchPoint, ticks},
+    tr,
     ui::{group_geometry::clip_rect, timeline::beat_at},
 };
 
@@ -20,7 +21,7 @@ pub(in crate::ui::piano) fn interaction(
     }
     let Some(reference) = app.editor.active_ref().cloned() else {
         if response.double_clicked() {
-            app.status = "请先点击音符组标题，再添加音高控制点".into();
+            app.status = tr!("请先点击音符组标题，再添加音高控制点").into();
         }
         return;
     };
@@ -58,7 +59,7 @@ pub(in crate::ui::piano) fn interaction(
         let (time, pitch) = geometry::sample(app, canvas, &reference, pointer);
         let point = PitchPoint::new(time, pitch);
         anchor_clear(app);
-        app.editor.begin("创建音高控制点");
+        app.editor.begin(tr!("创建音高控制点"));
         if let Some(group) = app.editor.group_mut() {
             group.pitch_controls.push(PitchControl::Point(point));
         }
@@ -113,14 +114,14 @@ fn context_menu(app: &mut App, response: &Response) {
         if ui
             .add_enabled(
                 !app.piano_anchor.ids.is_empty(),
-                Button::new("删除所选音高控制点").shortcut_text("Delete"),
+                Button::new(tr!("删除所选音高控制点")).shortcut_text("Delete"),
             )
             .clicked()
         {
             anchor_delete(app);
             ui.close();
         }
-        if ui.button("全选音高控制点").clicked() {
+        if ui.button(tr!("全选音高控制点")).clicked() {
             anchor_select_all(app);
             ui.close();
         }

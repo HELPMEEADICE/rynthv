@@ -1,15 +1,33 @@
 use super::widgets::*;
-use crate::{app::App, ui::state::Column};
+use crate::{app::App, tr, trf, ui::state::Column};
 use eframe::egui::*;
 
 pub(super) fn general(app: &mut App, ui: &mut Ui) {
-    fixed(ui, "界面语言", "简体中文", "当前界面仅支持简体中文");
-    #[cfg(target_arch = "wasm32")]
-    row(ui, "界面主题", |ui| {
-        ui.selectable_value(&mut app.preferences.light_theme, false, "深色");
-        ui.selectable_value(&mut app.preferences.light_theme, true, "浅色");
+    row(ui, tr!("界面语言"), |ui| {
+        let mut changed = false;
+        ComboBox::from_id_salt("ui-locale")
+            .width(ui.available_width().min(180.0))
+            .selected_text(app.preferences.locale.native_name())
+            .show_ui(ui, |ui| {
+                for locale in crate::i18n::Locale::ALL {
+                    if ui
+                        .selectable_value(&mut app.preferences.locale, locale, locale.native_name())
+                        .clicked()
+                    {
+                        changed = true;
+                    }
+                }
+            });
+        if changed {
+            crate::i18n::set_locale(app.preferences.locale);
+        }
     });
-    row(ui, "界面缩放", |ui| {
+    #[cfg(target_arch = "wasm32")]
+    row(ui, tr!("界面主题"), |ui| {
+        ui.selectable_value(&mut app.preferences.light_theme, false, tr!("深色"));
+        ui.selectable_value(&mut app.preferences.light_theme, true, tr!("浅色"));
+    });
+    row(ui, tr!("界面缩放"), |ui| {
         let id = ui.make_persistent_id("zoom-draft");
         let mut percent = ui
             .ctx()
@@ -31,90 +49,90 @@ pub(super) fn general(app: &mut App, ui: &mut Ui) {
             ui.ctx().data_mut(|data| data.remove::<f32>(id));
         }
     });
-    fixed(ui, "图形渲染", &app.graphics_api, "编辑器图形渲染后端");
-    section(ui, "帮助和指导");
-    toggle(ui, "显示状态栏", &mut app.preferences.show_status_bar);
-    toggle(ui, "显示控件操作提示", &mut app.preferences.control_hints);
-    section(ui, "工作区");
+    fixed(ui, tr!("图形渲染"), &app.graphics_api, tr!("编辑器图形渲染后端"));
+    section(ui, tr!("帮助和指导"));
+    toggle(ui, tr!("显示状态栏"), &mut app.preferences.show_status_bar);
+    toggle(ui, tr!("显示控件操作提示"), &mut app.preferences.control_hints);
+    section(ui, tr!("工作区"));
     #[cfg(not(target_os = "android"))]
-    row(ui, "工具列宽度", |ui| {
+    row(ui, tr!("工具列宽度"), |ui| {
         ui.spacing_mut().slider_width = (ui.available_width() - 55.0).max(40.0);
         ui.add(Slider::new(&mut app.view.panel_width, 140.0..=420.0).suffix(" px"));
     });
-    row(ui, "布局", |ui| {
-        if ui.button("重置工作区布局").clicked() {
+    row(ui, tr!("布局"), |ui| {
+        if ui.button(tr!("重置工作区布局")).clicked() {
             app.view = Default::default();
         }
     });
 }
 
 pub(super) fn audio(app: &mut App, ui: &mut Ui) {
-    section(ui, "音频输出");
+    section(ui, tr!("音频输出"));
     fixed(
         ui,
-        "输出设备",
-        "系统默认输出设备",
-        "当前跟随系统默认设备，设备切换尚未接入",
+        tr!("输出设备"),
+        tr!("系统默认输出设备"),
+        tr!("当前跟随系统默认设备，设备切换尚未接入"),
     );
     fixed(
         ui,
-        "播放格式",
-        "设备默认格式",
-        "预览音频自动适配输出设备的采样率和声道",
+        tr!("播放格式"),
+        tr!("设备默认格式"),
+        tr!("预览音频自动适配输出设备的采样率和声道"),
     );
     if let Some(error) = app.synthesis.playback_error() {
         ui.colored_label(Color32::from_rgb(218, 142, 126), error);
     }
-    section(ui, "MIDI 输入");
-    fixed(ui, "输入设备", "未启用", "MIDI 输入尚未接入");
+    section(ui, tr!("MIDI 输入"));
+    fixed(ui, tr!("输入设备"), tr!("未启用"), tr!("MIDI 输入尚未接入"));
 }
 
 pub(super) fn editing(app: &mut App, ui: &mut Ui) {
-    section(ui, "钢琴卷帘");
-    row(ui, "半音行高", |ui| {
+    section(ui, tr!("钢琴卷帘"));
+    row(ui, tr!("半音行高"), |ui| {
         ui.spacing_mut().slider_width = (ui.available_width() - 55.0).max(40.0);
         ui.add(Slider::new(&mut app.view.row_height, 12.0..=36.0).suffix(" px"));
     });
-    toggle(ui, "音符对齐网格", &mut app.view.snap);
-    row(ui, "网格精度", |ui| {
+    toggle(ui, tr!("音符对齐网格"), &mut app.view.snap);
+    row(ui, tr!("网格精度"), |ui| {
         ComboBox::from_id_salt("settings-grid")
             .width(ui.available_width())
-            .selected_text(format!("{} 分音符", app.view.grid))
+            .selected_text(trf!("{} 分音符", app.view.grid))
             .show_ui(ui, |ui| {
                 for value in [4, 8, 16, 32, 64, 128] {
-                    ui.selectable_value(&mut app.view.grid, value, format!("{value} 分音符"));
+                    ui.selectable_value(&mut app.view.grid, value, trf!("{} 分音符", value));
                 }
             });
     });
-    toggle(ui, "三连音网格", &mut app.view.triplet);
-    section(ui, "显示");
-    toggle(ui, "显示音高线", &mut app.show_pitch);
-    toggle(ui, "显示波形", &mut app.show_waveform);
-    toggle(ui, "编排位于上方", &mut app.view.arrangement_first);
-    toggle(ui, "显示曲速和拍号轨", &mut app.show_time_tracks);
+    toggle(ui, tr!("三连音网格"), &mut app.view.triplet);
+    section(ui, tr!("显示"));
+    toggle(ui, tr!("显示音高线"), &mut app.show_pitch);
+    toggle(ui, tr!("显示波形"), &mut app.show_waveform);
+    toggle(ui, tr!("编排位于上方"), &mut app.view.arrangement_first);
+    toggle(ui, tr!("显示曲速和拍号轨"), &mut app.show_time_tracks);
     ui.add_space(10.0);
-    ui.weak("拖动标题可调整工具列顺序，拖动分隔线可调整区域尺寸。");
+    ui.weak(tr!("拖动标题可调整工具列顺序，拖动分隔线可调整区域尺寸。"));
 }
 
 pub(super) fn recording(ui: &mut Ui) {
-    fixed(ui, "录音输入设备", "未启用", "录音功能尚未接入");
-    fixed(ui, "录音声道", "未启用", "录音功能尚未接入");
-    section(ui, "录制");
-    ui.weak("录制功能尚未接入，相关设置暂不可用。");
+    fixed(ui, tr!("录音输入设备"), tr!("未启用"), tr!("录音功能尚未接入"));
+    fixed(ui, tr!("录音声道"), tr!("未启用"), tr!("录音功能尚未接入"));
+    section(ui, tr!("录制"));
+    ui.weak(tr!("录制功能尚未接入，相关设置暂不可用。"));
 }
 
 pub(super) fn rendering(app: &mut App, ui: &mut Ui) {
     super::compute::settings(app, ui);
     crate::ui::voice_library::settings(app, ui);
-    row(ui, "歌声数据库", |ui| {
-        if ui.button("管理歌声…").clicked() {
+    row(ui, tr!("歌声数据库"), |ui| {
+        if ui.button(tr!("管理歌声…")).clicked() {
             app.settings = false;
             app.voice_manager = true;
         }
     });
-    section(ui, "音频导出");
-    row(ui, "导出设置", |ui| {
-        if ui.button("打开渲染面板").clicked() {
+    section(ui, tr!("音频导出"));
+    row(ui, tr!("导出设置"), |ui| {
+        if ui.button(tr!("打开渲染面板")).clicked() {
             #[cfg(not(target_os = "android"))]
             if !app.view.columns.contains(&Column::Render) {
                 app.view.toggle(Column::Render);
@@ -124,5 +142,5 @@ pub(super) fn rendering(app: &mut App, ui: &mut Ui) {
             app.settings = false;
         }
     });
-    ui.weak("目标文件夹、音轨、声道、位深度和采样率在渲染面板中设置。");
+    ui.weak(tr!("目标文件夹、音轨、声道、位深度和采样率在渲染面板中设置。"));
 }

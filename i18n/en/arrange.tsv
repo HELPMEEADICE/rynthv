@@ -1,0 +1,74 @@
+# en catalog fragment: arrange
+# format: <simplified-chinese msgid> TAB <translation>
+编辑当前拍号	Edit Current Time Signature
+编辑当前曲速	Edit Current Tempo
+编辑拍号…	Edit Time Signature…
+编辑曲速…	Edit Tempo…
+编辑曲速标记	Edit Tempo Marker
+播放 / 暂停（Space）	Play / Pause (Space)
+布鲁斯音阶	Blues Scale
+插入新的音符组	Insert New Note Group
+初始拍号和曲速必须保留，可通过编辑修改其数值	The initial time signature and tempo must be kept; edit them to change their values
+创建新的伴奏轨	Create New Instrumental Track
+创建新的音轨	Create New Track
+大调五声音阶	Major Pentatonic Scale
+大调音阶	Major Scale
+导入 / 替换伴奏音频	Import / Replace Backing Audio
+导入 / 替换音频…	Import / Replace Audio…
+导入伴奏…	Import Instrumental…
+调整混音	Adjust Mixer
+调整音符组范围	Resize Note Group
+多利亚调式	Dorian Mode
+分母	Denominator
+分子	Numerator
+弗里几亚调式	Phrygian Mode
+和声小调	Harmonic Minor Scale
+混合利底亚调式	Mixolydian Mode
+节拍器：播放时打拍，仅用于试听	Metronome: clicks while playing, for auditioning only
+利底亚调式	Lydian Mode
+录制（尚未接入）	Record (not available yet)
+洛克里亚调式	Locrian Mode
+每分钟节拍数 (BPM)	Beats per Minute (BPM)
+拍号	Time Signature
+拍号分子须为 1–64 的整数	The numerator must be an integer from 1 to 64
+请输入有效的 BPM 数值	Enter a valid BPM value
+曲速	Tempo
+删除拍号标记	Delete Time Signature Marker
+删除曲速标记	Delete Tempo Marker
+上移音轨	Move Track Up
+声像	Pan
+双击导入伴奏音频…	Double-click to import backing audio…
+所编辑的曲速事件已不存在	The tempo event being edited no longer exists
+替换音频…	Replace Audio…
+停止（Ctrl+Space）	Stop (Ctrl+Space)
+未指定歌声	No voice selected
+下移音轨	Move Track Down
+显示 / 隐藏曲速和拍号轨	Show / Hide Tempo and Time Signature Tracks
+显示循环标记 / 循环播放	Show Loop Region / Loop Playback
+小调五声音阶	Minor Pentatonic Scale
+新增伴奏轨…	Add Instrumental Track…
+新增音轨	Add Track
+修改调式音阶	Change Scale and Mode
+旋律小调（上行）	Melodic Minor Scale (Ascending)
+移除音频	Remove Audio
+移到工程开头	Move to Project Start
+移动伴奏	Move Instrumental
+移动音符组	Move Note Group
+音轨独奏	Track Solo
+音轨混音	Track Mixer
+音轨静音	Track Mute
+音轨颜色	Track Color
+音量	Volume
+暂停播放时返回起播位置	Return to the start position when pausing
+展开 / 折叠编排	Expand / Collapse Arrangement
+正在导入音频…	Importing audio…
+重命名音符组…	Rename Note Group…
+重命名音轨…	Rename Track…
+重新加载音频	Reload Audio
+重新链接音频…	Relink Audio…
+自然小调	Natural Minor Scale
+作为链接音符组粘贴	Paste as Linked Note Group
+{}  {}\n拖动调整，双击复位	{}  {}\nDrag to adjust, double-click to reset
+{} · 加载失败	{} · Load failed
+{} · 加载中…	{} · Loading…
+{}\n{} 秒 · 拖动调整位置，双击替换音频	{}\n{} s · Drag to reposition, double-click to replace the audio

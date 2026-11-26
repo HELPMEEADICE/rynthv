@@ -2,7 +2,7 @@ use super::{
     POPUP_KNOB, STYLE_FILL,
     numeric::{self, ControlResponse, Geometry, Spec},
 };
-use crate::ui::theme::*;
+use crate::{tr, ui::theme::*};
 use eframe::egui::*;
 
 pub(crate) fn style(
@@ -51,9 +51,9 @@ pub(crate) fn style(
     toggle
         .on_hover_cursor(CursorIcon::PointingHand)
         .on_hover_text(if expanded {
-            "收起独立唱法参数"
+            tr!("收起独立唱法参数")
         } else {
-            "分别调整音高、音色与发音"
+            tr!("分别调整音高、音色与发音")
         });
     if expanded {
         return components(ui, id, rect, values, enabled_components);
@@ -107,7 +107,7 @@ fn components(
 ) -> ControlResponse {
     let mut result = ControlResponse::default();
     let width = (rect.width() - 12.0) / 3.0;
-    for (index, label) in ["音高", "音色", "发音"].iter().enumerate() {
+    for (index, label) in [tr!("音高"), tr!("音色"), tr!("发音")].iter().enumerate() {
         let center = pos2(
             rect.left() + 6.0 + width * (index as f32 + 0.5),
             rect.top() + 48.0,
@@ -164,7 +164,7 @@ fn components(
                 id.with(("disabled", index)),
                 Sense::hover(),
             )
-            .on_hover_text("此声库引擎暂不支持独立调整该参数");
+            .on_hover_text(tr!("此声库引擎暂不支持独立调整该参数"));
         }
         result.merge(response);
     }

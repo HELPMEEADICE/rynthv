@@ -1,5 +1,6 @@
 use super::Editor;
 use crate::model::{Automation, AutomationTarget, Interpolation};
+use crate::tr;
 
 impl Editor {
     pub fn automation(&self, target: &AutomationTarget) -> Option<&Automation> {
@@ -20,7 +21,7 @@ impl Editor {
         if self.automation(target).is_none() && interpolation == Interpolation::Cubic {
             return Ok(false);
         }
-        let group = self.group_mut().ok_or("请先选择音符组")?;
+        let group = self.group_mut().ok_or(tr!("请先选择音符组"))?;
         let curve = group.ensure_automation(target);
         let changed = curve.mode != interpolation.key();
         curve.mode = interpolation.key().into();
@@ -50,10 +51,10 @@ impl Editor {
 
     fn validate_automation_target(&self, target: &AutomationTarget) -> Result<(), String> {
         if !target.valid() {
-            return Err("唱法参数名称不能为空".into());
+            return Err(tr!("唱法参数名称不能为空").into());
         }
         if self.group().is_none() || self.current_track().is_instrumental() {
-            return Err("请先选择音符组".into());
+            return Err(tr!("请先选择音符组").into());
         }
         Ok(())
     }

@@ -1,5 +1,7 @@
 use super::LyricEdit;
 use crate::{app::App, model::*};
+#[cfg(target_os = "android")]
+use crate::tr;
 use eframe::egui::{
     text::{CCursor, CCursorRange},
     *,
@@ -40,11 +42,11 @@ pub(super) fn toolbar(app: &mut App, ui: &mut Ui) {
     };
     ui.horizontal_centered(|ui| {
         ui.add_space(5.0);
-        ui.label("歌词");
+        ui.label(tr!("歌词"));
         let size = vec2((ui.available_width() - 52.0).max(30.0), 30.0);
         field(app, ui, size, &reference, edit);
         if ui
-            .add(Button::new("完成").min_size(vec2(44.0, 30.0)))
+            .add(Button::new(tr!("完成")).min_size(vec2(44.0, 30.0)))
             .clicked()
         {
             app.commit_lyric();

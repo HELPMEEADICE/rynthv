@@ -1,5 +1,6 @@
 use super::Editor;
 use crate::model::{Extra, Meter, Tempo};
+use crate::tr;
 
 impl Editor {
     pub fn delete_tempo(&mut self, position: i64) {
@@ -14,7 +15,7 @@ impl Editor {
         else {
             return;
         };
-        self.begin("删除曲速");
+        self.begin(tr!("删除曲速"));
         self.project.time.tempo.remove(index);
         self.finish();
     }
@@ -31,14 +32,14 @@ impl Editor {
         else {
             return;
         };
-        self.begin("删除拍号");
+        self.begin(tr!("删除拍号"));
         self.project.time.meter.remove(slot);
         self.finish();
     }
 
     pub fn set_tempo(&mut self, position: i64, bpm: f64) -> Result<(), String> {
         if position < 0 || !bpm.is_finite() || bpm <= 0.0 || !(60.0 / bpm).is_finite() {
-            return Err("曲速位置必须非负，BPM 必须使每拍时长为有限正数".into());
+            return Err(tr!("曲速位置必须非负，BPM 必须使每拍时长为有限正数").into());
         }
         let slot = self
             .project
@@ -46,9 +47,9 @@ impl Editor {
             .tempo
             .binary_search_by_key(&position, |t| t.position);
         self.begin(if slot.is_ok() {
-            "编辑曲速"
+            tr!("编辑曲速")
         } else {
-            "插入曲速"
+            tr!("插入曲速")
         });
         match slot {
             Ok(index) => self.project.time.tempo[index].bpm = bpm,
@@ -76,7 +77,7 @@ impl Editor {
             || !denominator.is_power_of_two()
             || denominator > 64
         {
-            return Err("拍号分子须为 1–64，分母须为 1、2、4、8、16、32 或 64".into());
+            return Err(tr!("拍号分子须为 1–64，分母须为 1、2、4、8、16、32 或 64").into());
         }
         let slot = self
             .project
@@ -84,9 +85,9 @@ impl Editor {
             .meter
             .binary_search_by_key(&index, |m| m.index);
         self.begin(if slot.is_ok() {
-            "编辑拍号"
+            tr!("编辑拍号")
         } else {
-            "插入拍号"
+            tr!("插入拍号")
         });
         match slot {
             Ok(slot) => {

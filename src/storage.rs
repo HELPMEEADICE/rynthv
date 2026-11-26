@@ -1,5 +1,6 @@
 use crate::model::*;
 use crate::platform::fs;
+use crate::{tr, trf};
 #[cfg(not(target_arch = "wasm32"))]
 use std::io::Read;
 use std::{
@@ -31,7 +32,7 @@ pub fn load(path: &Path) -> Result<LoadedProject, String> {
     let file = fs::File::open(path).map_err(|e| e.to_string())?;
     let metadata = file.metadata().map_err(|e| e.to_string())?;
     if !metadata.is_file() {
-        return Err(format!("工程路径 {} 不是普通文件", path.display()));
+        return Err(trf!("工程路径 {} 不是普通文件", path.display()));
     }
     check_project_size(metadata.len())?;
     let mut bytes = Vec::with_capacity(metadata.len() as usize);
@@ -41,7 +42,7 @@ pub fn load(path: &Path) -> Result<LoadedProject, String> {
     let base = std::path::absolute(path).map_err(|e| e.to_string())?;
     let parent = base
         .parent()
-        .ok_or_else(|| format!("路径 {} 缺少父目录", path.display()))?;
+        .ok_or_else(|| trf!("路径 {} 缺少父目录", path.display()))?;
     let mut loaded = decode_project(&bytes)?;
     resolve_project_paths(&mut loaded.project, parent);
     Ok(loaded)
@@ -50,14 +51,16 @@ pub fn load(path: &Path) -> Result<LoadedProject, String> {
 pub fn decode_project(bytes: &[u8]) -> Result<LoadedProject, String> {
     check_project_size(bytes.len() as u64)?;
     let mut project: Project =
-        serde_json::from_slice(bytes).map_err(|e| format!("SVP 解析失败：{e}"))?;
+        serde_json::from_slice(bytes).map_err(|e| trf!("SVP 解析失败：{}", e))?;
     let revision = Revision::of(bytes);
     let imported = match project.version {
         SVP_VERSION => false,
         svp_v153::VERSION => true,
         version => {
-            return Err(format!(
-                "不支持 SVP 版本 {version}，可打开 {SVP_VERSION} 或导入 {}",
+            return Err(trf!(
+                "不支持 SVP 版本 {}，可打开 {} 或导入 {}",
+                version,
+                SVP_VERSION,
                 svp_v153::VERSION
             ));
         }
@@ -115,7 +118,7 @@ pub fn save(path: &Path, project: &Project) -> Result<(), String> {
 
 pub fn validate(project: &Project) -> Result<(), String> {
     if project.version != SVP_VERSION {
-        return Err(format!("只能保存为 SVP {SVP_VERSION} 工程"));
+        return Err(trf!("只能保存为 SVP {} 工程", SVP_VERSION));
     }
     validate_time(&project.time)?;
     validate_content(project)
@@ -128,7 +131,7 @@ fn save_locked(path: &Path, project: &Project, overwrite: bool) -> Result<(), St
     let base = std::path::absolute(path).map_err(|e| e.to_string())?;
     let parent = base
         .parent()
-        .ok_or_else(|| format!("路径 {} 缺少父目录", path.display()))?;
+        .ok_or_else(|| trf!("路径 {} 缺少父目录", path.display()))?;
     for track in &mut ordered.tracks {
         if let Some(clip) = track.instrumental.as_mut().and_then(|t| t.clip.as_mut())
             && let Ok(relative) = clip.path.strip_prefix(parent)
@@ -173,13 +176,13 @@ pub fn atomic_write_policy(
     write: impl FnOnce(&mut BufWriter<fs::File>) -> Result<(), String>,
 ) -> Result<(), String> {
     if path.as_os_str().to_string_lossy().ends_with(['/', '\\']) {
-        return Err(format!("写入 {} 失败：目标路径不是文件", path.display()));
+        return Err(trf!("写入 {} 失败：目标路径不是文件", path.display()));
     }
     let name = path
         .file_name()
         .and_then(|s| s.to_str())
         .filter(|s| !s.is_empty())
-        .ok_or_else(|| format!("写入 {} 失败：路径缺少文件名", path.display()))?;
+        .ok_or_else(|| trf!("写入 {} 失败：路径缺少文件名", path.display()))?;
     let parent = path
         .parent()
         .filter(|p| !p.as_os_str().is_empty())
@@ -224,7 +227,7 @@ pub fn atomic_write_policy(
         if error.starts_with("OUTPUT_EXISTS: ") {
             error
         } else {
-            format!("写入 {} 失败：{error}", path.display())
+            trf!("写入 {} 失败：{}", path.display(), error)
         }
     })
 }
@@ -271,11 +274,11 @@ fn resolve_relative_clip(parent: &Path, clip_path: &Path) -> std::path::PathBuf 
 }
 
 fn validate_time(time: &TimeAxis) -> Result<(), String> {
-    let bad = |s: &str| Err(format!("工程校验失败：{s}"));
+    let bad = |s: &str| Err(trf!("工程校验失败：{}", s));
     if time.tempo.first().is_none_or(|t| t.position != 0)
         || time.meter.first().is_none_or(|m| m.index != 0)
     {
-        return bad("时间轴必须从 0 开始");
+        return bad(tr!("时间轴必须从 0 开始"));
     }
     if !time.start_time_seconds.is_finite()
         || time.tempo.iter().any(|t| {
@@ -286,7 +289,7 @@ fn validate_time(time: &TimeAxis) -> Result<(), String> {
             .windows(2)
             .any(|a| a[0].position >= a[1].position)
     {
-        return bad("曲速必须为正数，标记按时间严格递增");
+        return bad(tr!("曲速必须为正数，标记按时间严格递增"));
     }
     if time.meter.iter().any(|m| {
         m.index < 0
@@ -296,27 +299,27 @@ fn validate_time(time: &TimeAxis) -> Result<(), String> {
             || m.denominator > 64
     }) || time.meter.windows(2).any(|a| a[0].index >= a[1].index)
     {
-        return bad("拍号或拍号位置无效");
+        return bad(tr!("拍号或拍号位置无效"));
     }
     Ok(())
 }
 
 fn validate_content(p: &Project) -> Result<(), String> {
-    let bad = |s: &str| Err(format!("工程校验失败：{s}"));
+    let bad = |s: &str| Err(trf!("工程校验失败：{}", s));
     identity::validate(p)?;
     if p.tracks.is_empty() {
-        return bad("至少需要一条音轨");
+        return bad(tr!("至少需要一条音轨"));
     }
     for (name, dictionary) in &p.dictionaries {
         if name.trim().is_empty() || name != name.trim() {
-            return bad("发音词典名称不能为空或包含首尾空白");
+            return bad(tr!("发音词典名称不能为空或包含首尾空白"));
         }
         if dictionary.entries.iter().any(|(word, phones)| {
             word.trim().is_empty()
                 || word != word.trim()
                 || phones.split_whitespace().next().is_none()
         }) {
-            return bad("发音词典的字词或音素无效");
+            return bad(tr!("发音词典的字词或音素无效"));
         }
     }
     struct GroupBounds {
@@ -332,19 +335,19 @@ fn validate_content(p: &Project) -> Result<(), String> {
         .chain(p.tracks.iter().map(|t| &t.main_group))
     {
         if g.uuid.is_empty() {
-            return bad("音符组 UUID 缺失或重复");
+            return bad(tr!("音符组 UUID 缺失或重复"));
         }
         let mut note_bounds: Option<(i64, i64)> = None;
         let mut pitch_bounds: Option<(i32, i32)> = None;
         for note in &g.notes {
             let Some(note_end) = note.onset.checked_add(note.duration) else {
-                return bad("音符时间或 MIDI 音高无效");
+                return bad(tr!("音符时间或 MIDI 音高无效"));
             };
             if note.duration <= 0 || !(0..=127).contains(&note.pitch) || !note.detune.is_finite() {
-                return bad("音符时间或 MIDI 音高无效");
+                return bad(tr!("音符时间或 MIDI 音高无效"));
             }
             if note.rynthv_sv1_pitch.is_some_and(|pitch| !pitch.valid()) {
-                return bad("一代音符音高参数无效");
+                return bad(tr!("一代音符音高参数无效"));
             }
             note_bounds = Some(match note_bounds {
                 Some((min_o, max_e)) => (min_o.min(note.onset), max_e.max(note_end)),
@@ -355,26 +358,26 @@ fn validate_content(p: &Project) -> Result<(), String> {
                 None => (note.pitch, note.pitch),
             });
             NotePerformance::from_note(note)
-                .map_err(|error| format!("工程校验失败：音符 {}：{error}", note.lyrics))?;
+                .map_err(|error| trf!("工程校验失败：音符 {}：{}", note.lyrics, error))?;
             PhonemeAttributes::read(&note.attributes)
-                .map_err(|error| format!("工程校验失败：音符 {}：{error}", note.lyrics))?;
+                .map_err(|error| trf!("工程校验失败：音符 {}：{}", note.lyrics, error))?;
             TakeSet::from_extra(&note.extra)
-                .map_err(|error| format!("工程校验失败：音符 {}：{error}", note.lyrics))?;
+                .map_err(|error| trf!("工程校验失败：音符 {}：{}", note.lyrics, error))?;
         }
         for (name, curve) in g.parameters.iter().chain(&g.vocal_modes) {
             if name.trim().is_empty() {
-                return bad("参数名称不能为空");
+                return bad(tr!("参数名称不能为空"));
             }
             curve
                 .validate()
-                .map_err(|error| format!("工程校验失败：参数 {name}：{error}"))?;
+                .map_err(|error| trf!("工程校验失败：参数 {}：{}", name, error))?;
         }
         let mut control_bounds: Option<(i64, i64)> = None;
         for control in &g.pitch_controls {
             match control {
                 PitchControl::Point(point) => {
                     if !point.valid() {
-                        return bad("音高控制点的音高或标识无效");
+                        return bad(tr!("音高控制点的音高或标识无效"));
                     }
                     control_bounds = Some(match control_bounds {
                         Some((min_t, max_t)) => (min_t.min(point.pos), max_t.max(point.pos)),
@@ -383,7 +386,7 @@ fn validate_content(p: &Project) -> Result<(), String> {
                 }
                 PitchControl::Curve(curve) => {
                     let Some((start, end)) = curve.valid().then(|| curve.range()).flatten() else {
-                        return bad("手绘音高曲线必须包含至少两个按时间递增的有效控制点");
+                        return bad(tr!("手绘音高曲线必须包含至少两个按时间递增的有效控制点"));
                     };
                     control_bounds = Some(match control_bounds {
                         Some((min_t, max_t)) => (min_t.min(start), max_t.max(end)),
@@ -404,54 +407,54 @@ fn validate_content(p: &Project) -> Result<(), String> {
             )
             .is_some()
         {
-            return bad("音符组 UUID 缺失或重复");
+            return bad(tr!("音符组 UUID 缺失或重复"));
         }
     }
     for track in &p.tracks {
         if track.audio_clip().is_some_and(|c| !c.valid()) {
-            return bad("伴奏文件路径或时间范围无效");
+            return bad(tr!("伴奏文件路径或时间范围无效"));
         }
         if track.is_instrumental()
             && (!track.groups.is_empty() || !track.main_group.notes.is_empty())
         {
-            return bad("伴奏轨不能包含音符组");
+            return bad(tr!("伴奏轨不能包含音符组"));
         }
         if track.main_ref.group_id != track.main_group.uuid {
-            return bad("主组引用不匹配");
+            return bad(tr!("主组引用不匹配"));
         }
         for r in track.references() {
             if let Some(curve) = r.system_pitch_delta.as_deref() {
                 curve.validate().map_err(|error| {
-                    format!("工程校验失败：音轨 {} 的系统音高：{error}", track.name)
+                    trf!("工程校验失败：音轨 {} 的系统音高：{}", track.name, error)
                 })?;
             }
             TakeSet::from_extra(&r.extra)
-                .map_err(|error| format!("工程校验失败：音轨 {}：{error}", track.name))?;
+                .map_err(|error| trf!("工程校验失败：音轨 {}：{}", track.name, error))?;
             let Some(bounds) = groups.get(r.group_id.as_str()) else {
-                return bad("存在悬空音符组引用");
+                return bad(tr!("存在悬空音符组引用"));
             };
             if r.blick_absolute_begin < 0
                 || (r.blick_absolute_end != -1 && r.blick_absolute_end < r.blick_absolute_begin)
             {
-                return bad("片段可见范围无效");
+                return bad(tr!("片段可见范围无效"));
             }
             if let Some((min_o, max_e)) = bounds.notes
                 && (min_o.checked_add(r.blick_offset).is_none()
                     || max_e.checked_add(r.blick_offset).is_none())
             {
-                return bad("实例时间或音高溢出");
+                return bad(tr!("实例时间或音高溢出"));
             }
             if let Some((min_p, max_p)) = bounds.pitches
                 && (min_p.checked_add(r.pitch_offset).is_none()
                     || max_p.checked_add(r.pitch_offset).is_none())
             {
-                return bad("实例时间或音高溢出");
+                return bad(tr!("实例时间或音高溢出"));
             }
             if let Some((min_t, max_t)) = bounds.pitch_controls
                 && (min_t.checked_add(r.blick_offset).is_none()
                     || max_t.checked_add(r.blick_offset).is_none())
             {
-                return bad("实例音高控制时间溢出");
+                return bad(tr!("实例音高控制时间溢出"));
             }
         }
     }

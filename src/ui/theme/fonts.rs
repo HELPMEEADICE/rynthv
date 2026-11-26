@@ -1,3 +1,4 @@
+use crate::{i18n::Locale, tr};
 use eframe::egui::{Context, FontData, FontDefinitions, FontFamily};
 #[cfg(not(target_arch = "wasm32"))]
 use std::path::Path;
@@ -6,15 +7,18 @@ use std::path::Path;
 mod linux;
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn install(ctx: &Context) -> Result<(), String> {
+pub fn install(ctx: &Context, locale: Locale) -> Result<(), String> {
     let mut fonts = FontDefinitions::default();
-    let result = load(&mut fonts);
+    let result = load(&mut fonts, locale);
     set_definitions(ctx, fonts);
     result
 }
 
 #[cfg(target_arch = "wasm32")]
-pub fn install_web(ctx: &Context, font: Result<Vec<u8>, String>) -> Result<(), String> {
+pub fn install_web(
+    ctx: &Context,
+    font: Result<Vec<u8>, String>,
+) -> Result<(), String> {
     let mut fonts = FontDefinitions::default();
     let result = font.map(|bytes| {
         let font = std::sync::Arc::new(FontData::from_owned(bytes));
@@ -42,13 +46,13 @@ fn set_definitions(ctx: &Context, mut fonts: FontDefinitions) {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn load(fonts: &mut FontDefinitions) -> Result<(), String> {
-    let regular = std::sync::Arc::new(system_font(false)?);
+fn load(fonts: &mut FontDefinitions, locale: Locale) -> Result<(), String> {
+    let regular = std::sync::Arc::new(system_font(locale, false)?);
     #[cfg(target_os = "android")]
     let bold = regular.clone();
     register(fonts, regular);
     #[cfg(not(target_os = "android"))]
-    let bold = std::sync::Arc::new(system_font(true)?);
+    let bold = std::sync::Arc::new(system_font(locale, true)?);
     fonts.font_data.insert("ChineseBold".into(), bold);
     Ok(())
 }
@@ -77,24 +81,44 @@ fn read_font(path: &Path, index: u32) -> Result<FontData, String> {
     })
 }
 
+/// The first existing font file among the language's preferred faces.
 #[cfg(target_os = "windows")]
-fn system_font(bold: bool) -> Result<FontData, String> {
-    let root = std::env::var_os("WINDIR").ok_or("缺少 WINDIR，无法加载中文字体")?;
-    let path = std::path::PathBuf::from(root).join("Fonts").join(if bold {
-        "msyhbd.ttc"
-    } else {
-        "msyh.ttc"
-    });
+fn first_available(candidates: &[&str], bold: bool) -> Option<std::path::PathBuf> {
+    let root = std::path::PathBuf::from(std::env::var_os("WINDIR")?);
+    let directory = root.join("Fonts");
+    candidates.iter().find_map(|name| {
+        let name = if bold {
+            name.replace(".ttc", "bd.ttc").replace(".ttf", "bd.ttf")
+        } else {
+            (*name).to_owned()
+        };
+        let path = directory.join(name);
+        path.exists().then_some(path)
+    })
+}
+
+#[cfg(target_os = "windows")]
+fn system_font(locale: Locale, bold: bool) -> Result<FontData, String> {
+    // Each interface language prefers a face designed for it, and the
+    // Simplified Chinese face stays the last resort because it covers every
+    // CJK unified ideograph the interface can display.
+    let candidates: &[&str] = match locale {
+        Locale::Japanese => &["YuGothM.ttc", "meiryo.ttc", "msgothic.ttc", "msyh.ttc"],
+        Locale::TraditionalChinese => &["msjh.ttc", "msyl.ttc", "msyh.ttc"],
+        Locale::SimplifiedChinese | Locale::English => &["msyh.ttc", "msjh.ttc"],
+    };
+    let path = first_available(candidates, bold)
+        .ok_or(tr!("无法加载界面字体：系统中缺少中文字体"))?;
     read_font(&path, 0)
 }
 
 #[cfg(target_os = "linux")]
-fn system_font(bold: bool) -> Result<FontData, String> {
-    linux::load(bold)
+fn system_font(locale: Locale, bold: bool) -> Result<FontData, String> {
+    linux::load(locale, bold)
 }
 
 #[cfg(target_os = "android")]
-fn system_font(_bold: bool) -> Result<FontData, String> {
+fn system_font(_locale: Locale, _bold: bool) -> Result<FontData, String> {
     read_font(Path::new("/system/fonts/NotoSansCJK-Regular.ttc"), 2)
 }
 
@@ -104,6 +128,6 @@ fn system_font(_bold: bool) -> Result<FontData, String> {
     target_os = "android",
     target_arch = "wasm32"
 )))]
-fn system_font(_bold: bool) -> Result<FontData, String> {
+fn system_font(_locale: Locale, _bold: bool) -> Result<FontData, String> {
     Err("UI system font loading is supported on Windows and Linux only".into())
 }

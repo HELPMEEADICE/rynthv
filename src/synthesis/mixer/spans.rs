@@ -3,6 +3,7 @@
 
 use super::{Controls, NATIVE_SAMPLE_RATE, RenderedAudio, intersection, mix_samples};
 use std::{collections::BTreeMap, ops::Range, sync::Arc};
+use crate::{tr, trf};
 
 #[derive(Clone)]
 struct Span {
@@ -23,19 +24,16 @@ impl ReadySpans {
         coverage: &Range<usize>,
     ) -> Result<Range<usize>, String> {
         if audio.sample_rate() != NATIVE_SAMPLE_RATE {
-            return Err(format!(
-                "实时混音要求 48000 Hz PCM，收到 {} Hz",
-                audio.sample_rate()
-            ));
+            return Err(trf!("实时混音要求 48000 Hz PCM，收到 {} Hz", audio.sample_rate()));
         }
         let origin = (audio.start_seconds() * f64::from(NATIVE_SAMPLE_RATE)).round();
         if !origin.is_finite() || origin < 0.0 || origin >= isize::MAX as f64 {
-            return Err("PCM 开始位置超出地址范围".into());
+            return Err(tr!("PCM 开始位置超出地址范围").into());
         }
         let origin = origin as usize;
         let end = origin
             .checked_add(audio.frames())
-            .ok_or("PCM 结束位置溢出")?;
+            .ok_or(tr!("PCM 结束位置溢出"))?;
         let range = intersection(&(origin..end), coverage);
         if !range.is_empty() {
             self.replace(

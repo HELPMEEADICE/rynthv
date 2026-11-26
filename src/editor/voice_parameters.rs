@@ -1,5 +1,6 @@
 use super::{Editor, SelectionState};
 use crate::model::{EntityId, GroupRef, VocalModeValues, VoiceParameter, VoiceSettings};
+use crate::tr;
 use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -35,10 +36,10 @@ impl Editor {
         let reference = self.voice_target().id;
         self.begin(match parameter {
             VoiceEditParameter::Scalar(VoiceParameter::PitchShift | VoiceParameter::KeyShift) => {
-                "调整调音参数"
+                tr!("调整调音参数")
             }
-            VoiceEditParameter::Scalar(_) => "调整歌声参数",
-            VoiceEditParameter::VocalMode(_) => "调整唱法",
+            VoiceEditParameter::Scalar(_) => tr!("调整歌声参数"),
+            VoiceEditParameter::VocalMode(_) => tr!("调整唱法"),
         });
         self.voice_edit = Some(VoiceEdit {
             parameter,
@@ -85,9 +86,9 @@ impl Editor {
         enabled_components: [bool; 3],
     ) -> Result<(), String> {
         if self.is_editing() {
-            return Err("请先完成当前编辑".into());
+            return Err(tr!("请先完成当前编辑").into());
         }
-        let state = self.voice_parameter_state()?.ok_or("伴奏轨不能设置唱法")?;
+        let state = self.voice_parameter_state()?.ok_or(tr!("伴奏轨不能设置唱法"))?;
         let changes = state
             .values
             .vocal_modes
@@ -107,7 +108,7 @@ impl Editor {
         if changes.is_empty() {
             return Ok(());
         }
-        self.begin("重置不支持的唱法参数");
+        self.begin(tr!("重置不支持的唱法参数"));
         let result = VoiceSettings::write_vocal_modes(&mut self.voice_target_mut().extra, &changes);
         if result.is_ok() {
             self.finish();

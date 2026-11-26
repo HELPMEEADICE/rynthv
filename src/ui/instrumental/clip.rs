@@ -2,6 +2,7 @@ use super::AudioDrag;
 use crate::{
     app::App,
     model::*,
+    tr, trf,
     ui::{theme::*, timeline::*, track_color::TrackColors},
 };
 use eframe::egui::*;
@@ -17,7 +18,7 @@ pub fn show(app: &mut App, ui: &mut Ui, body: Rect, track_index: usize) {
     };
     let row = ui.interact(body, Id::new(("audio-row", track_id)), Sense::click());
     row.context_menu(|ui| {
-        if ui.button("导入 / 替换音频…").clicked() {
+        if ui.button(tr!("导入 / 替换音频…")).clicked() {
             ui.close();
             app.import_audio(Some(track_id), ui.ctx());
         }
@@ -32,9 +33,9 @@ pub fn show(app: &mut App, ui: &mut Ui, body: Rect, track_index: usize) {
             body.left_center() + vec2(12.0, 0.0),
             Align2::LEFT_CENTER,
             if loading {
-                "正在导入音频…"
+                tr!("正在导入音频…")
             } else {
-                "双击导入伴奏音频…"
+                tr!("双击导入伴奏音频…")
             },
             FontId::proportional(12.0),
             muted_color(),
@@ -43,7 +44,7 @@ pub fn show(app: &mut App, ui: &mut Ui, body: Rect, track_index: usize) {
             app.import_audio(Some(track_id), ui.ctx());
         }
         response.context_menu(|ui| {
-            if ui.button("导入音频…").clicked() {
+            if ui.button(tr!("导入音频…")).clicked() {
                 ui.close();
                 app.import_audio(Some(track_id), ui.ctx());
             }
@@ -73,9 +74,9 @@ pub fn show(app: &mut App, ui: &mut Ui, body: Rect, track_index: usize) {
     let error = app.synthesis.instrumentals.error(&clip.path);
     let asset = app.synthesis.instrumentals.asset(&clip.path);
     let title = if error.is_some() {
-        format!("{} · 加载失败", clip.name())
+        trf!("{} · 加载失败", clip.name())
     } else if asset.is_none() {
-        format!("{} · 加载中…", clip.name())
+        trf!("{} · 加载中…", clip.name())
     } else {
         clip.name().to_owned()
     };
@@ -136,10 +137,10 @@ pub fn show(app: &mut App, ui: &mut Ui, body: Rect, track_index: usize) {
             if let Some(error) = &error {
                 ui.label(error);
             } else {
-                ui.label(format!(
-                    "{}\n{:.2} 秒 · 拖动调整位置，双击替换音频",
+                ui.label(trf!(
+                    "{}\n{} 秒 · 拖动调整位置，双击替换音频",
                     path_display.display(),
-                    duration_seconds
+                    format!("{duration_seconds:.2}")
                 ));
             }
         });
@@ -154,7 +155,7 @@ pub fn show(app: &mut App, ui: &mut Ui, body: Rect, track_index: usize) {
         && let Some(pointer) = ui.input(|i| i.pointer.press_origin())
     {
         app.commit_lyric();
-        app.editor.begin("移动伴奏");
+        app.editor.begin(tr!("移动伴奏"));
         app.audio_drag = Some(AudioDrag {
             track: track_id,
             pointer_x: pointer.x,
@@ -163,25 +164,25 @@ pub fn show(app: &mut App, ui: &mut Ui, body: Rect, track_index: usize) {
         });
     }
     response.context_menu(|ui| {
-        if ui.button("替换音频…").clicked() {
+        if ui.button(tr!("替换音频…")).clicked() {
             ui.close();
             app.import_audio(Some(track_id), ui.ctx());
         }
-        if ui.button("重新链接音频…").clicked() {
+        if ui.button(tr!("重新链接音频…")).clicked() {
             ui.close();
             app.relink_audio(track_id, ui.ctx());
         }
-        if ui.button("重新加载音频").clicked() {
+        if ui.button(tr!("重新加载音频")).clicked() {
             app.reload_audio(track_id, ui.ctx());
             ui.close();
         }
-        if ui.button("移到工程开头").clicked() {
-            app.editor.begin("移动伴奏");
+        if ui.button(tr!("移到工程开头")).clicked() {
+            app.editor.begin(tr!("移动伴奏"));
             app.editor.move_audio_clip(track_id, 0.0);
             app.editor.finish();
             ui.close();
         }
-        if ui.button("移除音频").clicked() {
+        if ui.button(tr!("移除音频")).clicked() {
             app.editor.set_audio_clip(track_id, None);
             ui.close();
         }

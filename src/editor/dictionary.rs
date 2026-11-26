@@ -1,5 +1,6 @@
 use super::Editor;
 use crate::model::{Language, PronunciationDictionary};
+use crate::tr;
 use std::collections::BTreeMap;
 
 impl Editor {
@@ -7,7 +8,7 @@ impl Editor {
         if !name.is_empty() && !self.project.dictionaries.contains_key(name) {
             return;
         }
-        self.begin("选择发音词典");
+        self.begin(tr!("选择发音词典"));
         self.assign_dictionary(name);
         self.finish();
     }
@@ -34,12 +35,12 @@ impl Editor {
     pub fn create_dictionary(&mut self, name: &str, language: Language) -> Result<(), String> {
         let name = name.trim();
         if name.is_empty() {
-            return Err("请输入词典名称".into());
+            return Err(tr!("请输入词典名称").into());
         }
         if self.project.dictionaries.contains_key(name) {
-            return Err("已有同名词典".into());
+            return Err(tr!("已有同名词典").into());
         }
-        self.begin("新建发音词典");
+        self.begin(tr!("新建发音词典"));
         self.project.dictionaries.insert(
             name.into(),
             PronunciationDictionary {
@@ -53,7 +54,7 @@ impl Editor {
     }
 
     pub fn remove_dictionary(&mut self, name: &str) {
-        self.begin("移除发音词典");
+        self.begin(tr!("移除发音词典"));
         self.project.dictionaries.remove(name);
         for track in &mut self.project.tracks {
             for reference in std::iter::once(&mut track.main_ref).chain(&mut track.groups) {
@@ -78,16 +79,16 @@ impl Editor {
     ) -> Result<(), String> {
         let word = word.trim();
         if word.is_empty() {
-            return Err("请输入字词".into());
+            return Err(tr!("请输入字词").into());
         }
         let phones = phones.map(|value| value.split_whitespace().collect::<Vec<_>>().join(" "));
         if phones.as_ref().is_some_and(String::is_empty) {
-            return Err("请输入音素，以空格分隔".into());
+            return Err(tr!("请输入音素，以空格分隔").into());
         }
         if !self.project.dictionaries.contains_key(name) {
-            return Err("请先新建或选择词典".into());
+            return Err(tr!("请先新建或选择词典").into());
         }
-        self.begin("编辑发音词典");
+        self.begin(tr!("编辑发音词典"));
         let dictionary = self
             .project
             .dictionaries

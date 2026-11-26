@@ -1,0 +1,119 @@
+# en catalog fragment: synth_voice
+# format: <simplified-chinese msgid> TAB <translation>
+歌声 database 必须是对象	Voice database must be an object
+歌声 database.{0} 必须是字符串	Voice database.{0} must be a string
+歌声版本无效：{0}	Invalid voice version: {0}
+找不到歌声 {0}（版本 {1}），请检查 databases 目录	Voice {0} (version {1}) was not found; check the databases directory
+默认	Default
+存在多个同名歌声 {0}，请为音轨重新选择歌手	Multiple voices named {0} exist; choose a singer again for this track
+歌声 {0}（版本 {1}）不可用：{2}	Voice {0} (version {1}) is unavailable: {2}
+无法读取声库目录 {0}：{1}	Cannot read the voicebank directory {0}: {1}
+相同声库版本存在多个文件，请移除重复项后刷新	Multiple files exist for the same voicebank revision; remove the duplicates and refresh
+无法读取声库 {0}：{1}	Cannot read the voicebank {0}: {1}
+无法读取声库版本 {0}：{1}	Cannot read the voicebank revision {0}: {1}
+声库配置版本与目录版本不一致	The voicebank configuration version does not match the directory version
+缺少本地{0}模型，当前安装内容无法在本机合成	The local {0} model is missing, so this installation cannot synthesize on this machine
+缺少 Flat 模型：{0}	Missing Flat models: {0}
+此声库声明了暂不支持的 Flat sing_model	This voicebank declares a Flat sing_model that is not supported yet
+时长	Duration
+音高	Pitch
+音色	Timbre
+声码器	Vocoder
+、	, 
+该版本目录中没有 DNNI 模型文件	No DNNI model files in this revision directory
+声库含有多个配置资源，需要明确模型路由	The voicebank contains multiple configuration resources; explicit model routing is required
+声库缺少名称配置资源	The voicebank is missing its name configuration resource
+声库配置不是 UTF-8	The voicebank configuration is not UTF-8
+不支持的声库配置行格式	Unsupported voicebank configuration line format
+声库配置包含重复字段	The voicebank configuration contains duplicate fields
+声库配置缺少 {0}	The voicebank configuration is missing {0}
+不支持的声库模型代际	Unsupported voicebank model generation
+不支持的 DNNI 容器格式	Unsupported DNNI container format
+声库资源索引超过扫描大小限制	The voicebank resource index exceeds the scan size limit
+声库资源索引被截断	The voicebank resource index is truncated
+声库资源索引校验失败	The voicebank resource index failed verification
+声库资源索引内容无效	The voicebank resource index content is invalid
+声库名称配置超过扫描大小限制	The voicebank name configuration exceeds the scan size limit
+声库名称配置校验失败	The voicebank name configuration failed verification
+声库文件头校验失败	The voicebank file header failed verification
+暂不支持该 SV1 声库类型，仅支持 DDS AI 声库	This SV1 voicebank type is not supported yet; only DDS AI voicebanks are
+暂不支持该 SV1 声库的自定义 F0 模型配置	Custom F0 model configurations in this SV1 voicebank are not supported yet
+SV1 目录包含多个声库文件，请从声库列表选择明确版本	The SV1 directory contains multiple voicebank files; select an explicit revision from the voicebank list
+目录同时包含 SV1 与 SV2 模型，请选择明确的声库文件或版本目录	The directory contains both SV1 and SV2 models; select an explicit voicebank file or revision directory
+未识别声库	Unrecognized voicebank
+不支持的 SV1 模型类型	Unsupported SV1 model type
+SV1 声库缺少受支持的本地模型：{0}	The SV1 voicebank is missing supported local models: {0}
+声库缺少本地 {0} 模型	The voicebank is missing the local {0} model
+声库包含多个 {0} 模型，无法确定执行目标	The voicebank contains multiple {0} models, so the execution target is ambiguous
+未找到声库 {0}（模型版本 {1}）已导入的模型上下文。请先导入此声库的模型上下文。	No imported model context was found for voicebank {0} (model version {1}). Import this voicebank's model context first.
+模型 identity 必须是完整的无符号 64 位整数，支持十进制或 0x 开头的十六进制。	The model identity must be a complete unsigned 64-bit integer, in decimal or 0x-prefixed hexadecimal.
+模型 identity 超出无符号 64 位整数范围。	The model identity is outside the unsigned 64-bit integer range.
+该模型上下文绑定原 Windows 机器，请使用手动导入上下文文件将所选声库保存为便携上下文。	This model context is bound to the original Windows machine; import a context file manually to save the selected voicebank as a portable context.
+模型上下文与当前 Windows 用户或处理器不匹配。请重新获取本机上下文或手动导入。	The model context does not match the current Windows user or processor. Acquire a context from this machine again or import one manually.
+所选文件中没有声库 {0}（模型版本 {1}）的模型上下文记录。	The selected file has no model context record for voicebank {0} (model version {1}).
+模型上下文记录格式无效或包含重复声库记录。	The model context record format is invalid or contains duplicate voicebank records.
+无法核对模型上下文的实际保存路径。	The actual save path of the model context cannot be verified.
+模型上下文路径被宿主程序重定向。请从桌面启动 RynthV 后执行导入。	The model context path is redirected by the host program. Start RynthV from the desktop and import again.
+模型上下文必须是普通文件，不能使用硬链接。	The model context must be a regular file; hard links are not allowed.
+模型上下文路径缺少父目录。	The model context path has no parent directory.
+模型上下文路径缺少文件名。	The model context path has no file name.
+模型上下文的实际路径与预期路径不一致。	The actual model context path does not match the expected path.
+模型上下文导入当前仅支持 Windows 和 Linux。	Model context import currently supports Windows and Linux only.
+模型上下文必须是大小不超过 1 MiB 的 JSON 文件。	The model context must be a JSON file no larger than 1 MiB.
+模型上下文文件超过 1 MiB 大小限制。	The model context file exceeds the 1 MiB size limit.
+模型上下文文件格式无效。	The model context file format is invalid.
+无法编码模型上下文。	The model context cannot be encoded.
+在线模型上下文导入目前仅支持 Windows x64。	Online model context import currently supports Windows x64 only.
+只能从当前 Windows 用户、当前会话的原编辑器导入模型上下文。	A model context can only be imported from an original editor running as the current Windows user in the current session.
+原编辑器的主模块范围不符合已验证版本。	The original editor's main module range does not match the verified version.
+原编辑器的主模块地址无效。	The original editor's main module address is invalid.
+原编辑器进程在导入期间发生变化，请重新选择来源。	The original editor process changed during the import; select the source again.
+所选原编辑器的可执行文件大小超出已支持范围。	The selected original editor executable exceeds the supported size.
+所选原编辑器版本尚未支持上下文导入；当前只支持已验证的 Windows x64 2.2.1。	The selected original editor version does not support context import yet; only the verified Windows x64 2.2.1 is supported.
+无法验证所选进程的 Windows 会话。	The Windows session of the selected process cannot be verified.
+无法验证所选进程的 Windows 用户。	The Windows user of the selected process cannot be verified.
+原编辑器的模型上下文地址无效。	The original editor's model context address is invalid.
+原编辑器的在线会话在读取时发生变化，请重试。	The original editor's online session changed while being read; try again.
+原编辑器的在线上下文在读取时发生变化，请重试。	The original editor's online context changed while being read; try again.
+原编辑器尚未准备好在线模型上下文，请先登录并加载歌声。	The original editor has not prepared an online model context yet; sign in and load a voice first.
+原编辑器的模型上下文不是有效的 UTF-8。	The original editor's model context is not valid UTF-8.
+原编辑器的模型上下文超过安全读取上限，已停止导入。	The original editor's model context exceeds the safe read limit; the import was stopped.
+原编辑器的模型上下文地址不可用。	The original editor's model context address is unavailable.
+无法完整读取原编辑器的在线模型上下文，请确认会话仍在运行。	The original editor's online model context could not be read completely; confirm the session is still running.
+在线模型上下文导入：{0} 失败（{1}）。	Online model context import: {0} failed ({1}).
+所选进程的可执行文件路径无效。	The executable path of the selected process is invalid.
+所选进程不是 Synthesizer V Studio。	The selected process is not Synthesizer V Studio.
+无法确认所选原编辑器的主模块，未读取模型上下文。	The main module of the selected original editor could not be confirmed; no model context was read.
+无法打开所选会话文件：{0}	Cannot open the selected session file: {0}
+请选择大小不超过 1 MiB 的会话文件。	Choose a session file no larger than 1 MiB.
+无法读取所选会话文件：{0}	Cannot read the selected session file: {0}
+所选会话文件超过 1 MiB。	The selected session file exceeds 1 MiB.
+所选会话文件的长度无效。	The selected session file has an invalid length.
+无法解码所选会话文件，请选择本机 Synthesizer V Studio 2 保存的 session 文件。	The selected session file cannot be decoded; choose a session file saved by Synthesizer V Studio 2 on this machine.
+所选会话文件包含无效的 UTF-8 数据。	The selected session file contains invalid UTF-8 data.
+所选会话文件的模型上下文字段为空。	The model context field of the selected session file is empty.
+所选会话文件的模型上下文字段包含无效的 UTF-8 数据。	The model context field of the selected session file contains invalid UTF-8 data.
+所选会话文件缺少必需字段。	The selected session file is missing required fields.
+请先选择 Synthesizer V Studio 2 的本地会话文件。	Select a local Synthesizer V Studio 2 session file first.
+无法从所选会话文件读取模型上下文：{0}	Cannot read the model context from the selected session file: {0}
+所选会话文件未保存可用的模型上下文，请选择“从原版获取”、上下文文件或手动输入。	The selected session file has no usable saved model context; use “Fetch from the original”, a context file, or manual entry.
+本地会话文件导入仅支持 Windows x64；当前平台可导入上下文文件或手动输入。	Local session file import supports Windows x64 only; on this platform, import a context file or enter the value manually.
+只能移除由 RynthV 导入的 SVPK 声库	Only SVPK voicebanks imported by RynthV can be removed
+声库 {0} 的 {1} 版已导入	Version {1} of voicebank {0} is already imported
+无法识别的 SVPK 文件头	Unrecognized SVPK file header
+SVPK 缺少 voice.nofs，仅支持原生 SV1 AI 声库	The SVPK is missing voice.nofs; only native SV1 AI voicebanks are supported
+SVPK 资源条目无效：{0}	Invalid SVPK resource entry: {0}
+请选择 clf-data 的 ZIP 或 7z 压缩包	Choose a clf-data ZIP or 7z archive
+7z 压缩包缺少声明的词典文件	The 7z archive is missing declared dictionary files
+词典压缩包解包后超出大小或条目数限制	The dictionary archive exceeds the size or entry count limit after extraction
+7z 读取失败：{0}	7z read failed: {0}
+压缩包中没有完整的 clf-data 语言词典	The archive does not contain a complete clf-data language dictionary
+压缩包包含多套 clf-data 词典	The archive contains multiple clf-data dictionaries
+压缩包中的词典条目无效或重名：{0}	Invalid or duplicate dictionary entry in the archive: {0}
+{0} {1}：{2}	{0} {1}: {2}
+无法扫描 {0} 声库目录 {1}：{2}	Cannot scan the {0} voicebank directory {1}: {2}
+声库 {0}/{1} 对应多个文件，请检查声库目录配置。	Voicebank {0}/{1} matches multiple files; check the voicebank directory settings.
+资源压缩包不是普通文件，或超出大小限制	The resource archive is not a regular file or exceeds the size limit
+ZIP 条目过多、重名或相互重叠	The ZIP has too many entries, duplicate names, or overlapping entries
+资源条目大小与压缩包记录不一致：{0}	The resource entry size does not match the archive record: {0}
+ZIP 读取失败：{0}	ZIP read failed: {0}

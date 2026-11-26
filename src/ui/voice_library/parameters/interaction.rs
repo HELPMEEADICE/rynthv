@@ -2,6 +2,7 @@ use super::super::widgets::ControlResponse;
 use crate::{
     app::App,
     editor::{Editor, VoiceEditParameter},
+    tr,
 };
 use eframe::egui::*;
 
@@ -80,7 +81,7 @@ pub(super) fn apply(
         if gesture.is_some_and(|gesture| gesture.widget == widget) {
             if !update(&mut app.editor) {
                 finish(app, ctx, true);
-                app.error = Some("无法更新当前歌声参数，请重新选择音符组后重试。".into());
+                app.error = Some(tr!("无法更新当前歌声参数，请重新选择音符组后重试。").into());
                 return;
             }
             app.status.clear();

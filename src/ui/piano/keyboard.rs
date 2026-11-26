@@ -3,7 +3,7 @@
 mod decoration;
 mod layout;
 
-use crate::{app::App, ui::track_color::TrackColors};
+use crate::{app::App, tr, ui::track_color::TrackColors};
 use eframe::egui::*;
 use layout::KeyboardLayout;
 pub(super) use layout::white_index;
@@ -112,6 +112,6 @@ pub(super) fn show(app: &mut App, ui: &mut Ui, all: Rect, canvas: Rect) {
     if enabled && note.is_some() {
         response
             .on_hover_cursor(CursorIcon::PointingHand)
-            .on_hover_text("按住试听钢琴音，拖动切换琴键");
+            .on_hover_text(tr!("按住试听钢琴音，拖动切换琴键"));
     }
 }

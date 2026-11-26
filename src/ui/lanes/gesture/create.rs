@@ -1,4 +1,5 @@
 use super::*;
+use crate::tr;
 
 pub(super) fn add_point(app: &mut App, lane: &Lane, mapping: &Mapping, pos: Pos2) {
     if app.gesture.is_some() || app.editor.is_editing() {
@@ -14,7 +15,7 @@ pub(super) fn add_point(app: &mut App, lane: &Lane, mapping: &Mapping, pos: Pos2
         .flat_map(|curve| curve.points.iter().copied())
         .collect();
     points.insert(point.0, point.1);
-    app.editor.begin("添加参数控制点");
+    app.editor.begin(tr!("添加参数控制点"));
     match app
         .editor
         .replace_automation_points(&lane.foreground, points.into_iter().collect())

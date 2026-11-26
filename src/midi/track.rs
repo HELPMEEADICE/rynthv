@@ -1,6 +1,7 @@
 mod output;
 
 use super::{Budget, MAX_TEXT, MidiTrack, time::TimeEvents};
+use crate::{tr, trf};
 use midly::{EventIter, MetaMessage, MidiMessage, TrackEventKind};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
@@ -55,14 +56,13 @@ pub(super) fn parse(
     let mut ended = false;
     for event in events {
         budget.event()?;
-        let event =
-            event.map_err(|e| format!("MIDI 音轨 {} 的事件无效或不完整：{e}", index + 1))?;
+        let event = event.map_err(|e| trf!("MIDI 音轨 {} 的事件无效或不完整：{}", index + 1, e))?;
         if ended {
-            return Err(format!("MIDI 音轨 {} 在结束标记之后仍有事件", index + 1));
+            return Err(trf!("MIDI 音轨 {} 在结束标记之后仍有事件", index + 1));
         }
         position = position
             .checked_add(u64::from(event.delta.as_int()))
-            .ok_or("MIDI 音轨时间超出范围")?;
+            .ok_or(tr!("MIDI 音轨时间超出范围"))?;
         match event.kind {
             TrackEventKind::Midi { channel, message } => {
                 track.message(
@@ -100,7 +100,7 @@ pub(super) fn parse(
                 }
                 MetaMessage::SmpteOffset(_) => track.diagnostics.smpte_offset = true,
                 MetaMessage::Unknown(0x2f | 0x51 | 0x58, _) => {
-                    return Err(format!(
+                    return Err(trf!(
                         "MIDI 音轨 {} 的结束、曲速或拍号事件格式无效",
                         index + 1
                     ));
@@ -168,7 +168,7 @@ impl Track {
 
     fn text(&mut self, value: &[u8]) -> Result<String, String> {
         if value.len() > MAX_TEXT {
-            return Err(format!("MIDI 名称或歌词单项长度超过 {MAX_TEXT} 字节"));
+            return Err(trf!("MIDI 名称或歌词单项长度超过 {} 字节", MAX_TEXT));
         }
         let text = String::from_utf8_lossy(value);
         if matches!(text, std::borrow::Cow::Owned(_)) {

@@ -9,6 +9,7 @@ use std::{
     },
     thread,
 };
+use crate::{tr, trf};
 
 #[derive(Clone, Default)]
 pub(super) struct Snapshot {
@@ -87,7 +88,7 @@ impl Playback {
             })
         {
             state.lock().expect("new playback state").error =
-                Some(format!("无法启动音频线程：{error}"));
+                Some(trf!("无法启动音频线程：{}", error));
         }
         Self {
             tx,
@@ -210,7 +211,7 @@ impl Playback {
 
     fn thread_stopped(&self) {
         if let Ok(mut state) = self.state.lock() {
-            state.error = Some("音频输出线程已停止。".into());
+            state.error = Some(tr!("音频输出线程已停止。").into());
             state.ready = false;
         }
     }

@@ -1,5 +1,6 @@
 use super::{AudioError, ChannelLayout, RenderedAudio, conversion};
 use std::{io::Write, path::Path};
+use crate::{tr};
 
 #[derive(Clone, Copy)]
 pub struct WaveFormat {
@@ -29,7 +30,7 @@ pub fn save_wav_policy(
     overwrite: bool,
 ) -> Result<(), AudioError> {
     if ![44100, 48000, 96000].contains(&format.sample_rate) {
-        return Err(AudioError::Wave("不支持的导出格式".into()));
+        return Err(AudioError::Wave(tr!("不支持的导出格式").into()));
     }
     let converted = convert_format(audio, format)?;
     let audio = converted.as_ref().unwrap_or(audio);
@@ -58,7 +59,7 @@ fn convert_format(
     format: WaveFormat,
 ) -> Result<Option<RenderedAudio>, AudioError> {
     if ![16, 24, 32].contains(&format.bit_depth) {
-        return Err(AudioError::Wave("不支持的导出格式".into()));
+        return Err(AudioError::Wave(tr!("不支持的导出格式").into()));
     }
     if audio.sample_rate() == format.sample_rate && audio.layout() == format.layout {
         return Ok(None);
@@ -123,7 +124,7 @@ fn encode(writer: &mut impl Write, audio: &RenderedAudio, depth: u16) -> Result<
         }
         #[cfg(target_endian = "big")]
         32 => write_converted(audio.samples(), &mut write, f32::to_le_bytes)?,
-        _ => return Err("不支持的导出位深".into()),
+        _ => return Err(tr!("不支持的导出位深").into()),
     }
     if padding != 0 {
         write(&[0])?;

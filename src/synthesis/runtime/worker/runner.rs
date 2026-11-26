@@ -23,6 +23,7 @@ use std::{
     time::Duration,
 };
 use web_time::Instant;
+use crate::{tr, trf};
 
 pub(super) fn run(
     path: PathBuf,
@@ -56,7 +57,7 @@ pub(super) fn run(
             .configuration
             .as_ref()
             .map(|config| (config.name.clone(), config.version.clone()))
-            .ok_or_else(|| VoiceError::new("声库缺少合成配置。"))?;
+            .ok_or_else(|| VoiceError::new(tr!("声库缺少合成配置。")))?;
         Ok((inventory, prepared, name, version))
     });
     if !alive.load(Ordering::Acquire) {
@@ -76,7 +77,7 @@ pub(super) fn run(
     let frontend = inventory
         .configuration
         .as_ref()
-        .ok_or_else(|| VoiceError::new("声库缺少语言配置"))
+        .ok_or_else(|| VoiceError::new(tr!("声库缺少语言配置")))
         .and_then(|config| {
             LyricFrontend::new(
                 &dictionaries,
@@ -115,7 +116,7 @@ pub(super) fn run(
     let (lexicon, identity, network) = match context {
         Ok(context) => context,
         Err(error) => {
-            let error = format!("合成环境准备失败：{error}");
+            let error = trf!("合成环境准备失败：{}", error);
             let event = if context_required {
                 Event::ContextRequired { error }
             } else {
@@ -245,7 +246,7 @@ fn advance<'network, 'tree>(
                 checkpoint(state, commands, events, owner, stage)
             }),
             None if session.prepared.is_complete() => Ok(Vec::new()),
-            None => Err(VoiceError::new("未完成的音符组没有可执行的音频区间")),
+            None => Err(VoiceError::new(tr!("未完成的音符组没有可执行的音频区间"))),
         }
     });
     // Numerical cancellation can race the last kernel. A superseding plan must
@@ -302,7 +303,7 @@ fn finish(
     if let Completion::Failed(error) = state.cache.finish(job, rendered) {
         let _ = events.send(Event::Error {
             revision: Some(state.revision),
-            error: format!("音符组合成失败：{error}"),
+            error: trf!("音符组合成失败：{}", error),
         });
     }
 }
@@ -311,7 +312,7 @@ fn finish_error(state: &mut WorkState<'_, '_>, events: &Events, job: &RenderJob,
     if let Completion::Failed(error) = state.cache.finish(job, Err(error)) {
         let _ = events.send(Event::Error {
             revision: Some(state.revision),
-            error: format!("音符组合成失败：{error}"),
+            error: trf!("音符组合成失败：{}", error),
         });
     }
 }

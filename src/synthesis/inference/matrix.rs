@@ -1,6 +1,7 @@
 //! Prepared dense weights for CPU float execution.
 
 use std::{fmt, sync::Arc};
+use crate::{tr};
 
 /// Structural errors are reported before an operator writes its output.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -37,7 +38,7 @@ impl fmt::Display for MatrixError {
                 f.write_str("Integer matrix scale must be finite and nonnegative")
             }
             Self::Parallel(message) | Self::Compute(message) => f.write_str(message),
-            Self::Cancelled => f.write_str("合成任务已由更新的编辑替代。"),
+            Self::Cancelled => f.write_str(tr!("合成任务已由更新的编辑替代。")),
         }
     }
 }

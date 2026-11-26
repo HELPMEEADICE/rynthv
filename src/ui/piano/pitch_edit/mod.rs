@@ -7,6 +7,7 @@ use super::{Gesture, Tool};
 use crate::{
     app::App,
     model::{EntityId, GroupRef, PitchControl, pitch, ticks},
+    tr,
     ui::{group_geometry::clip_rect, timeline::beat_at},
 };
 use eframe::egui::*;
@@ -109,12 +110,12 @@ fn start(app: &mut App, ctx: &Context, canvas: Rect, pos: Pos2, button: PointerB
         return false;
     }
     let Some(reference) = app.editor.active_ref().cloned() else {
-        app.status = "请先点击音符组标题，再绘制音高曲线".into();
+        app.status = tr!("请先点击音符组标题，再绘制音高曲线").into();
         return false;
     };
     let global = ticks(beat_at(canvas, &app.view.piano, pos.x));
     if !reference.contains(global) {
-        app.status = "请在当前音符组范围内绘制音高，点击标题可切换音符组".into();
+        app.status = tr!("请在当前音符组范围内绘制音高，点击标题可切换音符组").into();
         return false;
     }
     let Some(group) = app.editor.group() else {
@@ -135,9 +136,9 @@ fn start(app: &mut App, ctx: &Context, canvas: Rect, pos: Pos2, button: PointerB
         return false;
     }
     app.editor.begin(if button == PointerButton::Primary {
-        "手绘音高"
+        tr!("手绘音高")
     } else {
-        "擦除手绘音高"
+        tr!("擦除手绘音高")
     });
     app.gesture = Some(Gesture::Pitch(Box::new(PitchGesture {
         track: app.editor.track,

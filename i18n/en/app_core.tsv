@@ -1,0 +1,170 @@
+# en catalog fragment: app_core
+# format: <simplified-chinese msgid> TAB <translation>
+保存的工作区尺寸或结构无效，已重置布局	The saved workspace size or structure is invalid; the layout was reset.
+无法读取工作区：{}	Cannot read the workspace: {}
+未初始化	Not initialized
+打开工程	Open Project
+Synthesizer V 工程	Synthesizer V Project
+未命名	Untitled
+保存工程更改？	Save project changes?
+当前工程包含尚未保存的编辑。	The current project has unsaved edits.
+保存	Save
+不保存	Don't Save
+取消	Cancel
+操作未完成	Action Incomplete
+确定	OK
+Rust + egui 歌声合成引擎	Rust + egui singing voice synthesis engine
+多音轨编辑、歌词与音高调整、MIDI 导入和 WAV 导出。	Multi-track editing, lyric and pitch adjustment, MIDI import, and WAV export.
+支持 Windows、Linux、Android 和 Web。	Runs on Windows, Linux, Android, and the Web.
+关闭	Close
+正在处理文件…	Working with files…
+本机工程	Local Projects
+保存的手机工程会显示在这里。	Projects saved on this device appear here.
+已导入 Synthesizer V Studio 1 工程，请另存为新文件	Imported a Synthesizer V Studio 1 project. Save it as a new file.
+未命名.svp	Untitled.svp
+工程已保存	Project saved
+工程副本已导出	Project copy exported
+导入 MIDI	Import MIDI
+MIDI 文件	MIDI Files
+无法启动 MIDI 读取线程：{}	Cannot start the MIDI reader thread: {}
+MIDI 读取线程意外停止。	The MIDI reader thread stopped unexpectedly.
+MIDI 尚未读取完成。	MIDI has not finished loading.
+已导入 {} 个音符到 {} 条音轨	Imported {} notes into {} tracks
+ · 重叠音符拆出 {} 条声部	 · {} overlapping voices split out
+重新链接音频	Relink Audio
+导入伴奏	Import Instrumental
+音频文件	Audio Files
+正在导入伴奏…	Importing the instrumental…
+伴奏导入失败	Instrumental import failed
+文件的时长短于片段的源起点，无法重新链接	The file is shorter than the clip's source start, so it cannot be relinked
+重新链接音频失败	Audio relink failed
+伴奏已加载，可拖动片段调整位置	Instrumental loaded; drag the clip to reposition it
+系统音频焦点暂不可用	System audio focus is unavailable right now
+保存副本	Save Copy
+工程恢复文件超过大小上限	The project recovery file exceeds the size limit
+无法读取工程恢复文件：{}	Cannot read the project recovery file: {}
+已恢复上次工作	Restored your previous session
+工程自动保存失败：{}	Project autosave failed: {}
+浏览器文件任务已中断	The browser file task was interrupted
+无法自动保存：{}	Cannot autosave: {}
+当前源约占用 {} MiB／配额 {} MiB	Origin uses about {} MiB of a {} MiB quota
+估算存储用量	Estimate Storage Usage
+清理 WAV 导出缓存	Clear WAV Export Cache
+不支持拖入此文件类型	This file type cannot be dropped here
+已打开浏览器工程	Browser project opened
+浏览器工程	Browser Projects
+已保存的工程会显示在这里。	Saved projects appear here.
+找不到已保存的工程	The saved project was not found
+工程已保存到浏览器	Project saved to the browser
+RynthV 图形初始化失败：{}	RynthV graphics initialisation failed: {}
+Android 图形设备已丢失（{}）：{}	Android graphics device lost ({}): {}
+LOCALAPPDATA 未设置为绝对路径，无法定位用户配置目录。	LOCALAPPDATA is not set to an absolute path, so the user configuration directory cannot be located.
+XDG_CONFIG_HOME 和 HOME 未设置为绝对路径，无法定位用户配置目录。	Neither XDG_CONFIG_HOME nor HOME is set to an absolute path, so the user configuration directory cannot be located.
+当前平台尚未支持用户配置目录。	This platform does not support a user configuration directory yet.
+Android 无法定位应用私有目录	Android cannot locate the app's private directory
+Android 无法定位应用缓存目录	Android cannot locate the app's cache directory
+Android Activity 未初始化	The Android activity is not initialised
+Android 应用目录未初始化	The Android app directory is not initialised
+Android 缓存目录未初始化	The Android cache directory is not initialised
+无法定位当前用户的漫游配置目录。	Cannot locate the current user's roaming configuration directory.
+当前用户的漫游配置目录路径无效。	The current user's roaming configuration directory path is invalid.
+合成 Worker 已停止	The synthesis worker has stopped
+合成 Worker 返回了无效回复	The synthesis worker returned an invalid reply
+无效的浏览器数据	Invalid browser data
+声库已加载	Voicebank loaded
+所选音轨没有可导出的音频	The selected tracks have no audio to export
+{}：{}	{}: {}
+已导入 {} 个声库（{}）	Imported {} voicebanks ({})
+、	, 
+发音词典已导入	Pronunciation dictionary imported
+所选声库不在浏览器存储中	The selected voicebank is not in browser storage
+声库已删除	Voicebank deleted
+请选择模型上下文文件或输入 identity	Choose a model context file or enter the identity
+模型上下文已保存	Model context saved
+工程路径 {} 不是普通文件	Project path {} is not a regular file
+路径 {} 缺少父目录	Path {} has no parent directory
+SVP 解析失败：{}	SVP parsing failed: {}
+不支持 SVP 版本 {}，可打开 {} 或导入 {}	SVP version {} is not supported; open {} or import {}
+只能保存为 SVP {} 工程	Projects can only be saved as SVP {}
+写入 {} 失败：目标路径不是文件	Cannot write {}: the target path is not a file
+写入 {} 失败：路径缺少文件名	Cannot write {}: the path has no file name
+写入 {} 失败：{}	Cannot write {}: {}
+工程校验失败：{}	Project validation failed: {}
+时间轴必须从 0 开始	The timeline must start at 0
+曲速必须为正数，标记按时间严格递增	Tempo must be positive and its markers strictly increasing in time
+拍号或拍号位置无效	The time signature or its position is invalid
+至少需要一条音轨	At least one track is required
+发音词典名称不能为空或包含首尾空白	A pronunciation dictionary name cannot be empty or padded with whitespace
+发音词典的字词或音素无效	A pronunciation dictionary entry or its phonemes are invalid
+音符组 UUID 缺失或重复	A note group UUID is missing or duplicated
+音符时间或 MIDI 音高无效	A note time or MIDI pitch is invalid
+一代音符音高参数无效	A generation 1 note pitch parameter is invalid
+工程校验失败：音符 {}：{}	Project validation failed: note {}: {}
+参数名称不能为空	A parameter name cannot be empty
+工程校验失败：参数 {}：{}	Project validation failed: parameter {}: {}
+音高控制点的音高或标识无效	A pitch control point's pitch or identifier is invalid
+手绘音高曲线必须包含至少两个按时间递增的有效控制点	A hand-drawn pitch curve must contain at least two valid control points increasing in time
+伴奏文件路径或时间范围无效	The instrumental file path or time range is invalid
+伴奏轨不能包含音符组	An instrumental track cannot contain note groups
+主组引用不匹配	The main group reference does not match
+工程校验失败：音轨 {} 的系统音高：{}	Project validation failed: system pitch of track {}: {}
+工程校验失败：音轨 {}：{}	Project validation failed: track {}: {}
+存在悬空音符组引用	A note group reference is dangling
+片段可见范围无效	The clip's visible range is invalid
+实例时间或音高溢出	An instance time or pitch overflows
+实例音高控制时间溢出	An instance pitch control time overflows
+工程校验失败：{} UUID 无效	Project validation failed: invalid {} UUID
+工程校验失败：{} UUID 重复	Project validation failed: duplicate {} UUID
+工程	Project
+音符组	Note group
+工程校验失败：音符 UUID 必须为 16 位十六进制标识	Project validation failed: a note UUID must be a 16-digit hexadecimal identifier
+工程校验失败：音符 UUID 无效	Project validation failed: invalid note UUID
+工程校验失败：音符 UUID 重复	Project validation failed: duplicate note UUID
+音符组实例	Note group instance
+工程超过 {} MiB 文件大小上限	The project exceeds the {} MiB file size limit
+SVP 音符组 {} · {}：{}	SVP note group {} · {}: {}
+SVP 伴奏轨 {}：{}	SVP instrumental track {}: {}
+音频文件路径或时长无效	The audio file path or duration is invalid
+伴奏时间超出有效范围	The instrumental time is out of range
+系统音符参数必须为对象	System note attributes must be an object
+音高参数 {} 必须为数值	Pitch parameter {} must be a number
+音素参数 {} 无效：{}	Phoneme parameter {} is invalid: {}
+音素参数数量超出支持范围	The number of phoneme parameters is out of range
+无法打开 MIDI 文件：{}	Cannot open the MIDI file: {}
+无法读取 MIDI 文件：{}	Cannot read the MIDI file: {}
+MIDI 路径 {} 不是普通文件	MIDI path {} is not a regular file
+MIDI 文件不能超过 64 MiB	A MIDI file cannot exceed 64 MiB
+MIDI 文件格式无效或不完整：{}	The MIDI file format is invalid or incomplete: {}
+暂不支持 Format 2 MIDI；请先转换为 Format 0 或 Format 1	Format 2 MIDI is not supported yet; convert it to Format 0 or Format 1 first
+MIDI 的每四分音符刻度数不能为 0	The MIDI ticks per quarter note cannot be 0
+暂不支持使用 SMPTE 时间码计时的 MIDI	MIDI timed with SMPTE timecode is not supported yet
+MIDI 最多支持 {} 个源音轨	MIDI supports at most {} source tracks
+MIDI 音轨 {} 格式无效：{}	MIDI track {} has an invalid format: {}
+MIDI 拆分通道后超过 {} 条音轨，无法导入	Splitting MIDI channels yields more than {} tracks, so it cannot be imported
+MIDI 实际音轨数量与文件头不一致	The actual MIDI track count does not match the header
+MIDI 事件数超过 {}，无法导入	The MIDI has more than {} events, so it cannot be imported
+MIDI 音符数超过 {}，无法导入	The MIDI has more than {} notes, so it cannot be imported
+MIDI tick {} 的曲速事件无效	The tempo event at MIDI tick {} is invalid
+发现 {} 处同位置曲速冲突，采用文件中后读取的事件。	Found {} conflicting tempo events at the same position; the one read later in the file was used.
+发现 {} 处同位置拍号冲突，采用文件中后读取的事件。	Found {} conflicting time signature events at the same position; the one read later in the file was used.
+已跳过 {} 个无法表示的拍号事件（拍号值不支持、小节中途变化或位置超出范围），沿用此前有效拍号。音符和曲速正常导入。	Skipped {} time signature events that cannot be represented (unsupported value, mid-bar change, or out-of-range position) and kept the last valid signature. Notes and tempo imported normally.
+MIDI 每四分音符的 tick 数不能为零	The MIDI ticks per quarter note cannot be zero
+MIDI 时间超出可用范围	The MIDI time is out of range
+MIDI 音轨 {} 的事件无效或不完整：{}	An event in MIDI track {} is invalid or incomplete: {}
+MIDI 音轨 {} 在结束标记之后仍有事件	MIDI track {} still has events after the end-of-track marker
+MIDI 音轨时间超出范围	The MIDI track time is out of range
+MIDI 音轨 {} 的结束、曲速或拍号事件格式无效	The end-of-track, tempo, or time signature event format in MIDI track {} is invalid
+MIDI 名称或歌词单项长度超过 {} 字节	A MIDI name or lyric entry is longer than {} bytes
+音轨 {}	Track {}
+{} · 端口 {} / 通道 {}	{} · Port {} / Channel {}
+{} · 通道 {}	{} · Channel {}
+缺少结束标记，使用最后一个事件的位置作为音轨终点	No end-of-track marker; the last event's position was used as the track end
+{} 个音符缺少关闭事件，已在音轨终点结束	{} notes had no note-off event and were ended at the track end
+忽略 {} 个未配对的音符关闭事件	Ignored {} unmatched note-off events
+忽略 {} 个没有正时长的音符	Ignored {} notes without a positive duration
+{} 项歌词没有同一时刻开始的音符，未导入	{} lyric entries had no note starting at the same time and were not imported
+含非 UTF-8 文本，无法识别的字符已显示为 �	Contains non-UTF-8 text; unrecognised characters are shown as �
+踏板、控制器、弯音及触后不转换为歌声参数	Sustain, controllers, pitch bend, and aftertouch are not converted to singing parameters
+忽略 SMPTE 播放起始偏移，保留 MIDI 音符相对时间	The SMPTE playback start offset was ignored; MIDI note relative times are kept
+音轨 {}：{}	Track {}: {}
+；	; 

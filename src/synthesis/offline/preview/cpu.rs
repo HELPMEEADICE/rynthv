@@ -6,6 +6,7 @@ use super::{
     *,
 };
 use crate::platform::web::cpu::wait_packets;
+use crate::{tr};
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn render(
@@ -58,11 +59,11 @@ pub(super) fn render(
         };
         match next {
             Some((PreviewSource::Vocal(id), target)) => {
-                let job = cache.take_owner(id).ok_or("无法调度待渲染的音符组")?;
+                let job = cache.take_owner(id).ok_or(tr!("无法调度待渲染的音符组"))?;
                 let path = voice_path(library, scheduler.key(id));
                 match path {
                     Ok(path) => {
-                        emit(Progress::Phase("准备声库与模型"));
+                        emit(Progress::Phase(tr!("准备声库与模型")));
                         pool.start(job, path, settings, true, target)?;
                     }
                     Err(error) => {

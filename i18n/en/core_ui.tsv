@@ -1,0 +1,79 @@
+# en catalog fragment: core_ui
+# format: <simplified-chinese msgid> TAB <translation>
+菜单	Menu
+文件	File
+新建	New
+打开…	Open…
+浏览器工程…	Browser project…
+本机工程…	Local project…
+保存	Save
+下载 SVP…	Download SVP…
+另存为…	Save As…
+分享工程…	Share Project…
+导入…	Import…
+作为音轨导入…	Import as Tracks…
+导入音频…	Import Audio…
+导出音频	Export Audio
+导出音频…	Export Audio…
+编辑	Edit
+撤销 {}	Undo {}
+重做	Redo
+全选	Select All
+取消选择	Deselect
+删除所选内容	Delete Selection
+复制	Copy
+剪切	Cut
+粘贴	Paste
+查看	View
+显示曲速和拍号轨	Show Tempo and Time Signature Tracks
+折叠编排	Collapse Arrangement
+空间充足时同时显示编排	Show Arrangement Too When Space Allows
+编排位于上方	Arrangement on Top
+设置	Settings
+修改	Modify
+填入歌词…	Fill Lyrics…
+静音音符	Mute Notes
+升高八度	Octave Up
+降低八度	Octave Down
+智能量化	Smart Quantize
+解除组链接	Unlink Group
+自动处理	Auto Process
+装饰所选音符	Decorate Selected Notes
+从音频提取音符	Extract Notes from Audio
+检测曲速	Detect Tempo
+项目	Project
+创建音轨	Create Track
+在走带处插入新组	Insert Group at Playhead
+创建伴奏轨	Create Instrumental Track
+设置歌声	Voice Settings
+走带控制	Transport
+播放 / 暂停	Play / Pause
+停止	Stop
+循环播放	Loop Playback
+跳到开头	Go to Start
+跳到结尾	Go to End
+脚本	Script
+重新扫描	Rescan
+打开脚本文件夹	Open Scripts Folder
+其他	Other
+关于 RynthV	About RynthV
+双击创建控制点 · 拖动框选 / 移动 · 四边手柄缩放 · Delete 删除 · Esc 取消 · Ctrl+Z 撤销	Double-click to create a control point · Drag to box-select / move · Edge handles resize · Delete to remove · Esc to cancel · Ctrl+Z to undo
+左键拖动绘制音高 · 右键拖动擦除 · Esc 取消本次绘制 · Ctrl+Z 撤销 · 中键拖动视野	Drag with the left button to draw pitch · Drag with the right button to erase · Esc cancels this drawing · Ctrl+Z to undo · Drag with the middle button to pan
+双击创建音符 · 拖动框选 · 中键拖动视野 · Shift+滚轮水平移动 · Ctrl+滚轮缩放	Double-click to create a note · Drag to box-select · Drag with the middle button to pan · Shift+wheel to scroll horizontally · Ctrl+wheel to zoom
+已复制音符	Notes copied
+已粘贴 {} 个音符	Pasted {} notes
+管理歌声	Manage Voices
+音素时值	Phoneme Timing
+新增参数区域	Add Parameter Lane
+关闭{}	Close {}
+关闭参数区域	Close Parameter Lane
+卷帘	Piano Roll
+编排	Arrangement
+混音	Mixer
+面板	Panels
+暂停	Pause
+播放	Play
+节拍器	Metronome
+编辑拍号 {}/{}…	Edit Time Signature {}/{}…
+编辑曲速 {} BPM…	Edit Tempo {} BPM…
+暂停时返回起播位置	Return to Start Position on Pause

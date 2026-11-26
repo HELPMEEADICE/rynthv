@@ -1,5 +1,6 @@
 use crate::{
     app::App,
+    tr, trf,
     ui::{
         icons::{Icon, IconButton},
         theme::*,
@@ -27,7 +28,7 @@ fn contents(app: &mut App, ui: &mut Ui) {
         overlays(app, ui, 24.0);
         super::scale_guide::toggle(app, ui);
         ui.add_space(7.0);
-        ui.label(RichText::new("网格").color(muted_color()));
+        ui.label(RichText::new(tr!("网格")).color(muted_color()));
         ui.add_space(8.0);
         grid_selector(app, ui, 96.0);
         ui.add_space(9.0);
@@ -38,9 +39,9 @@ fn contents(app: &mut App, ui: &mut Ui) {
 
 fn overlays(app: &mut App, ui: &mut Ui, height: f32) {
     for (icon, label, active) in [
-        (Icon::Pitch, "显示音高曲线", &mut app.show_pitch),
-        (Icon::Waveform, "显示渲染波形", &mut app.show_waveform),
-        (Icon::Retake, "显示 AI 重录小部件", &mut app.show_retakes),
+        (Icon::Pitch, tr!("显示音高曲线"), &mut app.show_pitch),
+        (Icon::Waveform, tr!("显示渲染波形"), &mut app.show_waveform),
+        (Icon::Retake, tr!("显示 AI 重录小部件"), &mut app.show_retakes),
     ] {
         if ui
             .add(
@@ -60,21 +61,17 @@ fn overlays(app: &mut App, ui: &mut Ui, height: f32) {
 fn grid_selector(app: &mut App, ui: &mut Ui, width: f32) {
     ComboBox::from_id_salt("grid")
         .width(width)
-        .selected_text(format!(
-            "{} 分{}",
-            app.view.grid,
-            if app.view.triplet {
-                "三连音"
-            } else {
-                "音符"
-            }
-        ))
+        .selected_text(if app.view.triplet {
+            trf!("{} 分三连音", app.view.grid)
+        } else {
+            trf!("{} 分音符", app.view.grid)
+        })
         .show_ui(ui, |ui| {
             for value in [4, 8, 16, 32, 64, 128] {
                 if ui
                     .selectable_label(
                         app.view.grid == value && !app.view.triplet,
-                        format!("{value} 分音符"),
+                        trf!("{} 分音符", value),
                     )
                     .clicked()
                 {
@@ -86,7 +83,7 @@ fn grid_selector(app: &mut App, ui: &mut Ui, width: f32) {
                 if ui
                     .selectable_label(
                         app.view.grid == value && app.view.triplet,
-                        format!("{value} 分三连音"),
+                        trf!("{} 分三连音", value),
                     )
                     .clicked()
                 {
@@ -100,7 +97,7 @@ fn grid_selector(app: &mut App, ui: &mut Ui, width: f32) {
 fn snap(app: &mut App, ui: &mut Ui, height: f32) {
     if ui
         .add(
-            IconButton::new(Icon::Magnet, "对齐网格")
+            IconButton::new(Icon::Magnet, tr!("对齐网格"))
                 .size(vec2(32.0, height))
                 .framed()
                 .selected(app.view.snap),
@@ -126,7 +123,7 @@ fn title(app: &mut App, ui: &mut Ui) {
                     } else {
                         Icon::ChevronDown
                     },
-                    "展开 / 折叠钢琴卷帘",
+                    tr!("展开 / 折叠钢琴卷帘"),
                 )
                 .size(vec2(20.0, 24.0))
                 .icon_size(12.0),
@@ -138,7 +135,7 @@ fn title(app: &mut App, ui: &mut Ui) {
             ui.ctx().request_repaint();
         }
         ui.add_space(3.0);
-        crate::ui::section_title(ui, "钢琴卷帘", crate::ui::state::DragPayload::Piano);
+        crate::ui::section_title(ui, tr!("钢琴卷帘"), crate::ui::state::DragPayload::Piano);
     });
 }
 
@@ -166,7 +163,7 @@ fn editing_tools(app: &mut App, ui: &mut Ui, height: f32) {
         for (icon, label, tool) in TOOLS {
             if ui
                 .add(
-                    IconButton::new(icon, label)
+                    IconButton::new(icon, tr!(label))
                         .size(vec2(40.0, height))
                         .grouped()
                         .selected(tool == app.piano_tool),
@@ -205,9 +202,9 @@ pub fn toolbar(app: &mut App, ui: &mut Ui) {
         if width >= 272.0 {
             editing_tools(app, ui, HEIGHT);
         } else {
-            ui.menu_button("工具", |ui| {
+            ui.menu_button(tr!("工具"), |ui| {
                 for (_, label, tool) in TOOLS {
-                    if ui.selectable_label(tool == app.piano_tool, label).clicked() {
+                    if ui.selectable_label(tool == app.piano_tool, tr!(label)).clicked() {
                         select(app, tool);
                         ui.close();
                     }
@@ -220,22 +217,22 @@ pub fn toolbar(app: &mut App, ui: &mut Ui) {
             snap(app, ui, HEIGHT);
         }
         let lanes_active = app.view.phonemes || app.view.lanes.iter().any(|lane| lane.visible);
-        let params = ui.add(Button::new("参数").selected(lanes_active));
+        let params = ui.add(Button::new(tr!("参数")).selected(lanes_active));
         Popup::menu(&params)
             .close_behavior(PopupCloseBehavior::CloseOnClickOutside)
             .show(|ui| crate::ui::lane_tabs::show(app, ui));
-        ui.menu_button("选项", |ui| {
+        ui.menu_button(tr!("选项"), |ui| {
             if width < 536.0 {
-                ui.checkbox(&mut app.show_pitch, "显示音高曲线");
-                ui.checkbox(&mut app.show_waveform, "显示渲染波形");
-                ui.checkbox(&mut app.show_retakes, "显示 AI 重录小部件");
-                ui.checkbox(&mut app.view.snap, "对齐网格");
+                ui.checkbox(&mut app.show_pitch, tr!("显示音高曲线"));
+                ui.checkbox(&mut app.show_waveform, tr!("显示渲染波形"));
+                ui.checkbox(&mut app.show_retakes, tr!("显示 AI 重录小部件"));
+                ui.checkbox(&mut app.view.snap, tr!("对齐网格"));
                 grid_selector(app, ui, 130.0);
                 ui.separator();
             }
             ui.horizontal(|ui| {
                 super::scale_guide::toggle(app, ui);
-                ui.label("显示调式音阶");
+                ui.label(tr!("显示调式音阶"));
             });
             ui.set_min_width(190.0);
             crate::ui::scale::controls::panel(app, ui);

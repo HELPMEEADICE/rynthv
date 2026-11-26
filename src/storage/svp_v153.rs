@@ -1,4 +1,5 @@
 use crate::model::{AudioClip, GroupRef, InstrumentalTrack, Project, SVP_VERSION, TimeAxis, beats};
+use crate::trf;
 use serde::Deserialize;
 use serde_json::Value;
 use std::path::PathBuf;
@@ -15,13 +16,13 @@ pub(super) fn import(project: &mut Project) -> Result<(), String> {
     {
         for note in &mut group.notes {
             synthesis::import_note(note)
-                .map_err(|error| format!("SVP 音符组 {} · {}：{error}", group.name, note.lyrics))?;
+                .map_err(|error| trf!("SVP 音符组 {} · {}：{}", group.name, note.lyrics, error))?;
         }
     }
     for track in &mut project.tracks {
         if track.main_ref.extra.remove("isInstrumental") == Some(Value::Bool(true)) {
             let clip = import_clip(&project.time, &mut track.main_ref)
-                .map_err(|error| format!("SVP 伴奏轨 {}：{error}", track.name))?;
+                .map_err(|error| trf!("SVP 伴奏轨 {}：{}", track.name, error))?;
             track.instrumental = Some(InstrumentalTrack { clip });
             track.main_ref.blick_absolute_begin = 0;
             track.main_ref.blick_absolute_end = -1;
@@ -45,7 +46,7 @@ fn import_clip(time: &TimeAxis, reference: &mut GroupRef) -> Result<Option<Audio
     if reference.blick_absolute_end != -1
         && reference.blick_absolute_end < reference.blick_absolute_begin
     {
-        return Err("片段可见范围无效".into());
+        return Err(crate::tr!("片段可见范围无效").into());
     }
     let Some(audio) = reference.extra.remove("audio") else {
         return Ok(None);
@@ -56,7 +57,7 @@ fn import_clip(time: &TimeAxis, reference: &mut GroupRef) -> Result<Option<Audio
     }
     if audio.filename.as_os_str().is_empty() || !audio.duration.is_finite() || audio.duration <= 0.0
     {
-        return Err("音频文件路径或时长无效".into());
+        return Err(crate::tr!("音频文件路径或时长无效").into());
     }
     let seconds_at = |position| {
         if position < 0 {
@@ -74,7 +75,7 @@ fn import_clip(time: &TimeAxis, reference: &mut GroupRef) -> Result<Option<Audio
         end = end.min(seconds_at(reference.blick_absolute_end));
     }
     if !begin.is_finite() || !end.is_finite() {
-        return Err("伴奏时间超出有效范围".into());
+        return Err(crate::tr!("伴奏时间超出有效范围").into());
     }
     Ok((end > begin).then_some(AudioClip {
         path: audio.filename,

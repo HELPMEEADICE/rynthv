@@ -9,6 +9,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
     },
 };
+use crate::{tr};
 
 #[derive(Clone, Debug)]
 pub struct Cancellation {
@@ -71,7 +72,7 @@ pub fn checkpoint() -> Result<()> {
             .is_some_and(Cancellation::is_cancelled)
     });
     if cancelled {
-        Err(VoiceError::new("合成任务已由更新的编辑替代。"))
+        Err(VoiceError::new(tr!("合成任务已由更新的编辑替代。")))
     } else {
         Ok(())
     }

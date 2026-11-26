@@ -3,7 +3,7 @@ use super::{
     time_edit::{self, Target},
     timeline::*,
 };
-use crate::{app::App, model::*};
+use crate::{app::App, model::*, tr};
 use eframe::egui::*;
 
 pub const ROW_HEIGHT: f32 = if cfg!(target_os = "android") {
@@ -126,8 +126,8 @@ fn marker(painter: &Painter, pos: Pos2, text: &str, flag: bool) -> Option<Rect> 
 
 fn event_menu(app: &mut App, ui: &mut Ui, target: Target) {
     let (edit_label, delete_label, can_delete) = match target {
-        Target::Meter(index) => ("编辑拍号…", "删除拍号标记", index > 0),
-        Target::Tempo(position) => ("编辑曲速…", "删除曲速标记", position > 0),
+        Target::Meter(index) => (tr!("编辑拍号…"), tr!("删除拍号标记"), index > 0),
+        Target::Tempo(position) => (tr!("编辑曲速…"), tr!("删除曲速标记"), position > 0),
     };
     if ui.button(edit_label).clicked() {
         time_edit::open(app, target);
@@ -136,7 +136,7 @@ fn event_menu(app: &mut App, ui: &mut Ui, target: Target) {
     ui.separator();
     if ui
         .add_enabled(can_delete, Button::new(delete_label))
-        .on_disabled_hover_text("初始拍号和曲速必须保留，可通过编辑修改其数值")
+        .on_disabled_hover_text(tr!("初始拍号和曲速必须保留，可通过编辑修改其数值"))
         .clicked()
     {
         super::tempo_input::finish(app);

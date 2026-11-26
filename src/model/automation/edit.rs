@@ -1,4 +1,5 @@
 use super::{Automation, validate_points};
+use crate::tr;
 
 impl Automation {
     /// Times use group-local blicks. Replacing a point at an existing time is exact.
@@ -40,7 +41,7 @@ impl Automation {
         self.validate()?;
         validate_points(points)?;
         if start > end || points.iter().any(|point| !(start..=end).contains(&point.0)) {
-            return Err("参数曲线替换范围无效".into());
+            return Err(tr!("参数曲线替换范围无效").into());
         }
         let first = self.points.partition_point(|point| point.0 < start);
         let last = self.points.partition_point(|point| point.0 <= end);
@@ -55,7 +56,7 @@ impl Automation {
 fn canonical_value(value: f64) -> Result<f64, String> {
     let value = value as f32;
     if !value.is_finite() {
-        return Err("参数控制点的值必须为有限数".into());
+        return Err(tr!("参数控制点的值必须为有限数").into());
     }
     Ok(f64::from(value))
 }

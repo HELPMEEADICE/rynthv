@@ -131,9 +131,9 @@ class RynthVActivity : NativeActivity() {
     private fun showGraphicsRecovery() {
         val failure = graphicsFailure ?: return
         if (graphicsDialog != null || isFinishing || isDestroyed || !hasWindowFocus()) return
-        graphicsDialog = AlertDialog.Builder(this).setTitle("图形设备需要恢复")
-            .setMessage(failure + "\n重新打开 RynthV 可恢复最近的自动保存。")
-            .setPositiveButton("恢复工作区") { _, _ -> GraphicsRecoveryActivity.recover(this) }
+        graphicsDialog = AlertDialog.Builder(this).setTitle(R.string.graphics_device_lost_title)
+            .setMessage(getString(R.string.graphics_device_lost_message, failure))
+            .setPositiveButton(R.string.graphics_recovery_action) { _, _ -> GraphicsRecoveryActivity.recover(this) }
             .setCancelable(false).show()
     }
     override fun onWindowFocusChanged(focused: Boolean) {
@@ -160,7 +160,8 @@ class RynthVActivity : NativeActivity() {
                 if (kind == PUBLISH) request.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
                 startActivityForResult(request, PICK_DOCUMENT)
             } catch (error: RuntimeException) {
-                complete(null, IllegalStateException("$title：${error.message}", error))
+                complete(null, IllegalStateException(
+                    getString(R.string.picker_error_message, title, error.message ?: error.javaClass.simpleName), error))
             }
         }
     }
@@ -178,7 +179,10 @@ class RynthVActivity : NativeActivity() {
         val extensions = pickerExtensions
         val source = publishSource
         publishSource = null
-        if (uris.isEmpty()) { complete(null, IllegalArgumentException("文件提供方没有返回文档。")); return }
+        if (uris.isEmpty()) {
+            complete(null, IllegalArgumentException(getString(R.string.picker_no_document_returned)))
+            return
+        }
         files.execute {
             try {
                 val paths = ArrayList<String>()
@@ -207,7 +211,7 @@ class RynthVActivity : NativeActivity() {
         if (error == null) result.put("Ok", JSONArray(paths))
         else {
             Log.w("RynthV", "Document operation failed", error)
-            result.put("Err", "文件操作失败：${error.message}")
+            result.put("Err", getString(R.string.file_operation_failed, error.message ?: error.javaClass.simpleName))
         }
         pickerResult.set(result.toString())
         nativeWake()
@@ -223,7 +227,8 @@ class RynthVActivity : NativeActivity() {
                 runOnUiThread { startActivity(Intent.createChooser(send, null)) }
             } catch (error: Exception) {
                 Log.w("RynthV", "Sharing failed", error)
-                runOnUiThread { Toast.makeText(this, "分享失败：${error.message}", Toast.LENGTH_LONG).show() }
+                val message = getString(R.string.share_failed, error.message ?: error.javaClass.simpleName)
+                runOnUiThread { Toast.makeText(this, message, Toast.LENGTH_LONG).show() }
             }
         }
     }

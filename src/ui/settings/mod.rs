@@ -5,7 +5,7 @@ mod shortcuts;
 mod widgets;
 
 use crate::{
-    app::App,
+    app::App, tr,
     ui::{
         child,
         icons::{Icon, IconButton},
@@ -40,12 +40,12 @@ impl Page {
     ];
     fn label(self) -> &'static str {
         match self {
-            Self::General => "常规",
-            Self::Audio => "音频与 MIDI",
-            Self::Editing => "编辑",
-            Self::Recording => "录制",
-            Self::Rendering => "渲染",
-            Self::Shortcuts => "快捷键",
+            Self::General => tr!("常规"),
+            Self::Audio => tr!("音频与 MIDI"),
+            Self::Editing => tr!("编辑"),
+            Self::Recording => tr!("录制"),
+            Self::Rendering => tr!("渲染"),
+            Self::Shortcuts => tr!("快捷键"),
         }
     }
 }
@@ -92,11 +92,11 @@ pub fn show(app: &mut App, ctx: &Context) {
             title.horizontal(|ui| {
                 let (icon, _) = ui.allocate_exact_size(Vec2::splat(17.0), Sense::hover());
                 Icon::Settings.paint(ui, icon, muted_color());
-                ui.label(RichText::new("设置").font(section_title_font()));
+                ui.label(RichText::new(tr!("设置")).font(section_title_font()));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     close = ui
                         .add(
-                            IconButton::new(Icon::Close, "关闭设置")
+                            IconButton::new(Icon::Close, tr!("关闭设置"))
                                 .size(Vec2::splat(24.0))
                                 .icon_size(13.0),
                         )

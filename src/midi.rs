@@ -7,6 +7,7 @@ pub use export::save as save_project;
 
 use crate::model::TimeAxis;
 use crate::platform::fs::File;
+use crate::trf;
 use midly::{Format, Timing};
 use std::{io::Read, path::Path};
 
@@ -44,43 +45,45 @@ pub struct MidiNote {
 }
 
 pub fn load(path: &Path) -> Result<MidiFile, String> {
-    let file = File::open(path).map_err(|e| format!("无法打开 MIDI 文件：{e}"))?;
+    let file = File::open(path).map_err(|e| trf!("无法打开 MIDI 文件：{}", e))?;
     let metadata = file
         .metadata()
-        .map_err(|e| format!("无法读取 MIDI 文件：{e}"))?;
+        .map_err(|e| trf!("无法读取 MIDI 文件：{}", e))?;
     if !metadata.is_file() {
-        return Err(format!("MIDI 路径 {} 不是普通文件", path.display()));
+        return Err(trf!("MIDI 路径 {} 不是普通文件", path.display()));
     }
     if metadata.len() > MAX_BYTES {
-        return Err("MIDI 文件不能超过 64 MiB".into());
+        return Err(crate::tr!("MIDI 文件不能超过 64 MiB").into());
     }
     let mut bytes = Vec::with_capacity(metadata.len() as usize);
     file.take(MAX_BYTES + 1)
         .read_to_end(&mut bytes)
-        .map_err(|e| format!("无法读取 MIDI 文件：{e}"))?;
+        .map_err(|e| trf!("无法读取 MIDI 文件：{}", e))?;
     if bytes.len() as u64 > MAX_BYTES {
-        return Err("MIDI 文件不能超过 64 MiB".into());
+        return Err(crate::tr!("MIDI 文件不能超过 64 MiB").into());
     }
     parse(&bytes)
 }
 
 pub fn parse(bytes: &[u8]) -> Result<MidiFile, String> {
     if bytes.len() as u64 > MAX_BYTES {
-        return Err("MIDI 文件不能超过 64 MiB".into());
+        return Err(crate::tr!("MIDI 文件不能超过 64 MiB").into());
     }
     let (header, source_tracks) =
-        midly::parse(bytes).map_err(|e| format!("MIDI 文件格式无效或不完整：{e}"))?;
+        midly::parse(bytes).map_err(|e| trf!("MIDI 文件格式无效或不完整：{}", e))?;
     if header.format == Format::Sequential {
-        return Err("暂不支持 Format 2 MIDI；请先转换为 Format 0 或 Format 1".into());
+        return Err(crate::tr!("暂不支持 Format 2 MIDI；请先转换为 Format 0 或 Format 1").into());
     }
     let ppqn = match header.timing {
         Timing::Metrical(ppqn) if ppqn.as_int() > 0 => ppqn.as_int(),
-        Timing::Metrical(_) => return Err("MIDI 的每四分音符刻度数不能为 0".into()),
-        Timing::Timecode(_, _) => return Err("暂不支持使用 SMPTE 时间码计时的 MIDI".into()),
+        Timing::Metrical(_) => return Err(crate::tr!("MIDI 的每四分音符刻度数不能为 0").into()),
+        Timing::Timecode(_, _) => {
+            return Err(crate::tr!("暂不支持使用 SMPTE 时间码计时的 MIDI").into());
+        }
     };
     let declared_tracks = source_tracks.size_hint().0;
     if declared_tracks > MAX_TRACKS {
-        return Err(format!("MIDI 最多支持 {MAX_TRACKS} 个源音轨"));
+        return Err(trf!("MIDI 最多支持 {} 个源音轨", MAX_TRACKS));
     }
     let mut budget = Budget::default();
     let mut time = time::TimeEvents::default();
@@ -90,14 +93,12 @@ pub fn parse(bytes: &[u8]) -> Result<MidiFile, String> {
     for (index, source) in source_tracks.enumerate() {
         count += 1;
         if count > MAX_TRACKS {
-            return Err(format!("MIDI 最多支持 {MAX_TRACKS} 个源音轨"));
+            return Err(trf!("MIDI 最多支持 {} 个源音轨", MAX_TRACKS));
         }
-        let events = source.map_err(|e| format!("MIDI 音轨 {} 格式无效：{e}", index + 1))?;
+        let events = source.map_err(|e| trf!("MIDI 音轨 {} 格式无效：{}", index + 1, e))?;
         let parsed = track::parse(index, events, ppqn, &mut budget, &mut time, &mut warnings)?;
         if tracks.len() + parsed.len() > MAX_ENTRIES {
-            return Err(format!(
-                "MIDI 拆分通道后超过 {MAX_ENTRIES} 条音轨，无法导入"
-            ));
+            return Err(trf!("MIDI 拆分通道后超过 {} 条音轨，无法导入", MAX_ENTRIES));
         }
         tracks.extend(parsed);
     }
@@ -105,7 +106,7 @@ pub fn parse(bytes: &[u8]) -> Result<MidiFile, String> {
         || count == 0
         || (header.format == Format::SingleTrack && count != 1)
     {
-        return Err("MIDI 实际音轨数量与文件头不一致".into());
+        return Err(crate::tr!("MIDI 实际音轨数量与文件头不一致").into());
     }
     Ok(MidiFile {
         tracks,
@@ -124,7 +125,7 @@ impl Budget {
     fn event(&mut self) -> Result<(), String> {
         self.events += 1;
         if self.events > MAX_EVENTS {
-            return Err(format!("MIDI 事件数超过 {MAX_EVENTS}，无法导入"));
+            return Err(trf!("MIDI 事件数超过 {}，无法导入", MAX_EVENTS));
         }
         Ok(())
     }
@@ -132,7 +133,7 @@ impl Budget {
     fn note(&mut self) -> Result<(), String> {
         self.notes += 1;
         if self.notes > MAX_NOTES {
-            return Err(format!("MIDI 音符数超过 {MAX_NOTES}，无法导入"));
+            return Err(trf!("MIDI 音符数超过 {}，无法导入", MAX_NOTES));
         }
         Ok(())
     }

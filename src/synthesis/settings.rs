@@ -10,6 +10,7 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
 };
+use crate::{tr, trf};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -73,9 +74,9 @@ impl SynthesisSettings {
         let path = Self::path()?;
         match fs::read(&path) {
             Ok(bytes) => serde_json::from_slice(&bytes)
-                .map_err(|error| format!("无法读取合成设置 {}：{error}", path.display())),
+                .map_err(|error| trf!("无法读取合成设置 {}：{}", path.display(), error)),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),
-            Err(error) => Err(format!("无法读取合成设置 {}：{error}", path.display())),
+            Err(error) => Err(trf!("无法读取合成设置 {}：{}", path.display(), error)),
         }
     }
 
@@ -86,9 +87,9 @@ impl SynthesisSettings {
         Self::load()?;
         let parent = path.parent().expect("settings path has a parent");
         fs::create_dir_all(parent)
-            .map_err(|error| format!("无法创建合成设置目录 {}：{error}", parent.display()))?;
+            .map_err(|error| trf!("无法创建合成设置目录 {}：{}", parent.display(), error))?;
         let bytes = serde_json::to_vec_pretty(self)
-            .map_err(|error| format!("无法序列化合成设置：{error}"))?;
+            .map_err(|error| trf!("无法序列化合成设置：{}", error))?;
         let temporary = parent.join(format!("synthesis-{}.tmp", uuid::Uuid::new_v4()));
         let result = (|| -> std::io::Result<()> {
             let mut file = fs::OpenOptions::new()
@@ -103,17 +104,17 @@ impl SynthesisSettings {
         if result.is_err() {
             let _ = fs::remove_file(&temporary);
         }
-        result.map_err(|error| format!("无法保存合成设置 {}：{error}", path.display()))
+        result.map_err(|error| trf!("无法保存合成设置 {}：{}", path.display(), error))
     }
 
     pub fn selected_directory(&self) -> Result<PathBuf, String> {
         if !self.has_databases() {
-            return Err("尚未设置声库目录。".to_owned());
+            return Err(tr!("尚未设置声库目录。").to_owned());
         }
         let selected = self
             .selected_voice
             .as_ref()
-            .ok_or_else(|| "尚未选择声库。".to_owned())?;
+            .ok_or_else(|| tr!("尚未选择声库。").to_owned())?;
         let scan = super::library::scan_roots(self);
         let mut directories = scan
             .catalog
@@ -123,20 +124,14 @@ impl SynthesisSettings {
         match (directories.next(), directories.next()) {
             (Some(directory), None) => Ok(directory),
             (None, _) => {
-                let mut message = format!(
-                    "声库 {}/{} 不在已配置的声库目录中。",
-                    selected.database_id, selected.revision
-                );
+                let mut message = trf!("声库 {}/{} 不在已配置的声库目录中。", selected.database_id, selected.revision);
                 if let Some(error) = scan.error {
                     message.push('\n');
                     message.push_str(&error);
                 }
                 Err(message)
             }
-            (Some(_), Some(_)) => Err(format!(
-                "声库 {}/{} 对应多个文件，请检查声库目录配置。",
-                selected.database_id, selected.revision
-            )),
+            (Some(_), Some(_)) => Err(trf!("声库 {}/{} 对应多个文件，请检查声库目录配置。", selected.database_id, selected.revision)),
         }
     }
 }

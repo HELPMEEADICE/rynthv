@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use crate::model::{Extra, Meter, QUARTER, Tempo, TimeAxis};
+use crate::{tr, trf};
 
 #[derive(Default)]
 pub(super) struct TimeEvents {
@@ -14,7 +15,7 @@ pub(super) struct TimeEvents {
 impl TimeEvents {
     pub(super) fn tempo(&mut self, tick: u64, micros: u32) -> Result<(), String> {
         if !(1..=0x00ff_ffff).contains(&micros) {
-            return Err(format!("MIDI tick {tick} 的曲速事件无效"));
+            return Err(trf!("MIDI tick {} 的曲速事件无效", tick));
         }
         if self
             .tempos
@@ -111,19 +112,19 @@ impl TimeEvents {
         }
 
         if self.tempo_conflicts > 0 {
-            warnings.push(format!(
+            warnings.push(trf!(
                 "发现 {} 处同位置曲速冲突，采用文件中后读取的事件。",
                 self.tempo_conflicts
             ));
         }
         if self.meter_conflicts > 0 {
-            warnings.push(format!(
+            warnings.push(trf!(
                 "发现 {} 处同位置拍号冲突，采用文件中后读取的事件。",
                 self.meter_conflicts
             ));
         }
         if self.skipped_meters > 0 {
-            warnings.push(format!(
+            warnings.push(trf!(
                 "已跳过 {} 个无法表示的拍号事件（拍号值不支持、小节中途变化或位置超出范围），沿用此前有效拍号。音符和曲速正常导入。",
                 self.skipped_meters
             ));
@@ -139,9 +140,9 @@ impl TimeEvents {
 
 pub(super) fn scale_tick(tick: u64, ppqn: u16) -> Result<i64, String> {
     if ppqn == 0 {
-        return Err("MIDI 每四分音符的 tick 数不能为零".into());
+        return Err(tr!("MIDI 每四分音符的 tick 数不能为零").into());
     }
     let divisor = u128::from(ppqn);
     let scaled = (u128::from(tick) * QUARTER as u128 + divisor / 2) / divisor;
-    i64::try_from(scaled).map_err(|_| "MIDI 时间超出可用范围".into())
+    i64::try_from(scaled).map_err(|_| tr!("MIDI 时间超出可用范围").into())
 }

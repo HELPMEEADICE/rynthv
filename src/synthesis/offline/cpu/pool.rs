@@ -22,6 +22,7 @@ use std::{
 };
 use wasm_bindgen::{JsCast, JsValue};
 use web_time::Instant;
+use crate::{tr};
 
 #[derive(Default)]
 pub(in crate::synthesis::offline) struct Pool {
@@ -115,7 +116,7 @@ impl Pool {
                     std::cmp::Reverse(*index),
                 )
             })
-            .ok_or("CPU Worker 池已满")?;
+            .ok_or(tr!("CPU Worker 池已满"))?;
         let coverage = job.request.coverage;
         let payload = Job {
             serial: job.serial(),
@@ -178,7 +179,7 @@ impl Pool {
         let Some(packet) = poll_cpu_packet() else {
             return Ok(None);
         };
-        let index = packet.get(0).as_f64().ok_or("CPU Worker 消息缺少槽位")? as usize;
+        let index = packet.get(0).as_f64().ok_or(tr!("CPU Worker 消息缺少槽位"))? as usize;
         let active = self.slots[index]
             .active
             .as_ref()
@@ -186,21 +187,21 @@ impl Pool {
         let done = packet
             .get(1)
             .as_bool()
-            .ok_or("CPU Worker 消息缺少完成标记")?;
+            .ok_or(tr!("CPU Worker 消息缺少完成标记"))?;
         let error = packet.get(2).as_string();
         let payload = packet.get(3).dyn_into::<Array>();
         let event = if done {
             let result = match error {
                 Some(error) => Err(error),
                 None => {
-                    let payload = payload.map_err(|_| "CPU Worker 消息缺少完成数据")?;
+                    let payload = payload.map_err(|_| tr!("CPU Worker 消息缺少完成数据"))?;
                     let serial = active.job.serial();
                     self.decode_completed(index, serial, &payload)
                 }
             };
             JobEvent::Done(Box::new(result))
         } else {
-            let payload = payload.map_err(|_| "CPU Worker 消息缺少进度数据")?;
+            let payload = payload.map_err(|_| tr!("CPU Worker 消息缺少进度数据"))?;
             let update = decode(&payload)?;
             let audio = match update {
                 Update::Pcm { seconds } => Some(
@@ -269,7 +270,7 @@ fn decode<T: serde::de::DeserializeOwned>(packet: &Array) -> Result<T, String> {
     let text = packet
         .get(0)
         .as_string()
-        .ok_or("CPU Worker 消息缺少元数据")?;
+        .ok_or(tr!("CPU Worker 消息缺少元数据"))?;
     serde_json::from_str(&text).map_err(|error| error.to_string())
 }
 
@@ -277,6 +278,6 @@ fn pcm(packet: &Array, index: u32) -> Result<Vec<f32>, String> {
     packet
         .get(index)
         .dyn_into::<Float32Array>()
-        .map_err(|_: JsValue| "CPU Worker 消息缺少 PCM 样本".into())
+        .map_err(|_: JsValue| tr!("CPU Worker 消息缺少 PCM 样本").into())
         .map(|samples| samples.to_vec())
 }

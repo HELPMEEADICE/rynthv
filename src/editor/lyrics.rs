@@ -1,5 +1,6 @@
 use super::Editor;
 use crate::model::EntityId;
+use crate::tr;
 use std::collections::BTreeMap;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -65,7 +66,7 @@ impl Editor {
             .zip(words.iter().cycle())
             .map(|(&id, word)| (id, word))
             .collect();
-        self.begin("填入歌词");
+        self.begin(tr!("填入歌词"));
         let mut changed = 0;
         if let Some(group) = self.project.group_mut(&selection.group) {
             for note in &mut group.notes {

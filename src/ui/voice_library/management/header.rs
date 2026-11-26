@@ -1,6 +1,7 @@
 use super::{super::paths, INK};
 use crate::{
     app::App,
+    tr,
     ui::{
         child,
         icons::{Icon, IconButton},
@@ -32,18 +33,18 @@ pub(super) fn show(app: &mut App, ui: &mut Ui, rect: Rect) -> bool {
                 .color(INK),
         );
         if wide {
-            ui.label(RichText::new("歌声").size(13.0).color(muted_color()));
+            ui.label(RichText::new(tr!("歌声")).size(13.0).color(muted_color()));
         }
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
             close = ui
                 .add(
-                    IconButton::new(Icon::Close, "关闭歌声管理")
+                    IconButton::new(Icon::Close, tr!("关闭歌声管理"))
                         .size(Vec2::splat(28.0))
                         .icon_size(15.0),
                 )
                 .clicked();
             let resources = ui.add(
-                IconButton::new(Icon::Settings, "资源目录设置")
+                IconButton::new(Icon::Settings, tr!("资源目录设置"))
                     .size(Vec2::splat(28.0))
                     .icon_size(18.0),
             );

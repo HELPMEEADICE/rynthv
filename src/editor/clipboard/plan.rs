@@ -1,5 +1,6 @@
 use super::{Editor, NoteClipboard};
 use crate::model::{EntityId, Group, GroupRef, Note};
+use crate::tr;
 
 pub(super) struct PastePlan {
     track: EntityId,
@@ -25,11 +26,11 @@ impl PastePlan {
     ) -> Result<Self, String> {
         clipboard.validate()?;
         if at < 0 {
-            return Err("粘贴位置不能早于项目起点。".into());
+            return Err(tr!("粘贴位置不能早于项目起点。").into());
         }
         let track = editor.current_track();
         if track.is_instrumental() {
-            return Err("请先选择歌声音轨再粘贴音符。".into());
+            return Err(tr!("请先选择歌声音轨再粘贴音符。").into());
         }
         let reference = if duplicate {
             editor.active_ref()
@@ -48,21 +49,21 @@ impl PastePlan {
         for note in &mut notes {
             let global = at
                 .checked_add(note.onset)
-                .ok_or("粘贴后的音符时间超出可用范围。")?;
+                .ok_or(tr!("粘贴后的音符时间超出可用范围。"))?;
             let global_end = global
                 .checked_add(note.duration)
-                .ok_or("粘贴后的音符结束时间超出可用范围。")?;
+                .ok_or(tr!("粘贴后的音符结束时间超出可用范围。"))?;
             note.onset = global
                 .checked_sub(offset)
-                .ok_or("粘贴后的组内时间超出可用范围。")?;
+                .ok_or(tr!("粘贴后的组内时间超出可用范围。"))?;
             note.onset
                 .checked_add(note.duration)
-                .ok_or("粘贴后的组内结束时间超出可用范围。")?;
+                .ok_or(tr!("粘贴后的组内结束时间超出可用范围。"))?;
             note.pitch = note
                 .pitch
                 .checked_sub(pitch_offset)
                 .filter(|pitch| (0..=127).contains(pitch))
-                .ok_or("目标音符组的移调使粘贴音高超出 MIDI 范围。")?;
+                .ok_or(tr!("目标音符组的移调使粘贴音高超出 MIDI 范围。"))?;
             note.renew_identity();
             end = end.max(global_end);
         }
@@ -70,7 +71,7 @@ impl PastePlan {
             editor
                 .project
                 .group(&reference.group_id)
-                .ok_or("目标音符组不存在，无法粘贴。")?;
+                .ok_or(tr!("目标音符组不存在，无法粘贴。"))?;
             Target::Existing {
                 reference: reference.id,
                 group: reference.group_id.clone(),

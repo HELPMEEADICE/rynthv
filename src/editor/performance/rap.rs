@@ -1,4 +1,5 @@
 use super::{Editor, Note, NotePerformance, PerformanceParameter};
+use crate::tr;
 use std::collections::BTreeSet;
 
 impl Editor {
@@ -20,7 +21,7 @@ impl Editor {
         if notes.is_empty() {
             return false;
         }
-        self.begin("切换说唱声调");
+        self.begin(tr!("切换说唱声调"));
         let value = accent.map_or_else(String::new, |accent| accent.to_string());
         if let Some(group) = self.project.group_mut(&group) {
             for note in &mut group.notes {

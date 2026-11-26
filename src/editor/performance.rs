@@ -2,6 +2,7 @@ mod rap;
 
 use super::{Editor, SelectionState};
 use crate::model::{EntityId, Note, NoteMode, NotePerformance};
+use crate::tr;
 use std::collections::BTreeSet;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -73,7 +74,7 @@ impl Editor {
         if notes.is_empty() {
             return false;
         }
-        self.begin("切换音符模式");
+        self.begin(tr!("切换音符模式"));
         if let Some(group) = self.project.group_mut(&group) {
             for note in &mut group.notes {
                 if notes.contains(&note.id) {
@@ -104,10 +105,10 @@ impl Editor {
             return false;
         }
         self.begin(match parameter {
-            PerformanceParameter::Expression => "调整音符演绎",
-            PerformanceParameter::Vibrato => "调整颤音调制",
-            PerformanceParameter::RapTone => "调整说唱音调",
-            PerformanceParameter::RapIntonation => "调整说唱语调",
+            PerformanceParameter::Expression => tr!("调整音符演绎"),
+            PerformanceParameter::Vibrato => tr!("调整颤音调制"),
+            PerformanceParameter::RapTone => tr!("调整说唱音调"),
+            PerformanceParameter::RapIntonation => tr!("调整说唱语调"),
         });
         self.performance_edit = Some(PerformanceEdit {
             parameter,

@@ -6,6 +6,7 @@ use super::{
 };
 use crate::synthesis::audio;
 use std::{sync::mpsc, thread};
+use crate::{tr, trf};
 
 impl Runtime {
     pub fn export_ready(&self, revision: u64) -> bool {
@@ -29,7 +30,7 @@ impl Runtime {
             let error = self
                 .recording_error
                 .clone()
-                .unwrap_or_else(|| "请等待当前工程合成完成后再导出".into());
+                .unwrap_or_else(|| tr!("请等待当前工程合成完成后再导出").into());
             self.export_result = Some(Err(error));
             return;
         }
@@ -49,7 +50,7 @@ impl Runtime {
             return;
         }
         if self.recordings.pending.keys().any(|id| includes(*id)) {
-            self.export_result = Some(Err("请等待所选伴奏加载完成后再导出".into()));
+            self.export_result = Some(Err(tr!("请等待所选伴奏加载完成后再导出").into()));
             return;
         }
         let owners = self.export_owners.clone();
@@ -85,17 +86,11 @@ impl Runtime {
                         )? {
                             outputs.push(output);
                         } else if output.stem != VocalStem::Aspiration {
-                            return Err(format!(
-                                "{} 没有可导出的音频，请检查音轨是否为空、静音或被独奏排除",
-                                output.path.display()
-                            ));
+                            return Err(trf!("{} 没有可导出的音频，请检查音轨是否为空、静音或被独奏排除", output.path.display()));
                         }
                     }
                     std::fs::create_dir_all(&request.directory).map_err(|error| {
-                        format!(
-                            "无法创建导出文件夹 {}：{error}",
-                            request.directory.display()
-                        )
+                        trf!("无法创建导出文件夹 {}：{}", request.directory.display(), error)
                     })?;
                     let mut written = Vec::with_capacity(outputs.len());
                     for output in outputs {
@@ -108,13 +103,10 @@ impl Runtime {
                             None,
                         )?
                         .ok_or_else(|| {
-                            format!(
-                                "{} 没有可导出的音频，请检查音轨是否为空、静音或被独奏排除",
-                                output.path.display()
-                            )
+                            trf!("{} 没有可导出的音频，请检查音轨是否为空、静音或被独奏排除", output.path.display())
                         })?;
                         audio::save_wav_as(&output.path, &audio, request.format)
-                            .map_err(|e| format!("{e}（此前已完成 {} 个文件）", written.len()))?;
+                            .map_err(|e| trf!("{}（此前已完成 {} 个文件）", e, written.len()))?;
                         written.push(output.path.clone());
                     }
                     Ok(written)
@@ -125,7 +117,7 @@ impl Runtime {
                 let result = crate::synthesis::execution::scope(cancellation.clone(), export)
                     .map_err(|error| {
                         if cancellation.is_cancelled() {
-                            "应用已进入后台，WAV 渲染已中止。".to_owned()
+                            tr!("应用已进入后台，WAV 渲染已中止。").to_owned()
                         } else {
                             error
                         }
@@ -133,7 +125,7 @@ impl Runtime {
                 let _ = sender.send(result);
             }) {
             Ok(_) => self.export = Some(rx),
-            Err(error) => self.export_result = Some(Err(format!("无法启动音频导出：{error}"))),
+            Err(error) => self.export_result = Some(Err(trf!("无法启动音频导出：{}", error))),
         }
     }
 }

@@ -25,6 +25,7 @@ use std::{
     },
 };
 use web_time::Instant;
+use crate::{tr};
 
 const BASELINE_BUDGET: usize = 24 << 20;
 const PARTIAL_BUDGET: usize = 24 << 20;
@@ -175,7 +176,7 @@ impl Worker {
                 }
                 let cursor = cursor
                     .as_mut()
-                    .ok_or_else(|| VoiceError::new("找不到待渲染音频的推理位置"))?;
+                    .ok_or_else(|| VoiceError::new(tr!("找不到待渲染音频的推理位置")))?;
                 let batch = if target.is_some() { 64 } else { 128 };
                 for audio in prepared.advance(cursor, batch, &mut stage)? {
                     publish(&audio).map_err(VoiceError::new)?;

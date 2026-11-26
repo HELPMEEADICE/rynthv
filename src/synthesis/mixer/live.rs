@@ -14,6 +14,7 @@ use std::{
     ops::Range,
     sync::Arc,
 };
+use crate::{tr, trf};
 
 struct Owner {
     coverage: Range<usize>,
@@ -34,7 +35,7 @@ impl LiveMixer {
         for (id, request) in &plan.requests {
             let coverage = request.coverage;
             if coverage.sample_rate == 0 || coverage.sample_end.0 < coverage.sample_start.0 {
-                return Err(format!("音符组 {} 的音频覆盖范围无效", id.0));
+                return Err(trf!("音符组 {} 的音频覆盖范围无效", id.0));
             }
             let coverage = native_bound(coverage.sample_start.0, coverage.sample_rate)?
                 ..native_bound(coverage.sample_end.0, coverage.sample_rate)?;
@@ -42,14 +43,11 @@ impl LiveMixer {
             let output = plan
                 .output_controls
                 .get(id)
-                .ok_or_else(|| format!("音符组 {} 缺少混音控制", id.0))?;
+                .ok_or_else(|| trf!("音符组 {} 缺少混音控制", id.0))?;
             let controls = Controls::read(&output.mixer)
-                .map_err(|error| format!("音轨 {}：{error}", output.track_id))?;
+                .map_err(|error| trf!("音轨 {}：{}", output.track_id, error))?;
             if controls.solo != solo_tracks.contains(&output.track_id) {
-                return Err(format!(
-                    "音轨 {} 的独奏状态与项目混音快照不一致",
-                    output.track_id
-                ));
+                return Err(trf!("音轨 {} 的独奏状态与项目混音快照不一致", output.track_id));
             }
             if coverage.is_empty()
                 || output.reference_muted
@@ -146,10 +144,10 @@ impl LiveMixer {
         };
         owner.completed_audio = None;
         if model.end < model.start {
-            return Err(format!("音符组 {} 的模型采样范围无效", id.0));
+            return Err(trf!("音符组 {} 的模型采样范围无效", id.0));
         }
-        let start = usize::try_from(model.start.max(0)).map_err(|_| "模型开始位置超出地址范围")?;
-        let end = usize::try_from(model.end.max(0)).map_err(|_| "模型结束位置超出地址范围")?;
+        let start = usize::try_from(model.start.max(0)).map_err(|_| tr!("模型开始位置超出地址范围"))?;
+        let end = usize::try_from(model.end.max(0)).map_err(|_| tr!("模型结束位置超出地址范围"))?;
         let before = owner.coverage.start..owner.coverage.end.min(start);
         let after = owner.coverage.start.max(end)..owner.coverage.end;
         // Set both regions before mixing either boundary block. A short model
@@ -210,7 +208,7 @@ impl LiveMixer {
         let mut active = BTreeMap::<OwnerId, &Owner>::new();
         for index in first_block..end_block {
             let start = index * LIVE_BLOCK_FRAMES;
-            let frames = source.block_frames(index).ok_or("混音块超出项目范围")?;
+            let frames = source.block_frames(index).ok_or(tr!("混音块超出项目范围"))?;
             let range = start..start + frames;
             active.retain(|_, owner| owner.coverage.end > range.start);
             while let Some((id, owner)) =

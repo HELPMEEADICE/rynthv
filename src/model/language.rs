@@ -1,3 +1,4 @@
+use crate::{tr, trf};
 use serde_json::Value;
 
 /// SVP language IDs and the corresponding voice configuration phone sets.
@@ -55,12 +56,12 @@ impl Language {
 
     pub fn label(self) -> &'static str {
         match self {
-            Self::English => "英语",
-            Self::Mandarin => "汉语普通话",
-            Self::Japanese => "日语",
-            Self::Spanish => "西班牙语",
-            Self::Cantonese => "汉语广东话",
-            Self::Korean => "韩语",
+            Self::English => tr!("英语"),
+            Self::Mandarin => tr!("汉语普通话"),
+            Self::Japanese => tr!("日语"),
+            Self::Spanish => tr!("西班牙语"),
+            Self::Cantonese => tr!("汉语广东话"),
+            Self::Korean => tr!("韩语"),
         }
     }
 
@@ -75,17 +76,17 @@ impl Language {
 /// fields: `language` describes the bank, `languageOverride` selects cross-language singing.
 pub fn database_language(database: &Value, inherited: Language) -> Result<Language, String> {
     if !database.is_object() {
-        return Err("歌声的 database 字段必须是对象".into());
+        return Err(tr!("歌声的 database 字段必须是对象").into());
     }
     let mut selected = inherited;
     for field in ["language", "languageOverride"] {
         if let Some(value) = database.get(field) {
             let value = value
                 .as_str()
-                .ok_or_else(|| format!("database.{field} 必须是字符串"))?;
+                .ok_or_else(|| trf!("database.{} 必须是字符串", field))?;
             if !value.is_empty() {
                 selected =
-                    Language::parse(value).ok_or_else(|| format!("不支持的歌声语言：{value}"))?;
+                    Language::parse(value).ok_or_else(|| trf!("不支持的歌声语言：{}", value))?;
             }
         }
     }

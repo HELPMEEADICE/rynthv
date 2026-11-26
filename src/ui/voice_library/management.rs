@@ -9,6 +9,7 @@ mod toolbar;
 use super::{context, error_label, paths, resource_import, text, weak};
 use crate::{
     app::App,
+    tr,
     ui::{child, theme::*},
 };
 use eframe::egui::*;
@@ -30,10 +31,10 @@ enum Sort {
 impl Sort {
     fn label(self) -> &'static str {
         match self {
-            Self::Default => "默认",
-            Self::Name => "名称 A–Z",
-            Self::NameReverse => "名称 Z–A",
-            Self::Version => "版本最新",
+            Self::Default => tr!("默认"),
+            Self::Name => tr!("名称 A–Z"),
+            Self::NameReverse => tr!("名称 Z–A"),
+            Self::Version => tr!("版本最新"),
         }
     }
 }
@@ -116,14 +117,14 @@ fn show(app: &mut App, ctx: &Context, state: &mut State) {
                     if app.synthesis.library.is_scanning() {
                         ui.horizontal(|ui| {
                             ui.spinner();
-                            text(ui, "正在扫描歌声…");
+                            text(ui, tr!("正在扫描歌声…"));
                         });
                         return;
                     }
                     if let Some(error) = app.synthesis.library.settings_error() {
-                        error_label(ui, "无法读取声库列表");
-                        ui.collapsing("查看原因", |ui| error_label(ui, error));
-                        ui.menu_button("选择声库目录…", |ui| {
+                        error_label(ui, tr!("无法读取声库列表"));
+                        ui.collapsing(tr!("查看原因"), |ui| error_label(ui, error));
+                        ui.menu_button(tr!("选择声库目录…"), |ui| {
                             paths::directory_menu(app, ui)
                         });
                         return;
@@ -137,13 +138,13 @@ fn show(app: &mut App, ctx: &Context, state: &mut State) {
                                 .catalog()
                                 .is_some_and(|catalog| !catalog.entries.is_empty())
                             {
-                                "部分声库目录无法读取"
+                                tr!("部分声库目录无法读取")
                             } else {
-                                "无法读取声库目录"
+                                tr!("无法读取声库目录")
                             },
                         );
-                        ui.collapsing("查看原因", |ui| error_label(ui, error));
-                        ui.menu_button("选择声库目录…", |ui| {
+                        ui.collapsing(tr!("查看原因"), |ui| error_label(ui, error));
+                        ui.menu_button(tr!("选择声库目录…"), |ui| {
                             paths::directory_menu(app, ui)
                         });
                         ui.add_space(12.0);
@@ -178,12 +179,12 @@ fn empty(app: &mut App, ui: &mut Ui, state: &mut State) {
             {
                 text(
                     ui,
-                    RichText::new("没有匹配的歌声")
+                    RichText::new(tr!("没有匹配的歌声"))
                         .font(section_title_font())
                         .size(16.0),
                 );
-                weak(ui, "换一个关键词，或清除筛选条件。");
-                if ui.button("清除搜索与筛选").clicked() {
+                weak(ui, tr!("换一个关键词，或清除筛选条件。"));
+                if ui.button(tr!("清除搜索与筛选")).clicked() {
                     state.query.clear();
                     state.language.clear();
                     state.vendor.clear();
@@ -192,17 +193,17 @@ fn empty(app: &mut App, ui: &mut Ui, state: &mut State) {
             } else {
                 text(
                     ui,
-                    RichText::new("没有可显示的声库")
+                    RichText::new(tr!("没有可显示的声库"))
                         .font(section_title_font())
                         .size(16.0),
                 );
-                weak(ui, "选择声库目录，或导入 .svpk、.sfpk、.sfpks 文件。");
-                ui.menu_button("选择声库目录…", |ui| paths::directory_menu(app, ui));
+                weak(ui, tr!("选择声库目录，或导入 .svpk、.sfpk、.sfpks 文件。"));
+                ui.menu_button(tr!("选择声库目录…"), |ui| paths::directory_menu(app, ui));
             }
             if let Some(catalog) = app.synthesis.library.catalog()
                 && !catalog.warnings.is_empty()
             {
-                ui.collapsing("扫描提示", |ui| {
+                ui.collapsing(tr!("扫描提示"), |ui| {
                     for warning in &catalog.warnings {
                         weak(ui, warning);
                     }

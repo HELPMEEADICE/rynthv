@@ -8,6 +8,7 @@ use std::{
     },
     time::Duration,
 };
+use crate::{trf};
 
 pub(super) fn run(
     rx: Receiver<Command>,
@@ -32,7 +33,7 @@ pub(super) fn run(
                     .and_then(|player| player.start_output().map_err(|error| error.to_string()));
                 if let Ok(mut status) = published.lock() {
                     status.audition_error =
-                        result.err().map(|error| format!("钢琴试听失败：{error}"));
+                        result.err().map(|error| trf!("钢琴试听失败：{}", error));
                 }
                 repaint.wake();
             }

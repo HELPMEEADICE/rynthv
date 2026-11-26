@@ -1,4 +1,5 @@
 use super::*;
+use crate::tr;
 
 pub(super) fn update(app: &mut App, gesture: &mut ParameterGesture) -> Result<(), String> {
     match &mut gesture.kind {
@@ -149,7 +150,7 @@ fn move_points(app: &mut App, gesture: &ParameterGesture) -> Result<(), String> 
         .iter()
         .any(|point| !selected_times.contains(&point.0) && moved_times.contains(&point.0))
     {
-        app.status = "控制点不能覆盖未选中的控制点".into();
+        app.status = tr!("控制点不能覆盖未选中的控制点").into();
         return Ok(());
     }
     let mut points: BTreeMap<_, _> = gesture

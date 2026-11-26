@@ -1,4 +1,5 @@
 use super::{Extra, VocalModeComponent, VocalModeValues, VoiceParameter, VoiceSettings};
+use crate::{tr, trf};
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
 
@@ -9,7 +10,7 @@ impl VoiceSettings {
         value: Option<f64>,
     ) -> Result<(), String> {
         if value.is_some_and(|value| !parameter.valid(value)) {
-            return Err(format!("歌声参数 {} 超出有效范围", parameter.label()));
+            return Err(trf!("歌声参数 {} 超出有效范围", parameter.label()));
         }
         let voice = voice_mut(extra)?;
         if let Some(value) = value {
@@ -26,7 +27,7 @@ impl VoiceSettings {
         values: &BTreeMap<String, VocalModeValues>,
     ) -> Result<(), String> {
         if values.values().any(|value| !value.valid()) {
-            return Err("唱法参数必须为 0 到 150 之间的有限数值".into());
+            return Err(tr!("唱法参数必须为 0 到 150 之间的有限数值").into());
         }
         Self::from_extra(extra)?;
         let voice = voice_mut(extra)?;
@@ -55,5 +56,5 @@ fn voice_mut(extra: &mut Extra) -> Result<&mut Map<String, Value>, String> {
         .entry("voice".into())
         .or_insert_with(|| Value::Object(Map::new()))
         .as_object_mut()
-        .ok_or_else(|| "歌声参数 voice 必须是对象".into())
+        .ok_or_else(|| tr!("歌声参数 voice 必须是对象").into())
 }

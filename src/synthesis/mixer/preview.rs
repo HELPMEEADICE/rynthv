@@ -11,6 +11,7 @@ use std::{
     ops::Range,
     sync::Arc,
 };
+use crate::{tr};
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum PreviewSource {
@@ -56,7 +57,7 @@ impl PreviewMixer {
         for (&id, request) in &plan.requests {
             let coverage = request.coverage;
             if coverage.sample_rate == 0 {
-                return Err("音符组采样率无效".into());
+                return Err(tr!("音符组采样率无效").into());
             }
             let range = native_bound(coverage.sample_start.0, coverage.sample_rate)?
                 ..native_bound(coverage.sample_end.0, coverage.sample_rate)?;

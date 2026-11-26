@@ -1,6 +1,7 @@
 //! Edit menu commands follow the active piano tool's selection domain.
 use crate::{
     app::App,
+    tr, trf,
     ui::{lanes, phonemes, piano},
 };
 use eframe::egui::{Context, Event};
@@ -122,7 +123,7 @@ fn copy_notes(app: &mut App, ctx: &Context) -> bool {
     match app.editor.copy() {
         Ok(Some(text)) => {
             ctx.copy_text(text);
-            app.status = "已复制音符".into();
+            app.status = tr!("已复制音符").into();
             true
         }
         Ok(None) => false,
@@ -193,7 +194,7 @@ pub(super) fn duplicate(app: &mut App) {
 fn report_paste(app: &mut App, result: Result<usize, String>) {
     match result {
         Ok(0) => {}
-        Ok(count) => app.status = format!("已粘贴 {count} 个音符"),
+        Ok(count) => app.status = trf!("已粘贴 {} 个音符", count),
         Err(error) => app.status = error,
     }
 }

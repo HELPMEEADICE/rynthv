@@ -1,0 +1,109 @@
+# en catalog fragment: ui_settings
+# format: <simplified-chinese msgid> TAB <translation>
+常规	General
+音频与 MIDI	Audio & MIDI
+编辑	Edit
+录制	Recording
+渲染	Rendering
+快捷键	Shortcuts
+设置	Settings
+关闭设置	Close settings
+模型推理	Model inference
+推理计算设备	Inference device
+自动选择（Auto）	Auto
+GPU（WebGPU）	GPU (WebGPU)
+CPU	CPU
+正在初始化推理设备…	Initializing inference device…
+尚未执行推理	No inference run yet
+实际执行	Actual execution
+GPU 提交 {}/{} 次／{} ms · 回读 {} 次／{} ms	GPU submissions {}/{} · {} ms, readbacks {} · {} ms
+算子与缓存诊断	Operator and cache diagnostics
+当前显卡	Current GPU
+{} {} · {} MiB / 存储缓冲区	{} {} · {} MiB / storage buffer
+已就绪 · 支持计算	Ready · compute supported
+CPU 已就绪	CPU ready
+GPU 不可用 · 使用 CPU	GPU unavailable · using CPU
+WebGPU 计算失败	WebGPU compute failed
+推理设备状态	Inference device status
+WebGPU 显卡	WebGPU adapter
+自动选择（独显优先）	Auto (dedicated GPU first)
+当前快捷键；自定义绑定尚未接入。	Current shortcuts; custom bindings are not available yet.
+工程	Project
+新建	New
+打开	Open
+保存	Save
+另存为	Save As
+撤销	Undo
+重做	Redo
+全选音符	Select all notes
+复制 / 剪切 / 粘贴	Copy / Cut / Paste
+重复音符	Duplicate notes
+删除音符	Delete notes
+取消选择	Deselect
+填入歌词	Fill lyrics
+静音音符	Mute notes
+重录新的采样	Retake new samples
+裁剪保留使用采样	Trim keeping used samples
+升高 / 降低八度	Octave up / down
+音符面板	Note panel
+走带控制	Transport
+播放 / 暂停	Play / Pause
+停止	Stop
+跳到结尾	Go to end
+按网格移动走带	Move transport by grid
+工具与视野	Tools and view
+选择 / 铅笔工具	Select / pencil tool
+创建音符 / 编辑歌词	Create note / edit lyrics
+平移视野	Pan the view
+水平滚动	Horizontal scroll
+缩放	Zoom
+界面主题	Theme
+深色	Dark
+浅色	Light
+界面缩放	Interface scale
+图形渲染	Graphics rendering
+编辑器图形渲染后端	Editor graphics backend
+帮助和指导	Help and guidance
+显示状态栏	Show status bar
+显示控件操作提示	Show control hints
+工作区	Workspace
+工具列宽度	Toolbar width
+布局	Layout
+重置工作区布局	Reset workspace layout
+音频输出	Audio output
+输出设备	Output device
+系统默认输出设备	System default output
+当前跟随系统默认设备，设备切换尚未接入	Following the system default device; device switching is not available yet
+播放格式	Playback format
+设备默认格式	Device default format
+预览音频自动适配输出设备的采样率和声道	Preview audio adapts to the output device's sample rate and channels
+MIDI 输入	MIDI input
+输入设备	Input device
+未启用	Disabled
+MIDI 输入尚未接入	MIDI input is not available yet
+钢琴卷帘	Piano roll
+半音行高	Semitone row height
+音符对齐网格	Snap notes to grid
+网格精度	Grid resolution
+{} 分音符	1/{} note
+三连音网格	Triplet grid
+显示	View
+显示音高线	Show pitch curve
+显示波形	Show waveform
+编排位于上方	Arrangement on Top
+显示曲速和拍号轨	Show Tempo and Time Signature Tracks
+拖动标题可调整工具列顺序，拖动分隔线可调整区域尺寸。	Drag a title to reorder panels; drag a divider to resize areas.
+录音输入设备	Recording input device
+录音功能尚未接入	Recording is not available yet
+录音声道	Recording channels
+歌声数据库	Voicebanks
+管理歌声…	Manage voicebanks…
+音频导出	Audio export
+导出设置	Export settings
+打开渲染面板	Open render panel
+录制功能尚未接入，相关设置暂不可用。	Recording is not available yet, so its settings are disabled.
+目标文件夹、音轨、声道、位深度和采样率在渲染面板中设置。	Target folder, tracks, channels, bit depth and sample rate are set in the render panel.
+双击	Double-click
+中键拖动	Middle-drag
+Shift+滚轮	Shift+wheel
+Ctrl+滚轮	Ctrl+wheel

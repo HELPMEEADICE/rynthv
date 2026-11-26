@@ -10,6 +10,7 @@ pub use sampling::AutomationSampler;
 pub use target::AutomationTarget;
 
 use super::Extra;
+use crate::tr;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -52,15 +53,16 @@ impl Automation {
 
 fn validate_points(points: &[(i64, f64)]) -> Result<(), String> {
     if points.iter().any(|(_, value)| !(*value as f32).is_finite()) {
-        return Err("参数控制点的值必须为有限数".into());
+        return Err(tr!("参数控制点的值必须为有限数").into());
     }
     if points.windows(2).any(|pair| pair[0].0 >= pair[1].0) {
-        return Err("参数控制点的时间必须严格递增".into());
+        return Err(tr!("参数控制点的时间必须严格递增").into());
     }
     Ok(())
 }
 
 pub(super) mod flat_points {
+    use crate::tr;
     use serde::{
         Deserializer, Serializer,
         de::{Error, SeqAccess, Visitor},
@@ -96,10 +98,10 @@ pub(super) mod flat_points {
                 let mut points = Vec::with_capacity(seq.size_hint().unwrap_or(0) / 2);
                 while let Some(time) = seq.next_element::<i64>()? {
                     let Some(value) = seq.next_element::<f64>()? else {
-                        return Err(A::Error::custom("参数控制点必须为 time/value 对"));
+                        return Err(A::Error::custom(tr!("参数控制点必须为 time/value 对")));
                     };
                     if !value.is_finite() {
-                        return Err(A::Error::custom("控制点值必须为有限数"));
+                        return Err(A::Error::custom(tr!("控制点值必须为有限数")));
                     }
                     points.push((time, value));
                 }

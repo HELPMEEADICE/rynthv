@@ -1,5 +1,6 @@
 use super::Editor;
 use crate::model::*;
+use crate::tr;
 
 impl Editor {
     /// Incoming time and pitch are in project coordinates.
@@ -22,7 +23,7 @@ impl Editor {
         Some(id)
     }
     pub fn delete_selected(&mut self) {
-        self.begin("删除音符");
+        self.begin(tr!("删除音符"));
         let selected = self.selected.clone();
         if let Some(group) = self.group_mut() {
             group.notes.retain(|n| !selected.contains(&n.id));
@@ -31,7 +32,7 @@ impl Editor {
         self.finish();
     }
     pub fn transpose(&mut self, amount: i32) {
-        self.begin("移调");
+        self.begin(tr!("移调"));
         let selected = self.selected.clone();
         if let Some(group) = self.group_mut() {
             for n in &mut group.notes {
@@ -43,7 +44,7 @@ impl Editor {
         self.finish();
     }
     pub fn mute_selected(&mut self) {
-        self.begin("静音音符");
+        self.begin(tr!("静音音符"));
         let selected = self.selected.clone();
         let mute = self
             .notes()
@@ -60,7 +61,7 @@ impl Editor {
         self.finish();
     }
     pub fn add_track(&mut self) {
-        self.begin("创建音轨");
+        self.begin(tr!("创建音轨"));
         let mut t = Track::new(self.project.tracks.len());
         t.disp_color = self.project.next_track_color();
         self.track = t.id;
@@ -76,12 +77,12 @@ impl Editor {
         if self.project.tracks[index].disp_color == color {
             return;
         }
-        self.begin("修改音轨颜色");
+        self.begin(tr!("修改音轨颜色"));
         self.project.tracks[index].disp_color = color;
         self.finish();
     }
     pub fn set_lyric(&mut self, id: EntityId, lyric: String) {
-        self.begin("填入歌词");
+        self.begin(tr!("填入歌词"));
         if let Some(n) = self
             .group_mut()
             .and_then(|g| g.notes.iter_mut().find(|n| n.id == id))

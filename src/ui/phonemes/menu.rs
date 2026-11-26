@@ -3,6 +3,7 @@ use crate::{
     app::App,
     model::{EntityId, PhonemeAttributes, PhonemeParameter, SourcePhone},
     synthesis::rendered::RenderedPhoneme,
+    tr,
 };
 use eframe::egui::*;
 
@@ -82,7 +83,7 @@ pub(super) fn show(
                 target.supports_timing || attributes.left_offset.is_some()
             });
         if ui
-            .add_enabled(timing_enabled, Button::new("重置音素时值"))
+            .add_enabled(timing_enabled, Button::new(tr!("重置音素时值")))
             .clicked()
             && let Some(source) = target.timing_source
         {
@@ -92,7 +93,7 @@ pub(super) fn show(
         if ui
             .add_enabled(
                 enabled && (target.supports_strength || attributes.strength.is_some()),
-                Button::new("重置音素强度"),
+                Button::new(tr!("重置音素强度")),
             )
             .clicked()
         {
@@ -105,7 +106,7 @@ pub(super) fn show(
                     && (target.supports_impulse
                         || attributes.position.is_some()
                         || attributes.activity.is_some()),
-                Button::new("重置辅音爆破"),
+                Button::new(tr!("重置辅音爆破")),
             )
             .clicked()
         {
@@ -116,7 +117,7 @@ pub(super) fn show(
         if ui
             .add_enabled(
                 enabled && attributes != PhonemeAttributes::default(),
-                Button::new("重置此音素全部属性"),
+                Button::new(tr!("重置此音素全部属性")),
             )
             .clicked()
         {
@@ -147,11 +148,11 @@ fn reset_impulse(app: &mut App, source: SourcePhone, mut attributes: PhonemeAttr
     attributes.position = None;
     attributes.activity = None;
     if !app.editor.begin_phoneme_edit(source) {
-        app.error = Some("无法编辑当前音素".into());
+        app.error = Some(tr!("无法编辑当前音素").into());
     } else if app.editor.update_phoneme_attributes(source, attributes) {
         app.editor.finish_phoneme_edit();
     } else {
         app.editor.cancel_phoneme_edit();
-        app.error = Some("无法重置辅音爆破".into());
+        app.error = Some(tr!("无法重置辅音爆破").into());
     }
 }

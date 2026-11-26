@@ -1,7 +1,7 @@
 use super::App;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::storage;
-use crate::{editor::Editor, model::*, ui};
+use crate::{editor::Editor, model::*, tr, ui};
 #[cfg(not(target_arch = "wasm32"))]
 use eframe::egui::Context;
 #[cfg(not(target_arch = "wasm32"))]
@@ -52,9 +52,9 @@ impl App {
         let mut close = false;
         let modal = Modal::new(Id::new("local-projects")).show(ctx, |ui| {
             ui.set_width((ctx.content_rect().width() - 30.0).clamp(220.0, 440.0));
-            ui.heading("本机工程");
+            ui.heading(tr!("本机工程"));
             if files.is_empty() {
-                ui.weak("保存的手机工程会显示在这里。");
+                ui.weak(tr!("保存的手机工程会显示在这里。"));
             }
             ScrollArea::vertical()
                 .max_height(ctx.content_rect().height() * 0.55)
@@ -69,7 +69,7 @@ impl App {
                         }
                     }
                 });
-            close = ui.button("关闭").clicked();
+            close = ui.button(tr!("关闭")).clicked();
         });
         if let Some(index) = selected {
             let path = files[index].clone();
@@ -95,7 +95,7 @@ impl App {
                 self.path = (!imported).then_some(path);
                 self.project_revision = (!imported).then_some(revision);
                 self.status = if imported {
-                    "已导入 Synthesizer V Studio 1 工程，请另存为新文件".into()
+                    tr!("已导入 Synthesizer V Studio 1 工程，请另存为新文件").into()
                 } else {
                     String::new()
                 };
@@ -166,9 +166,9 @@ impl App {
                 .as_ref()
                 .and_then(|p| p.file_name())
                 .and_then(|n| n.to_str())
-                .unwrap_or("未命名.svp");
+                .unwrap_or(tr!("未命名.svp"));
             rfd::FileDialog::new()
-                .add_filter("Synthesizer V 工程", &["svp"])
+                .add_filter(tr!("Synthesizer V 工程"), &["svp"])
                 .set_file_name(name)
                 .save_file()
         } else {
@@ -202,7 +202,7 @@ impl App {
                 self.editor.mark_saved();
                 self.path = Some(path.clone());
                 self.project_revision = Some(revision);
-                self.status = "工程已保存".into();
+                self.status = tr!("工程已保存").into();
                 #[cfg(target_os = "android")]
                 {
                     self.recovered_dirty = false;
@@ -210,7 +210,7 @@ impl App {
                         self.pick(
                             _ctx,
                             super::picker::Picker::publish(path, "application/octet-stream"),
-                            |app, _, _| app.status = "工程副本已导出".into(),
+                            |app, _, _| app.status = tr!("工程副本已导出").into(),
                         );
                     }
                 }
@@ -233,7 +233,7 @@ impl App {
             .path
             .as_deref()
             .and_then(std::path::Path::file_name)
-            .unwrap_or_else(|| std::ffi::OsStr::new("未命名.svp"));
+            .unwrap_or_else(|| std::ffi::OsStr::new(tr!("未命名.svp")));
         let directory = root.join(uuid::Uuid::new_v4().to_string());
         std::fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
         Ok(directory.join(name))

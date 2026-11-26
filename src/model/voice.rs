@@ -2,6 +2,7 @@ mod parameter;
 mod write;
 
 use super::Extra;
+use crate::{tr, trf};
 use std::collections::BTreeMap;
 
 pub use parameter::VoiceParameter;
@@ -26,9 +27,9 @@ impl VocalModeComponent {
 
     pub fn label(self) -> &'static str {
         match self {
-            Self::Pitch => "音高",
-            Self::Timbre => "音色",
-            Self::Pronunciation => "发音",
+            Self::Pitch => tr!("音高"),
+            Self::Timbre => tr!("音色"),
+            Self::Pronunciation => tr!("发音"),
         }
     }
 }
@@ -109,29 +110,29 @@ impl VoiceSettings {
         let Some(value) = extra.get("voice") else {
             return Ok(Self::default());
         };
-        let voice = value.as_object().ok_or("歌声参数 voice 必须是对象")?;
+        let voice = value.as_object().ok_or(tr!("歌声参数 voice 必须是对象"))?;
         let mut settings = Self::default();
         for parameter in VoiceParameter::ALL {
             if let Some(value) = voice.get(parameter.key()) {
                 let value = value
                     .as_f64()
                     .filter(|value| parameter.valid(*value))
-                    .ok_or_else(|| format!("歌声参数 {} 超出有效范围", parameter.label()))?;
+                    .ok_or_else(|| trf!("歌声参数 {} 超出有效范围", parameter.label()))?;
                 settings.scalars.insert(parameter, value);
             }
         }
         if let Some(value) = voice.get("vocalModeInherited") {
-            settings.vocal_mode_inherited = value.as_bool().ok_or("唱法继承标记必须是布尔值")?;
+            settings.vocal_mode_inherited = value.as_bool().ok_or(tr!("唱法继承标记必须是布尔值"))?;
         }
         if let Some(value) = voice.get("vocalModePreset") {
-            settings.vocal_mode_preset = value.as_str().ok_or("唱法预设必须是字符串")?.into();
+            settings.vocal_mode_preset = value.as_str().ok_or(tr!("唱法预设必须是字符串"))?.into();
         }
         if let Some(value) = voice.get("vocalModeParams") {
-            let modes = value.as_object().ok_or("唱法参数必须是对象")?;
+            let modes = value.as_object().ok_or(tr!("唱法参数必须是对象"))?;
             for (name, value) in modes {
                 let fields = value
                     .as_object()
-                    .ok_or_else(|| format!("唱法 {name} 的参数必须是对象"))?;
+                    .ok_or_else(|| trf!("唱法 {} 的参数必须是对象", name))?;
                 let mut values = VocalModeValues::DEFAULT;
                 for component in VocalModeComponent::ALL {
                     if let Some(value) = fields.get(component.key()) {
@@ -141,7 +142,7 @@ impl VoiceSettings {
                                 (VocalModeValues::MIN..=VocalModeValues::MAX).contains(value)
                             })
                             .ok_or_else(|| {
-                                format!("唱法 {name} 的{}必须为 0 到 150", component.label())
+                                trf!("唱法 {} 的{}必须为 0 到 150", name, component.label())
                             })?;
                         values.set_component(component, value);
                     }

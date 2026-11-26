@@ -1,5 +1,6 @@
 use super::Revision;
 use crate::model::Project;
+use crate::{tr, trf};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 
@@ -105,33 +106,33 @@ pub(super) fn validate(project: &Project) -> Result<(), String> {
     let mut note_ids = HashSet::new();
     let mut check = |value: &str, kind: &str| {
         let id =
-            uuid::Uuid::parse_str(value).map_err(|_| format!("工程校验失败：{kind} UUID 无效"))?;
+            uuid::Uuid::parse_str(value).map_err(|_| trf!("工程校验失败：{} UUID 无效", kind))?;
         if !ids.insert(id) {
-            return Err(format!("工程校验失败：{kind} UUID 重复"));
+            return Err(trf!("工程校验失败：{} UUID 重复", kind));
         }
         Ok(())
     };
-    check(&project.uuid, "工程")?;
+    check(&project.uuid, tr!("工程"))?;
     for group in project
         .library
         .iter()
         .chain(project.tracks.iter().map(|track| &track.main_group))
     {
-        check(&group.uuid, "音符组")?;
+        check(&group.uuid, tr!("音符组"))?;
         for note in &group.notes {
             if note.uuid.len() != 16 || !note.uuid.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-                return Err("工程校验失败：音符 UUID 必须为 16 位十六进制标识".into());
+                return Err(tr!("工程校验失败：音符 UUID 必须为 16 位十六进制标识").into());
             }
-            let id =
-                u64::from_str_radix(&note.uuid, 16).map_err(|_| "工程校验失败：音符 UUID 无效")?;
+            let id = u64::from_str_radix(&note.uuid, 16)
+                .map_err(|_| tr!("工程校验失败：音符 UUID 无效"))?;
             if !note_ids.insert(id) {
-                return Err("工程校验失败：音符 UUID 重复".into());
+                return Err(tr!("工程校验失败：音符 UUID 重复").into());
             }
         }
     }
     for track in &project.tracks {
         for reference in track.references() {
-            check(&reference.uuid, "音符组实例")?;
+            check(&reference.uuid, tr!("音符组实例"))?;
         }
     }
     Ok(())

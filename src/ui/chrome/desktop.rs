@@ -1,4 +1,4 @@
-use crate::{app::App, ui};
+use crate::{app::App, tr, ui};
 use eframe::egui::*;
 
 pub(crate) fn show(app: &mut App, ui: &mut Ui) {
@@ -24,11 +24,11 @@ pub(crate) fn show(app: &mut App, ui: &mut Ui) {
     if app.preferences.show_status_bar {
         ui::child(ui, status.shrink2(vec2(8.0, 1.0)), "status").horizontal(|ui| {
             let hint = if app.status.is_empty() && app.piano_tool == ui::piano::Tool::PitchAnchor {
-                "双击创建控制点 · 拖动框选 / 移动 · 四边手柄缩放 · Delete 删除 · Esc 取消 · Ctrl+Z 撤销"
+                tr!("双击创建控制点 · 拖动框选 / 移动 · 四边手柄缩放 · Delete 删除 · Esc 取消 · Ctrl+Z 撤销")
             } else if app.status.is_empty() && app.piano_tool == ui::piano::Tool::PitchDraw {
-                "左键拖动绘制音高 · 右键拖动擦除 · Esc 取消本次绘制 · Ctrl+Z 撤销 · 中键拖动视野"
+                tr!("左键拖动绘制音高 · 右键拖动擦除 · Esc 取消本次绘制 · Ctrl+Z 撤销 · 中键拖动视野")
             } else if app.status.is_empty() {
-                "双击创建音符 · 拖动框选 · 中键拖动视野 · Shift+滚轮水平移动 · Ctrl+滚轮缩放"
+                tr!("双击创建音符 · 拖动框选 · 中键拖动视野 · Shift+滚轮水平移动 · Ctrl+滚轮缩放")
             } else {
                 &app.status
             };

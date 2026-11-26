@@ -3,6 +3,7 @@
 mod location;
 mod storage;
 
+use crate::{tr, trf};
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -51,13 +52,13 @@ pub(super) fn read(voice_name: &str, model_version: u8) -> Result<Option<u64>> {
         {
             let _ = fingerprint;
             return Err(VoiceError::new(
-                "该模型上下文绑定原 Windows 机器，请使用手动导入上下文文件将所选声库保存为便携上下文。",
+                tr!("该模型上下文绑定原 Windows 机器，请使用手动导入上下文文件将所选声库保存为便携上下文。"),
             ));
         }
         #[cfg(all(windows, target_arch = "x86_64"))]
         if fingerprint != &machine_fingerprint()? {
             return Err(VoiceError::new(
-                "模型上下文与当前 Windows 用户或处理器不匹配。请重新获取本机上下文或手动导入。",
+                tr!("模型上下文与当前 Windows 用户或处理器不匹配。请重新获取本机上下文或手动导入。"),
             ));
         }
     }
@@ -69,9 +70,7 @@ pub(super) fn read_source(voice_name: &str, model_version: u8, path: &Path) -> R
     find(&context, voice_name, model_version)
         .map(|entry| entry.identity)
         .ok_or_else(|| {
-            VoiceError::new(format!(
-                "所选文件中没有声库 {voice_name}（模型版本 {model_version}）的模型上下文记录。"
-            ))
+            VoiceError::new(trf!("所选文件中没有声库 {0}（模型版本 {1}）的模型上下文记录。", voice_name, model_version))
         })
 }
 
@@ -134,7 +133,7 @@ fn validate(context: &Context) -> Result<()> {
             })
         {
             return Err(VoiceError::new(
-                "模型上下文记录格式无效或包含重复声库记录。",
+                tr!("模型上下文记录格式无效或包含重复声库记录。"),
             ));
         }
     }

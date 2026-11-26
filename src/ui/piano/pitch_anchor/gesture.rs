@@ -7,6 +7,7 @@ use crate::ui::{group_geometry::clip_rect, piano::Gesture};
 use crate::{
     app::App,
     model::{EntityId, GroupRef, PitchControl, PitchPoint, ticks},
+    tr,
 };
 use eframe::egui::*;
 use std::collections::BTreeSet;
@@ -96,9 +97,9 @@ pub(super) fn start(app: &mut App, ui: &Ui, canvas: Rect) {
             return;
         }
         app.editor.begin(if handle.is_some() {
-            "缩放音高控制点"
+            tr!("缩放音高控制点")
         } else {
-            "移动音高控制点"
+            tr!("移动音高控制点")
         });
         Kind::Transform {
             original,

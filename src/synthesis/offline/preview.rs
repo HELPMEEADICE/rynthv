@@ -19,6 +19,7 @@ use crate::synthesis::{
 use scheduler::Scheduler;
 use serde::Serialize;
 use std::cell::OnceCell;
+use crate::{tr};
 
 #[derive(Default, Serialize, serde::Deserialize)]
 pub struct PreviewMetrics {
@@ -77,7 +78,7 @@ impl Offline {
         let emit = |event| events.borrow_mut()(event);
         let mut load_recording =
             |id, scheduler: &mut Scheduler<'_, '_, '_>, metrics: &mut PreviewMetrics| {
-                emit(Progress::Phase("读取伴奏"));
+                emit(Progress::Phase(tr!("读取伴奏")));
                 let track = accompaniment
                     .iter()
                     .find(|track| track.id == id)
@@ -158,7 +159,7 @@ impl Offline {
                                 |key| {
                                     let slot = &programs[key];
                                     if networks[key].get().is_none() {
-                                        emit(Progress::Phase("准备声库与模型"));
+                                        emit(Progress::Phase(tr!("准备声库与模型")));
                                         let started = Instant::now();
                                         let mut loaded_ms = 0.0;
                                         let program =

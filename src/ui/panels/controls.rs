@@ -1,4 +1,4 @@
-use crate::ui::theme::*;
+use crate::{tr, ui::theme::*};
 use eframe::egui::*;
 
 pub(super) fn padded(ui: &mut Ui, content: impl FnOnce(&mut Ui)) {
@@ -55,7 +55,7 @@ pub(super) fn combo<T: PartialEq + Clone>(
     let label = options
         .iter()
         .find(|(v, _)| v == value)
-        .map_or("未支持的值", |(_, label)| *label);
+        .map_or(tr!("未支持的值"), |(_, label)| *label);
     ComboBox::from_id_salt(id)
         .width(ui.available_width())
         .selected_text(label)

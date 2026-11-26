@@ -1,3 +1,4 @@
+use crate::{tr, trf};
 use super::{
     VoiceAvailability, VoiceCatalog, VoiceCatalogEntry, metadata::MetadataIndex, resource,
 };
@@ -17,7 +18,7 @@ pub(super) fn scan(
         Err(error) => {
             catalog
                 .warnings
-                .push(format!("无法读取声库 {database_id}：{error}"));
+                .push(trf!("无法读取声库 {0}：{1}", database_id, error));
             return Ok(());
         }
     };
@@ -27,17 +28,14 @@ pub(super) fn scan(
             Err(error) => {
                 catalog
                     .warnings
-                    .push(format!("无法读取声库 {database_id}：{error}"));
+                    .push(trf!("无法读取声库 {0}：{1}", database_id, error));
                 continue;
             }
         };
         let is_dir = match revision.file_type() {
             Ok(kind) => kind.is_dir(),
             Err(error) => {
-                catalog.warnings.push(format!(
-                    "无法读取声库版本 {}：{error}",
-                    revision.path().display()
-                ));
+                catalog.warnings.push(trf!("无法读取声库版本 {0}：{1}", revision.path().display(), error));
                 continue;
             }
         };
@@ -74,11 +72,11 @@ pub(super) fn scan(
                 let missing = configuration.models.missing(configuration.model_version);
                 if configuration.version != version.to_string() {
                     entry.availability =
-                        VoiceAvailability::Unsupported("声库配置版本与目录版本不一致".to_owned());
+                        VoiceAvailability::Unsupported(tr!("声库配置版本与目录版本不一致").to_owned());
                 } else if !missing.is_empty() {
-                    entry.availability = VoiceAvailability::Unsupported(format!(
-                        "缺少本地{}模型，当前安装内容无法在本机合成",
-                        missing.join("、")
+                    entry.availability = VoiceAvailability::Unsupported(trf!(
+                        "缺少本地{0}模型，当前安装内容无法在本机合成",
+                        missing.join(tr!("、"))
                     ));
                 }
                 entry.display_name = configuration.name;

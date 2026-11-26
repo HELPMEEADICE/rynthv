@@ -3,6 +3,7 @@ use std::{
     os::windows::ffi::OsStringExt,
     path::{Path, PathBuf},
 };
+use crate::{tr};
 
 use super::{Result, VoiceError, native::*};
 
@@ -40,14 +41,14 @@ pub(super) fn image_path(process: &Handle) -> Result<PathBuf> {
         return Err(api_error("QueryFullProcessImageNameW"));
     }
     if length == 0 || length as usize >= buffer.len() {
-        return Err(VoiceError::new("所选进程的可执行文件路径无效。"));
+        return Err(VoiceError::new(tr!("所选进程的可执行文件路径无效。")));
     }
     let path = PathBuf::from(OsString::from_wide(&buffer[..length as usize]));
     if !path
         .file_name()
         .is_some_and(|name| name.to_string_lossy().eq_ignore_ascii_case(EDITOR_NAME))
     {
-        return Err(VoiceError::new("所选进程不是 Synthesizer V Studio。"));
+        return Err(VoiceError::new(tr!("所选进程不是 Synthesizer V Studio。")));
     }
     Ok(path)
 }
@@ -80,7 +81,7 @@ pub(super) fn main_module(process_id: u32, executable: &Path) -> Result<(usize, 
         || entry.image_size == 0
     {
         return Err(VoiceError::new(
-            "无法确认所选原编辑器的主模块，未读取模型上下文。",
+            tr!("无法确认所选原编辑器的主模块，未读取模型上下文。"),
         ));
     }
     Ok((entry.base_address as usize, entry.image_size as usize))

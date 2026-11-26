@@ -1,6 +1,7 @@
 use super::*;
 use crate::synthesis::{audio::AudioLayer, plan::OwnerRequest, render_cache::CompletedOwner};
 use std::ops::Range;
+use crate::{tr};
 
 const DEMAND_BATCH: usize = 64;
 const BACKGROUND_BATCH: usize = 128;
@@ -185,7 +186,7 @@ impl<'network, 'tree: 'network, 'plan> Scheduler<'network, 'tree, 'plan> {
                 .as_ref()
                 .is_some_and(|samples| samples.iter().any(|sample| !sample.is_finite()))
             {
-                return Err("预览混音产生了非有限的 PCM 样本".into());
+                return Err(tr!("预览混音产生了非有限的 PCM 样本").into());
             }
             let is_first = metrics.first_block_ms.is_none() && index >= demand && samples.is_some();
             if is_first {
@@ -222,7 +223,7 @@ impl<'network, 'tree: 'network, 'plan> Scheduler<'network, 'tree, 'plan> {
     ) -> Result<Option<StageTimings>, String> {
         let key = self.keys[&id];
         if !self.active.contains_key(&id) {
-            let job = cache.take_owner(id).ok_or("无法调度待渲染的音符组")?;
+            let job = cache.take_owner(id).ok_or(tr!("无法调度待渲染的音符组"))?;
             update(Update::Counts(cache.counts()));
             let prepared = match partial.remove(&id) {
                 Some(work) => Ok(work.prepared),
@@ -284,7 +285,7 @@ impl<'network, 'tree: 'network, 'plan> Scheduler<'network, 'tree, 'plan> {
                         .start(network, &program.voice, start)
                         .map_err(|error| error.to_string())?;
                 }
-                let cursor = active.cursor.as_mut().ok_or("找不到待渲染音频的推理位置")?;
+                let cursor = active.cursor.as_mut().ok_or(tr!("找不到待渲染音频的推理位置"))?;
                 let budget = if target.is_some() {
                     DEMAND_BATCH
                 } else {
@@ -382,7 +383,7 @@ impl<'network, 'tree: 'network, 'plan> Scheduler<'network, 'tree, 'plan> {
                     }
                 }
             }
-            Completion::Discarded => return Err("合成任务已失效".into()),
+            Completion::Discarded => return Err(tr!("合成任务已失效").into()),
         }
         Ok(timing)
     }

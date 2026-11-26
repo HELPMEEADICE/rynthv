@@ -1,5 +1,6 @@
 pub mod controls;
 
+use crate::tr;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -126,18 +127,18 @@ impl Scale {
 
     pub fn label(self) -> &'static str {
         match self {
-            Self::Major => "大调音阶",
-            Self::NaturalMinor => "自然小调",
-            Self::HarmonicMinor => "和声小调",
-            Self::MelodicMinor => "旋律小调（上行）",
-            Self::Dorian => "多利亚调式",
-            Self::Phrygian => "弗里几亚调式",
-            Self::Lydian => "利底亚调式",
-            Self::Mixolydian => "混合利底亚调式",
-            Self::Locrian => "洛克里亚调式",
-            Self::MajorPentatonic => "大调五声音阶",
-            Self::MinorPentatonic => "小调五声音阶",
-            Self::Blues => "布鲁斯音阶",
+            Self::Major => tr!("大调音阶"),
+            Self::NaturalMinor => tr!("自然小调"),
+            Self::HarmonicMinor => tr!("和声小调"),
+            Self::MelodicMinor => tr!("旋律小调（上行）"),
+            Self::Dorian => tr!("多利亚调式"),
+            Self::Phrygian => tr!("弗里几亚调式"),
+            Self::Lydian => tr!("利底亚调式"),
+            Self::Mixolydian => tr!("混合利底亚调式"),
+            Self::Locrian => tr!("洛克里亚调式"),
+            Self::MajorPentatonic => tr!("大调五声音阶"),
+            Self::MinorPentatonic => tr!("小调五声音阶"),
+            Self::Blues => tr!("布鲁斯音阶"),
         }
     }
 

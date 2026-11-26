@@ -1,5 +1,6 @@
 //! Seek only the public voice configuration, never tensor or session resources.
 
+use crate::{tr, trf};
 use crate::platform::fs::{self, File};
 use std::{
     collections::{BTreeMap, HashSet},
@@ -51,10 +52,10 @@ impl ModelPresence {
     pub(super) fn missing(&self, model_version: u8) -> Vec<&'static str> {
         let generation = usize::from(model_version - 1);
         [
-            (self.duration, "时长"),
-            (self.f0[generation], "音高"),
-            (self.timbre[generation], "音色"),
-            (self.vocoder, "声码器"),
+            (self.duration, tr!("时长")),
+            (self.f0[generation], tr!("音高")),
+            (self.timbre[generation], tr!("音色")),
+            (self.vocoder, tr!("声码器")),
         ]
         .into_iter()
         .filter_map(|(present, role)| (!present).then_some(role))
@@ -75,46 +76,46 @@ pub(super) fn configuration(directory: &Path, context: &FormatContext) -> Result
     });
     files.sort();
     if files.is_empty() {
-        return Err(VoiceError::new("该版本目录中没有 DNNI 模型文件"));
+        return Err(VoiceError::new(tr!("该版本目录中没有 DNNI 模型文件")));
     }
     let mut configuration = None;
     let mut models = ModelPresence::default();
     for path in files {
         if let Some(bytes) = read_configuration(&path, context, &mut models)? {
             if configuration.is_some() {
-                return Err(VoiceError::new("声库含有多个配置资源，需要明确模型路由"));
+                return Err(VoiceError::new(tr!("声库含有多个配置资源，需要明确模型路由")));
             }
             configuration = Some(parse_configuration(&bytes)?);
         }
     }
-    let mut configuration = configuration.ok_or_else(|| VoiceError::new("声库缺少名称配置资源"))?;
+    let mut configuration = configuration.ok_or_else(|| VoiceError::new(tr!("声库缺少名称配置资源")))?;
     configuration.models = models;
     Ok(configuration)
 }
 
 fn parse_configuration(bytes: &[u8]) -> Result<Configuration> {
-    let text = std::str::from_utf8(bytes).map_err(|_| VoiceError::new("声库配置不是 UTF-8"))?;
+    let text = std::str::from_utf8(bytes).map_err(|_| VoiceError::new(tr!("声库配置不是 UTF-8")))?;
     let mut fields = BTreeMap::new();
     for line in text.lines() {
         let (key, value) = line
             .split_once(' ')
             .filter(|(key, value)| !key.is_empty() && !value.is_empty())
-            .ok_or_else(|| VoiceError::new("不支持的声库配置行格式"))?;
+            .ok_or_else(|| VoiceError::new(tr!("不支持的声库配置行格式")))?;
         if fields.insert(key, value).is_some() {
-            return Err(VoiceError::new("声库配置包含重复字段"));
+            return Err(VoiceError::new(tr!("声库配置包含重复字段")));
         }
     }
     let required = |key| {
         fields
             .get(key)
             .map(|value| (*value).to_owned())
-            .ok_or_else(|| VoiceError::new(format!("声库配置缺少 {key}")))
+            .ok_or_else(|| VoiceError::new(trf!("声库配置缺少 {0}", key)))
     };
     Ok(Configuration {
         model_version: match fields.get("model-version").copied() {
             None | Some("1") => 1,
             Some("2") => 2,
-            _ => return Err(VoiceError::new("不支持的声库模型代际")),
+            _ => return Err(VoiceError::new(tr!("不支持的声库模型代际"))),
         },
         name: required("name")?,
         vendor: required("vendor")?,
@@ -138,7 +139,7 @@ fn read_configuration(
     let mut header = [0u8; HEADER_BYTES];
     file.read_exact(&mut header)?;
     if header[..8] != [0xff, 0, 0xca, 0x7f, 3, 0, 0, 0] {
-        return Err(VoiceError::new("不支持的 DNNI 容器格式"));
+        return Err(VoiceError::new(tr!("不支持的 DNNI 容器格式")));
     }
     verify_signature(&header, context)?;
     let nonce: [u8; 12] = array(&header, 0x118)?;
@@ -158,9 +159,9 @@ fn read_configuration(
     let table_length = count
         .checked_mul(56)
         .filter(|length| *length <= MAX_INDEX_BYTES)
-        .ok_or_else(|| VoiceError::new("声库资源索引超过扫描大小限制"))?;
+        .ok_or_else(|| VoiceError::new(tr!("声库资源索引超过扫描大小限制")))?;
     if (HEADER_BYTES + table_length) as u64 > file_length {
-        return Err(VoiceError::new("声库资源索引被截断"));
+        return Err(VoiceError::new(tr!("声库资源索引被截断")));
     }
     let mut table = vec![0u8; table_length];
     file.read_exact(&mut table)?;
@@ -178,7 +179,7 @@ fn read_configuration(
     digest.update(&material);
     digest.update(&nonce);
     if digest.digest128().to_le_bytes() != header[8..24] {
-        return Err(VoiceError::new("声库资源索引校验失败"));
+        return Err(VoiceError::new(tr!("声库资源索引校验失败")));
     }
     let table = stream::decode(&table, &context.constants, &material, &nonce, 4)?;
     let mut identities = HashSet::with_capacity(count);
@@ -189,7 +190,7 @@ fn read_configuration(
         let offset = u32_at(record, 48)? as u64;
         let length = u32_at(record, 52)? as u64;
         if flag > 1 || !identities.insert(id) || offset + length > file_length {
-            return Err(VoiceError::new("声库资源索引内容无效"));
+            return Err(VoiceError::new(tr!("声库资源索引内容无效")));
         }
         if id == CONFIGURATION_ID.0 {
             selected = Some(record);
@@ -201,7 +202,7 @@ fn read_configuration(
     };
     let length = u32_at(record, 52)? as usize;
     if length > MAX_CONFIGURATION_BYTES {
-        return Err(VoiceError::new("声库名称配置超过扫描大小限制"));
+        return Err(VoiceError::new(tr!("声库名称配置超过扫描大小限制")));
     }
     file.seek(SeekFrom::Start(u32_at(record, 48)? as u64))?;
     let mut source = vec![0u8; length];
@@ -218,7 +219,7 @@ fn read_configuration(
     digest.update(&material);
     digest.update(&resource_nonce);
     if digest.digest128().to_le_bytes() != record[..16] {
-        return Err(VoiceError::new("声库名称配置校验失败"));
+        return Err(VoiceError::new(tr!("声库名称配置校验失败")));
     }
     if flag == 1 {
         source = stream::decode(&source, &context.constants, &material, &resource_nonce, 0)?;
@@ -240,7 +241,7 @@ fn verify_signature(header: &[u8], context: &FormatContext) -> Result<()> {
     let count = decoded.len().min(low.len());
     low[..count].copy_from_slice(&decoded[..count]);
     if low != xxh3_128(&message).to_le_bytes() {
-        return Err(VoiceError::new("声库文件头校验失败"));
+        return Err(VoiceError::new(tr!("声库文件头校验失败")));
     }
     Ok(())
 }

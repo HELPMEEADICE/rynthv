@@ -9,6 +9,7 @@ use std::{
     thread,
 };
 use zeroize::Zeroizing;
+use crate::{tr, trf};
 
 impl Runtime {
     pub fn import_context(&mut self) {
@@ -67,7 +68,7 @@ impl Runtime {
             let _ = tx.send(work());
         }) {
             Ok(_) => self.context_import.task = Some(rx),
-            Err(error) => self.context_import_failed(format!("无法启动模型上下文任务：{error}")),
+            Err(error) => self.context_import_failed(trf!("无法启动模型上下文任务：{}", error)),
         }
     }
 
@@ -88,7 +89,7 @@ impl Runtime {
             Ok(event) => event,
             Err(TryRecvError::Empty) => return,
             Err(TryRecvError::Disconnected) => {
-                self.context_import_failed("模型上下文任务意外终止。".into());
+                self.context_import_failed(tr!("模型上下文任务意外终止。").into());
                 return;
             }
         };
@@ -135,7 +136,7 @@ impl Runtime {
                 }
                 self.aggregate_voices();
                 self.context_import.feedback =
-                    Some(Ok(format!("已导入 {voice_name} 的模型上下文。")));
+                    Some(Ok(trf!("已导入 {} 的模型上下文。", voice_name)));
             }
         }
     }

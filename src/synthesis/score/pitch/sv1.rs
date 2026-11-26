@@ -6,6 +6,7 @@ use crate::{
     },
 };
 use std::{f64::consts, sync::Arc};
+use crate::{tr};
 
 #[derive(Clone, Debug)]
 pub(super) struct Pitch {
@@ -50,10 +51,10 @@ impl Pitch {
                 .onset
                 .0
                 .checked_add(input.content_offset.0)
-                .ok_or_else(|| VoiceError::new("一代音高的音符位置溢出"))?;
+                .ok_or_else(|| VoiceError::new(tr!("一代音高的音符位置溢出")))?;
             let end = start
                 .checked_add(note.duration)
-                .ok_or_else(|| VoiceError::new("一代音高的音符结束位置溢出"))?;
+                .ok_or_else(|| VoiceError::new(tr!("一代音高的音符结束位置溢出")))?;
             let key = f64::from(note.pitch)
                 + f64::from(input.pitch_offset)
                 + f64::from(note.detune) / 100.0
@@ -144,7 +145,7 @@ impl Pitch {
                 pitch += vibrato(settings, note, time);
             }
             if !pitch.is_finite() || !((pitch as f32).is_finite()) {
-                return Err(VoiceError::new("一代音高曲线产生了无效数值"));
+                return Err(VoiceError::new(tr!("一代音高曲线产生了无效数值")));
             }
             *value = pitch as f32;
         }

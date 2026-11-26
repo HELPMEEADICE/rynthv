@@ -1,5 +1,6 @@
 use super::{Channel, Track};
 use crate::midi::{MidiNote, MidiTrack, instruments, time::scale_tick};
+use crate::{tr, trf};
 use std::collections::BTreeMap;
 
 impl Track {
@@ -52,7 +53,7 @@ impl Track {
         }
         self.warn(index, ended, warnings);
         let name = if self.name.is_empty() {
-            format!("音轨 {}", index + 1)
+            trf!("音轨 {}", index + 1)
         } else {
             self.name.clone()
         };
@@ -72,13 +73,14 @@ impl Track {
             .map(|(channel, mut notes)| {
                 notes.sort_by_key(|note| (note.onset, note.pitch));
                 let name = if split && ports {
-                    format!(
-                        "{name} · 端口 {} / 通道 {}",
+                    trf!(
+                        "{} · 端口 {} / 通道 {}",
+                        name,
                         channel.port + 1,
                         channel.number + 1
                     )
                 } else if split {
-                    format!("{name} · 通道 {}", channel.number + 1)
+                    trf!("{} · 通道 {}", name, channel.number + 1)
                 } else {
                     name.clone()
                 };
@@ -114,43 +116,43 @@ impl Track {
         let diagnostics = &self.diagnostics;
         let mut details = Vec::new();
         if !ended {
-            details.push("缺少结束标记，使用最后一个事件的位置作为音轨终点".into());
+            details.push(tr!("缺少结束标记，使用最后一个事件的位置作为音轨终点").into());
         }
         if diagnostics.dangling > 0 {
-            details.push(format!(
+            details.push(trf!(
                 "{} 个音符缺少关闭事件，已在音轨终点结束",
                 diagnostics.dangling
             ));
         }
         if diagnostics.unmatched_off > 0 {
-            details.push(format!(
+            details.push(trf!(
                 "忽略 {} 个未配对的音符关闭事件",
                 diagnostics.unmatched_off
             ));
         }
         if diagnostics.zero_duration > 0 {
-            details.push(format!(
+            details.push(trf!(
                 "忽略 {} 个没有正时长的音符",
                 diagnostics.zero_duration
             ));
         }
         if diagnostics.unmatched_lyrics > 0 {
-            details.push(format!(
+            details.push(trf!(
                 "{} 项歌词没有同一时刻开始的音符，未导入",
                 diagnostics.unmatched_lyrics
             ));
         }
         if diagnostics.lossy_text > 0 {
-            details.push("含非 UTF-8 文本，无法识别的字符已显示为 �".into());
+            details.push(tr!("含非 UTF-8 文本，无法识别的字符已显示为 �").into());
         }
         if diagnostics.performance {
-            details.push("踏板、控制器、弯音及触后不转换为歌声参数".into());
+            details.push(tr!("踏板、控制器、弯音及触后不转换为歌声参数").into());
         }
         if diagnostics.smpte_offset {
-            details.push("忽略 SMPTE 播放起始偏移，保留 MIDI 音符相对时间".into());
+            details.push(tr!("忽略 SMPTE 播放起始偏移，保留 MIDI 音符相对时间").into());
         }
         if !details.is_empty() {
-            warnings.push(format!("音轨 {}：{}", index + 1, details.join("；")));
+            warnings.push(trf!("音轨 {}：{}", index + 1, details.join(tr!("；"))));
         }
     }
 }

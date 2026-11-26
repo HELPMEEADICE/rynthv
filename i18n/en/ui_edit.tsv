@@ -1,0 +1,138 @@
+# en catalog fragment: ui_edit
+# format: <simplified-chinese msgid> TAB <translation>
+当前选择的是伴奏轨，请选择歌声音轨以编辑此项。	An instrumental track is selected. Choose a vocal track to edit this.
+脚本运行环境尚未接入	The script runtime is not connected yet
+文件名称	File Name
+导出为文件	Export to File
+等待伴奏加载和当前歌声合成完成后导出	Export once the accompaniment loads and the current vocal synthesis finishes
+正在导出…	Exporting…
+保存 WAV…	Save WAV…
+WAV 已保存	WAV saved
+分享 WAV…	Share WAV…
+Worker {} ms · 渲染 {} ms · 混音 {} ms · WAV 转换和写入 {} ms	Worker {} ms · Render {} ms · Mix {} ms · WAV conversion and write {} ms
+下载 {}	Download {}
+已导出 {} 个文件	Exported {} files
+音轨	Tracks
+混音导出	Mixdown
+取消全选	Deselect All
+格式	Format
+声道	Channels
+单声道	Mono
+立体声	Stereo
+气声输出	Aspiration Output
+与人声合并	Merged with Vocals
+单独导出气声文件	Aspiration in Separate Files
+位深度	Bit Depth
+16 位	16-bit
+24 位	24-bit
+32 位浮点	32-bit float
+采样率	Sample Rate
+渲染设置	Render Settings
+合成状态	Synthesis Status
+覆盖音频文件	Overwrite Audio Files
+以下文件已存在，是否覆盖？\n{}	The following files already exist. Overwrite them?\n{}
+选择目标文件夹	Choose Destination Folder
+目标文件夹	Destination Folder
+选择导出文件夹	Choose Export Folder
+未支持的值	Unsupported Value
+当前词典	Current Dictionary
+（继承音轨默认值）	(Track Default)
+新建…	New…
+新建发音词典	New Pronunciation Dictionary
+创建	Create
+移除	Remove
+{} · 保存在当前工程	{} · Saved in the current project
+字词	Word
+音素	Phoneme
+以空格分隔音素；只覆盖与词典语言相同的音符，手动填写的音素优先	Separate phonemes with spaces. Only notes in the dictionary language are overridden, and manually entered phonemes take priority.
+发音	Pronunciation
+模式	Mode
+演绎	Expression
+AI 重录	AI Retake
+语言	Language
+在钢琴卷帘中选择音符	Select notes in the piano roll
+继承歌声语言	Inherit Voice Language
+{}（继承歌声）	{} (inherited)
+多个值	Multiple
+自动	Auto
+音素以空格分隔；回车或移开焦点应用到所选音符，清空恢复自动发音。Esc 取消输入。	Separate phonemes with spaces. Press Enter or move the focus away to apply them to the selected notes; clear the field to restore automatic pronunciation. Esc cancels the input.
+按音符时值均匀分配音节	Distribute Syllables Evenly Across Note Duration
+歌唱	Sing
+说唱	Rap
+此声库暂不支持说唱模式	This voicebank does not support rap mode yet
+多个模式	Multiple modes
+此声库暂不支持演绎坐标	This voicebank does not support expression coordinates yet
+颤音调制	Vibrato Modulation
+说唱声调	Rap Accent
+说唱声调仅用于汉语普通话，请选择语言均为汉语普通话的音符。	Rap accent applies to Mandarin only. Select notes whose language is Mandarin.
+语调	Intonation
+音调	Tone
+鲜活	Vivid
+精修	Refined
+机械	Robotic
+原生	Natural
+拖动调整所选音符的演绎；方向键微调，Shift 加方向键精细调整。双击或 Home 恢复默认，Esc 取消本次拖动。	Drag to adjust the expression of the selected notes; arrow keys nudge, Shift plus arrow keys fine-tune. Double-click or Home restores the default, Esc cancels this drag.
+拖动调整所选音符的{}；方向键微调，Shift 加方向键精细调整。双击或 Home 恢复默认，Esc 取消本次拖动。	Drag to adjust the {} of the selected notes; arrow keys nudge, Shift plus arrow keys fine-tune. Double-click or Home restores the default, Esc cancels this drag.
+全部	All
+时值	Duration
+音高	Pitch
+音色	Timbre
+重录{}采样	New {} take
+默认采样	Default Take
+重录采样 {}	Take {}
+在钢琴卷帘中选择要重录的音符	Select the notes to retake in the piano roll
+请先结束当前编辑	Finish the current edit first
+一代歌声支持音高和音色重录	First-generation voices support pitch and timbre retakes
+请先为当前音轨选择歌声	Choose a voice for the current track first
+歌声正在加载，请稍候	The voice is loading, please wait
+歌声加载失败，请在歌声面板重试	Voice loading failed; retry in the voice panel
+请先加载当前音轨的歌声	Load the voice for the current track first
+多个采样	Multiple takes
+切换所选 {} 个音符的采样	Switch the take of the {} selected notes
+上一个采样	Previous take
+下一个采样	Next take
+用空格隔开字词。\n每个音符对应一个字词。	Separate words with spaces.\nEach note takes one word.
+循环填入	Repeat to Fill
+逐字填入	Split by Character
+拆分汉字、假名和韩文音节；拼音、罗马字及英文按空格分词。	Splits Chinese characters, kana, and Hangul syllables; pinyin, romaji, and English split on spaces.
+已选择 {} 个音符，请输入歌词。	{} notes selected. Enter the lyrics.
+{} 个字词 · 循环填入 {} 个音符	{} words · Repeat to fill {} notes
+填入 {} 个音符 · 多出的 {} 个字词不填入	Fill {} notes · {} extra words are skipped
+填入 {} / {} 个音符 · 其余保留原歌词	Fill {} of {} notes · The rest keep their lyrics
+{} 个字词 · 填入 {} 个音符	{} words · Fill {} notes
+更改歌词时会清除对应音符的自定义音素，以便重新生成发音。	Changing the lyrics clears the custom phonemes of those notes so pronunciation is regenerated.
+Ctrl+Enter 确定	Ctrl+Enter to confirm
+已更新 {} 个音符的歌词	Updated the lyrics of {} notes
+导入 MIDI	Import MIDI
+正在读取 MIDI 音轨…	Reading MIDI tracks…
+要导入的音轨	Tracks to Import
+新建工程，使用 MIDI 的曲速和拍号。	Create a new project using the MIDI tempo and time signature.
+从工程起点追加音轨，保留当前曲速和拍号。	Append tracks from the project start, keeping the current tempo and time signature.
+重叠音符会拆分为独立声部。	Overlapping notes are split into separate voices.
+导入提示（{}）	Import Warnings ({})
+文件中没有可导入的音符。	The file contains no importable notes.
+导入	Import
+{} 个音符	{} notes
+，{} – {}	, {} – {}
+，{}	, {}
+{}（{}）	{} ({})
+重命名音轨	Rename Track
+重命名音符组	Rename Note Group
+歌声合成	Vocal Synthesis
+已完成 {} 组 · 处理中 {} 组 · 等待 {} 组 · 失败 {} 组	{} groups done · {} processing · {} queued · {} failed
+为 {} 导入模型上下文…	Import Model Context for {}…
+失败详情	Failure Details
+音符组 {}：{}	Note group {}: {}
+重试合成	Retry Synthesis
+播放设备：{}	Playback device: {}
+当前混音 {} 秒 · 48 kHz · 立体声	Current mix {} s · 48 kHz · Stereo
+预览耗时	Preview Timing
+请求至首个就绪 PCM 块 {} ms	Request to first ready PCM block {} ms
+Worker 至首块 {} ms	Worker to first block {} ms
+Worker 完成 {} ms · 区间混音 {} ms	Worker done {} ms · Range mix {} ms
+声库读取 {} ms · 模型准备 {} ms · 伴奏读取 {} ms	Voicebank load {} ms · Model prepare {} ms · Accompaniment load {} ms
+时长 {} ms · 音高 {} ms · 音色 {} ms · 声码器 {} ms	Duration {} ms · Pitch {} ms · Timbre {} ms · Vocoder {} ms
+合成计划	Synthesis Plan
+{} 个音符组纳入当前计划	{} note groups in the current plan
+本次变化 {} 组 · 保留 {} 组请求	{} groups changed · {} requests kept
+优先准备播放位置的音频，其余部分在后台继续合成；无改动区段复用已有结果。	Audio at the playhead is prepared first and the rest keeps synthesizing in the background; unchanged sections reuse existing results.

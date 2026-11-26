@@ -10,6 +10,7 @@ use std::{
     sync::{Arc, mpsc::TryRecvError},
     time::Duration,
 };
+use crate::{tr, trf};
 
 pub(super) struct VoiceSlot {
     pub state: VoiceState,
@@ -76,9 +77,9 @@ impl Runtime {
                         v.worker = None;
                         v.waiting = false;
                         if matches!(v.state, VoiceState::Loading) {
-                            v.state = VoiceState::Failed("声库加载线程意外终止。".into());
+                            v.state = VoiceState::Failed(tr!("声库加载线程意外终止。").into());
                         } else if v.error.is_none() && !matches!(v.state, VoiceState::Failed(_)) {
-                            v.error = Some("合成线程意外终止。".into());
+                            v.error = Some(tr!("合成线程意外终止。").into());
                         }
                         v.stats.queued = 0;
                         v.stats.running = 0;
@@ -123,7 +124,7 @@ impl Runtime {
                 owner,
                 stage,
             } if revision == v.revision => {
-                v.progress = Some(format!("音符组 {} · {stage}", owner.0));
+                v.progress = Some(trf!("音符组 {} · {}", owner.0, stage));
             }
             worker::Event::Publication {
                 revision,

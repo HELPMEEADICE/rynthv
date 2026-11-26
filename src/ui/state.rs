@@ -1,4 +1,8 @@
-use crate::model::{AutomationTarget, Parameter, new_id};
+use crate::{
+    model::{AutomationTarget, Parameter, new_id},
+    tr,
+};
+
 use serde::{Deserialize, Serialize};
 
 use super::scale::ScaleDisplay;
@@ -22,12 +26,12 @@ impl Column {
     ];
     pub fn label(self) -> &'static str {
         match self {
-            Self::Editor => "编辑器",
-            Self::Voice => "歌声",
-            Self::Note => "音符",
-            Self::Dictionary => "词典",
-            Self::Render => "渲染",
-            Self::Script => "脚本",
+            Self::Editor => tr!("编辑器"),
+            Self::Voice => tr!("歌声"),
+            Self::Note => tr!("音符"),
+            Self::Dictionary => tr!("词典"),
+            Self::Render => tr!("渲染"),
+            Self::Script => tr!("脚本"),
         }
     }
     pub fn icon(self) -> super::icons::Icon {

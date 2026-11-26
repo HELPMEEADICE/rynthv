@@ -5,6 +5,7 @@ use super::state::Column;
 use crate::{
     app::{App, FileAction, MidiImportMode},
     model::*,
+    tr, trf,
 };
 #[cfg(not(target_os = "android"))]
 pub(crate) use desktop::show as desktop;
@@ -41,7 +42,7 @@ pub(super) fn mobile_menus(app: &mut App, ui: &mut Ui, separate: bool) {
         file_menu(app, ui);
         edit_menu(app, ui);
     }
-    ui.menu_button("菜单", |ui| {
+    ui.menu_button(tr!("菜单"), |ui| {
         if !separate {
             file_menu(app, ui);
             edit_menu(app, ui);
@@ -52,20 +53,20 @@ pub(super) fn mobile_menus(app: &mut App, ui: &mut Ui, separate: bool) {
 
 fn file_menu(app: &mut App, ui: &mut Ui) {
     let ctx = ui.ctx().clone();
-    ui.menu_button("文件", |ui| {
-        if item(ui, "新建", "Ctrl+N", true) {
+    ui.menu_button(tr!("文件"), |ui| {
+        if item(ui, tr!("新建"), "Ctrl+N", true) {
             app.request_file(FileAction::New, &ctx);
         }
-        if item(ui, "打开…", "Ctrl+O", true) {
+        if item(ui, tr!("打开…"), "Ctrl+O", true) {
             app.request_file(FileAction::Open, &ctx);
         }
         #[cfg(any(target_os = "android", target_arch = "wasm32"))]
         if item(
             ui,
             if cfg!(target_arch = "wasm32") {
-                "浏览器工程…"
+                tr!("浏览器工程…")
             } else {
-                "本机工程…"
+                tr!("本机工程…")
             },
             "",
             true,
@@ -73,15 +74,15 @@ fn file_menu(app: &mut App, ui: &mut Ui) {
             app.request_file(FileAction::OpenLocal, &ctx);
         }
         ui.separator();
-        if item(ui, "保存", "Ctrl+S", true) {
+        if item(ui, tr!("保存"), "Ctrl+S", true) {
             app.save_project(false, &ctx);
         }
         if item(
             ui,
             if cfg!(target_arch = "wasm32") {
-                "下载 SVP…"
+                tr!("下载 SVP…")
             } else {
-                "另存为…"
+                tr!("另存为…")
             },
             "Ctrl+Shift+S",
             true,
@@ -89,29 +90,29 @@ fn file_menu(app: &mut App, ui: &mut Ui) {
             app.save_project(true, &ctx);
         }
         #[cfg(target_os = "android")]
-        if item(ui, "分享工程…", "", true) {
+        if item(ui, tr!("分享工程…"), "", true) {
             app.share_project(&ctx);
         }
         ui.separator();
-        if item(ui, "导入…", "Ctrl+Shift+I", true) {
+        if item(ui, tr!("导入…"), "Ctrl+Shift+I", true) {
             app.request_file(FileAction::ImportMidi, &ctx);
         }
-        if item(ui, "作为音轨导入…", "", true) {
+        if item(ui, tr!("作为音轨导入…"), "", true) {
             app.commit_lyric();
             app.begin_midi_import(MidiImportMode::Tracks, &ctx);
         }
-        if item(ui, "导入音频…", "", true) {
+        if item(ui, tr!("导入音频…"), "", true) {
             app.commit_lyric();
             app.import_audio(None, &ctx);
         }
         #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
-        item(ui, "导出音频", "", false);
+        item(ui, tr!("导出音频"), "", false);
         #[cfg(target_os = "android")]
-        if item(ui, "导出音频…", "", true) {
+        if item(ui, tr!("导出音频…"), "", true) {
             super::mobile::open_panel(app, &ctx, Column::Render);
         }
         #[cfg(target_arch = "wasm32")]
-        if item(ui, "导出音频…", "", true) {
+        if item(ui, tr!("导出音频…"), "", true) {
             if super::mobile::compact(&ctx) {
                 super::mobile::open_panel(app, &ctx, Column::Render);
             } else if !app.view.columns.contains(&Column::Render) {
@@ -123,45 +124,45 @@ fn file_menu(app: &mut App, ui: &mut Ui) {
 
 fn edit_menu(app: &mut App, ui: &mut Ui) {
     let ctx = ui.ctx().clone();
-    ui.menu_button("编辑", |ui| {
+    ui.menu_button(tr!("编辑"), |ui| {
         let idle = !app.editor.is_editing();
         if item(
             ui,
-            &format!("撤销 {}", app.editor.undo_label()),
+            &trf!("撤销 {}", app.editor.undo_label()),
             "Ctrl+Z",
             idle && app.editor.can_undo(),
         ) {
             app.commit_lyric();
             app.editor.undo();
         }
-        if item(ui, "重做", "Ctrl+Y", idle && app.editor.can_redo()) {
+        if item(ui, tr!("重做"), "Ctrl+Y", idle && app.editor.can_redo()) {
             app.commit_lyric();
             app.editor.redo();
         }
         ui.separator();
-        if item(ui, "全选", "Ctrl+A", idle) {
+        if item(ui, tr!("全选"), "Ctrl+A", idle) {
             app.commit_lyric();
             edit::select_all(app);
         }
-        if item(ui, "取消选择", "Esc", idle) {
+        if item(ui, tr!("取消选择"), "Esc", idle) {
             app.commit_lyric();
             edit::clear(app);
         }
         let selected = idle && edit::selected(app);
-        if item(ui, "删除所选内容", "Delete", selected) {
+        if item(ui, tr!("删除所选内容"), "Delete", selected) {
             app.commit_lyric();
             edit::delete(app);
         }
         ui.separator();
-        if item(ui, "复制", "Ctrl+C", selected) {
+        if item(ui, tr!("复制"), "Ctrl+C", selected) {
             app.commit_lyric();
             edit::copy(app, &ctx);
         }
-        if item(ui, "剪切", "Ctrl+X", selected) {
+        if item(ui, tr!("剪切"), "Ctrl+X", selected) {
             app.commit_lyric();
             edit::cut(app, &ctx);
         }
-        if item(ui, "粘贴", "Ctrl+V", idle && edit::can_paste(app)) {
+        if item(ui, tr!("粘贴"), "Ctrl+V", idle && edit::can_paste(app)) {
             app.commit_lyric();
             edit::paste(app, &ctx);
         }
@@ -170,11 +171,11 @@ fn edit_menu(app: &mut App, ui: &mut Ui) {
 
 fn other_menus(app: &mut App, ui: &mut Ui) {
     let ctx = ui.ctx().clone();
-    ui.menu_button("查看", |ui| {
-        ui.checkbox(&mut app.show_time_tracks, "显示曲速和拍号轨");
+    ui.menu_button(tr!("查看"), |ui| {
+        ui.checkbox(&mut app.show_time_tracks, tr!("显示曲速和拍号轨"));
         #[cfg(not(target_os = "android"))]
         if ui
-            .checkbox(&mut app.view.arrangement_collapsed, "折叠编排")
+            .checkbox(&mut app.view.arrangement_collapsed, tr!("折叠编排"))
             .clicked()
         {
             ui.close();
@@ -182,11 +183,11 @@ fn other_menus(app: &mut App, ui: &mut Ui) {
         #[cfg(target_os = "android")]
         {
             let mut show = !app.view.arrangement_collapsed;
-            if ui.checkbox(&mut show, "空间充足时同时显示编排").changed() {
+            if ui.checkbox(&mut show, tr!("空间充足时同时显示编排")).changed() {
                 app.view.arrangement_collapsed = !show;
             }
         }
-        ui.checkbox(&mut app.view.arrangement_first, "编排位于上方");
+        ui.checkbox(&mut app.view.arrangement_first, tr!("编排位于上方"));
         ui.separator();
         for column in Column::PANELS {
             #[cfg(not(target_os = "android"))]
@@ -202,28 +203,28 @@ fn other_menus(app: &mut App, ui: &mut Ui) {
             }
         }
         ui.separator();
-        if item(ui, "设置", "", true) {
+        if item(ui, tr!("设置"), "", true) {
             app.settings = true;
         }
     });
-    ui.menu_button("修改", |ui| {
+    ui.menu_button(tr!("修改"), |ui| {
         let selected = !app.editor.is_editing()
             && !super::lanes::parameter_active(app)
             && !super::phonemes::phoneme_active(app)
             && app.piano_tool != super::piano::Tool::PitchAnchor
             && !app.editor.selected.is_empty();
-        if item(ui, "填入歌词…", "Ctrl+L", selected) {
+        if item(ui, tr!("填入歌词…"), "Ctrl+L", selected) {
             app.commit_lyric();
             super::fill_lyrics::open(app);
         }
-        if item(ui, "静音音符", "Ctrl+M", selected) {
+        if item(ui, tr!("静音音符"), "Ctrl+M", selected) {
             app.commit_lyric();
             app.editor.mute_selected();
         }
         ui.separator();
         if item(
             ui,
-            "升高八度",
+            tr!("升高八度"),
             "Ctrl+↑",
             !app.editor.is_editing() && edit::can_transpose(app),
         ) {
@@ -232,18 +233,18 @@ fn other_menus(app: &mut App, ui: &mut Ui) {
         }
         if item(
             ui,
-            "降低八度",
+            tr!("降低八度"),
             "Ctrl+↓",
             !app.editor.is_editing() && edit::can_transpose(app),
         ) {
             app.commit_lyric();
             edit::transpose(app, false);
         }
-        item(ui, "智能量化", "", false);
-        item(ui, "解除组链接", "", false);
+        item(ui, tr!("智能量化"), "", false);
+        item(ui, tr!("解除组链接"), "", false);
     });
-    ui.menu_button("自动处理", |ui| {
-        item(ui, "装饰所选音符", "", false);
+    ui.menu_button(tr!("自动处理"), |ui| {
+        item(ui, tr!("装饰所选音符"), "", false);
         ui.add_enabled_ui(
             !app.editor.is_editing()
                 && !super::lanes::parameter_active(app)
@@ -252,59 +253,59 @@ fn other_menus(app: &mut App, ui: &mut Ui) {
                 super::retakes::commands(app, ui);
             },
         );
-        item(ui, "从音频提取音符", "", false);
-        item(ui, "检测曲速", "", false);
+        item(ui, tr!("从音频提取音符"), "", false);
+        item(ui, tr!("检测曲速"), "", false);
     });
-    ui.menu_button("项目", |ui| {
+    ui.menu_button(tr!("项目"), |ui| {
         let idle = !app.editor.is_editing();
-        if item(ui, "创建音轨", "", idle) {
+        if item(ui, tr!("创建音轨"), "", idle) {
             app.commit_lyric();
             app.editor.add_track();
         }
         if item(
             ui,
-            "在走带处插入新组",
+            tr!("在走带处插入新组"),
             "",
             idle && !app.editor.current_track().is_instrumental(),
         ) {
             app.commit_lyric();
             app.editor.add_group();
         }
-        if item(ui, "创建伴奏轨", "", idle) {
+        if item(ui, tr!("创建伴奏轨"), "", idle) {
             app.commit_lyric();
             let id = app.editor.add_instrumental_track();
             app.import_audio(Some(id), &ctx);
         }
-        item(ui, "设置歌声", "", false);
+        item(ui, tr!("设置歌声"), "", false);
     });
-    ui.menu_button("走带控制", |ui| {
+    ui.menu_button(tr!("走带控制"), |ui| {
         if item(
             ui,
-            "播放 / 暂停",
+            tr!("播放 / 暂停"),
             "Space",
             app.synthesis.recording_error.is_none(),
         ) {
             app.editor.transport.toggle();
         }
-        if item(ui, "停止", "Ctrl+Space", true) {
+        if item(ui, tr!("停止"), "Ctrl+Space", true) {
             app.editor.transport.stop();
         }
-        ui.checkbox(&mut app.editor.transport.looping, "循环播放");
-        if item(ui, "跳到开头", "", true) {
+        ui.checkbox(&mut app.editor.transport.looping, tr!("循环播放"));
+        if item(ui, tr!("跳到开头"), "", true) {
             app.editor.transport.position = 0;
         }
-        if item(ui, "跳到结尾", "Ctrl+End", true) {
+        if item(ui, tr!("跳到结尾"), "Ctrl+End", true) {
             app.editor.transport.position = app.editor.project.end();
         }
         #[cfg(target_os = "android")]
         super::mobile::transport_options(app, ui);
     });
-    ui.menu_button("脚本", |ui| {
-        item(ui, "重新扫描", "", false);
-        item(ui, "打开脚本文件夹", "", false);
+    ui.menu_button(tr!("脚本"), |ui| {
+        item(ui, tr!("重新扫描"), "", false);
+        item(ui, tr!("打开脚本文件夹"), "", false);
     });
-    ui.menu_button("其他", |ui| {
-        if item(ui, "关于 RynthV", "", true) {
+    ui.menu_button(tr!("其他"), |ui| {
+        if item(ui, tr!("关于 RynthV"), "", true) {
             app.about = true;
         }
     });

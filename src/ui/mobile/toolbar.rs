@@ -3,6 +3,7 @@ use super::{Page, current_page, set_page};
 use crate::ui::time_edit::{self, Target};
 use crate::{
     app::App,
+    tr,
     ui::{
         chrome,
         icons::{Icon, IconButton},
@@ -10,6 +11,8 @@ use crate::{
     },
 };
 use eframe::egui::*;
+#[cfg(target_os = "android")]
+use crate::trf;
 
 pub(super) fn show(app: &mut App, ui: &mut Ui) {
     let width = ui.max_rect().width();
@@ -57,7 +60,7 @@ fn navigation(app: &mut App, ui: &mut Ui, width: f32) {
         let label = if width < 345.0 || !Page::EDITORS.contains(&page) {
             page.label()
         } else {
-            "面板"
+            tr!("面板")
         };
         ComboBox::from_id_salt("mobile-page-picker")
             .width(if width < 210.0 { 54.0 } else { 68.0 })
@@ -88,35 +91,35 @@ fn transport(app: &mut App, ui: &mut Ui, width: f32, height: f32) {
         .add_enabled(
             app.synthesis.recording_error.is_none(),
             if playing {
-                button(Icon::Pause, "暂停")
+                button(Icon::Pause, tr!("暂停"))
             } else {
-                button(Icon::Play, "播放")
+                button(Icon::Play, tr!("播放"))
             },
         )
         .clicked()
     {
         transport.toggle();
     }
-    if width >= 210.0 && ui.add(button(Icon::Stop, "停止")).clicked() {
+    if width >= 210.0 && ui.add(button(Icon::Stop, tr!("停止"))).clicked() {
         transport.stop();
     }
     if width >= 260.0
         && ui
-            .add(button(Icon::Loop, "循环播放").selected(transport.looping))
+            .add(button(Icon::Loop, tr!("循环播放")).selected(transport.looping))
             .clicked()
     {
         transport.looping = !transport.looping;
     }
     if width >= 820.0 {
-        if ui.add(button(Icon::Rewind, "跳到开头")).clicked() {
+        if ui.add(button(Icon::Rewind, tr!("跳到开头"))).clicked() {
             transport.position = 0;
         }
-        if ui.add(button(Icon::Forward, "跳到结尾")).clicked() {
+        if ui.add(button(Icon::Forward, tr!("跳到结尾"))).clicked() {
             transport.position = app.editor.project.end();
         }
         let metronome = app.synthesis.metronome_enabled();
         if ui
-            .add(button(Icon::Metronome, "节拍器").selected(metronome))
+            .add(button(Icon::Metronome, tr!("节拍器")).selected(metronome))
             .clicked()
         {
             app.synthesis.set_metronome(!metronome);
@@ -163,7 +166,7 @@ pub(in crate::ui) fn transport_options(app: &mut App, ui: &mut Ui) {
             (event.position, event.bpm)
         });
     if ui
-        .button(format!(
+        .button(trf!(
             "编辑拍号 {}/{}…",
             meter.numerator, meter.denominator
         ))
@@ -172,16 +175,16 @@ pub(in crate::ui) fn transport_options(app: &mut App, ui: &mut Ui) {
         time_edit::open(app, Target::Meter(meter.index));
         ui.close();
     }
-    if ui.button(format!("编辑曲速 {bpm:.2} BPM…")).clicked() {
+    if ui.button(trf!("编辑曲速 {} BPM…", format!("{bpm:.2}"))).clicked() {
         time_edit::open(app, Target::Tempo(tempo_position));
         ui.close();
     }
     let mut metronome = app.synthesis.metronome_enabled();
-    if ui.checkbox(&mut metronome, "节拍器").changed() {
+    if ui.checkbox(&mut metronome, tr!("节拍器")).changed() {
         app.synthesis.set_metronome(metronome);
     }
     ui.checkbox(
         &mut app.editor.transport.return_on_pause,
-        "暂停时返回起播位置",
+        tr!("暂停时返回起播位置"),
     );
 }

@@ -5,6 +5,7 @@ use super::{
 use crate::{
     app::App,
     model::{GroupRef, PitchControl, QUARTER},
+    tr,
 };
 use std::collections::BTreeSet;
 
@@ -44,7 +45,7 @@ pub fn anchor_cut(app: &mut App) {
     }
     anchor_copy(app);
     let ids = app.piano_anchor.ids.clone();
-    app.editor.begin("剪切音高控制点");
+    app.editor.begin(tr!("剪切音高控制点"));
     if let Some(group) = app.editor.group_mut() {
         group
             .pitch_controls
@@ -64,7 +65,7 @@ pub fn anchor_paste(app: &mut App) {
     let controls = app.piano_anchor.clipboard.clone();
     let pitch_offset = app.piano_anchor.clipboard_pitch_offset;
     let at = app.editor.transport.position;
-    insert(app, controls, pitch_offset, at, "粘贴音高控制点");
+    insert(app, controls, pitch_offset, at, tr!("粘贴音高控制点"));
 }
 
 pub fn anchor_duplicate(app: &mut App) {
@@ -93,7 +94,7 @@ pub fn anchor_duplicate(app: &mut App) {
     }
     let pitch_offset = reference.pitch_offset;
     let at = left.saturating_add(reference.blick_offset);
-    insert(app, controls, pitch_offset, at, "复制音高控制点");
+    insert(app, controls, pitch_offset, at, tr!("复制音高控制点"));
 }
 
 pub fn anchor_shift_octave(app: &mut App, up: bool) {
@@ -132,9 +133,9 @@ pub fn anchor_shift_octave(app: &mut App, up: bool) {
         return;
     }
     app.editor.begin(if up {
-        "音高控制点升八度"
+        tr!("音高控制点升八度")
     } else {
-        "音高控制点降八度"
+        tr!("音高控制点降八度")
     });
     app.editor.group_mut().unwrap().pitch_controls = controls;
     app.editor.finish();

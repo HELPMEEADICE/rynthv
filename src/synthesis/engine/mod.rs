@@ -21,6 +21,7 @@ pub use prepared::{OwnerSynthesis, PreparedAcoustics, PreparedModelFeatures};
 pub use render::{RenderResult, synthesize};
 
 use serde::Serialize;
+use crate::{tr};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[cfg_attr(target_arch = "wasm32", derive(serde::Deserialize))]
@@ -34,10 +35,10 @@ pub enum RenderStage {
 impl RenderStage {
     pub fn label(self) -> &'static str {
         match self {
-            Self::Duration => "音素时长",
-            Self::Pitch => "音高",
-            Self::Timbre => "音色",
-            Self::Vocoder => "声码器",
+            Self::Duration => tr!("音素时长"),
+            Self::Pitch => tr!("音高"),
+            Self::Timbre => tr!("音色"),
+            Self::Vocoder => tr!("声码器"),
         }
     }
 }

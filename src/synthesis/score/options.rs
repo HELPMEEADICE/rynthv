@@ -14,6 +14,7 @@ use crate::{
         voice::{Result, VoiceError, VoiceFamily},
     },
 };
+use crate::{tr, trf};
 
 pub(super) fn validate_owner(input: &OwnerInput, family: VoiceFamily) -> Result<()> {
     for (name, curve) in input.automation.iter().chain(&input.track_automation) {
@@ -30,7 +31,7 @@ pub(super) fn validate_owner(input: &OwnerInput, family: VoiceFamily) -> Result<
     for control in &input.pitch_controls {
         if matches!(control, PitchControl::Point(_)) && family != VoiceFamily::Sv2 {
             return Err(VoiceError::new(
-                "音高控制点仅支持二代歌声；当前歌声请改用手绘音高曲线。",
+                tr!("音高控制点仅支持二代歌声；当前歌声请改用手绘音高曲线。"),
             ));
         }
         let extra = match control {
@@ -86,9 +87,7 @@ pub(super) fn validate_owner(input: &OwnerInput, family: VoiceFamily) -> Result<
         })
         .unwrap_or("");
     if !dictionary.is_empty() && input.voice.dictionary.is_none() {
-        return Err(VoiceError::new(format!(
-            "工程中找不到发音词典：{dictionary}"
-        )));
+        return Err(VoiceError::new(trf!("工程中找不到发音词典：{}", dictionary)));
     }
     if !input.voice.track_options.is_empty() || !input.project_options.is_empty() {
         return unsupported("additional track/project synthesis options");
@@ -187,7 +186,7 @@ fn validate_phonemes(value: &Value, note_id: u64) -> Result<()> {
 pub(super) fn validate_performance(value: NotePerformance, family: VoiceFamily) -> Result<()> {
     value.validate().map_err(VoiceError::new)?;
     if family == VoiceFamily::Sv1 && (value.expression_x != 0.0 || value.expression_y != 0.0) {
-        return Err(VoiceError::new("原生一代歌声暂不支持二维演绎参数。"));
+        return Err(VoiceError::new(tr!("原生一代歌声暂不支持二维演绎参数。")));
     }
     Ok(())
 }
@@ -206,7 +205,7 @@ pub(super) fn note_language(note: &NoteInput, inherited: Language) -> Result<Lan
         None => inherited,
         Some(Value::String(id)) if id.is_empty() => inherited,
         Some(Value::String(id)) => Language::parse(id)
-            .ok_or_else(|| VoiceError::new(format!("音符 {} 的语言无效：{id}", note.id)))?,
+            .ok_or_else(|| VoiceError::new(trf!("音符 {} 的语言无效：{}", note.id, id)))?,
         Some(_) => return unsupported(format!("note {} non-string language override", note.id)),
     };
     validate_phone_set(note.attributes.get("phonesetOverride"), language)?;
@@ -217,11 +216,7 @@ fn validate_phone_set(value: Option<&Value>, language: Language) -> Result<()> {
     match value {
         None => Ok(()),
         Some(Value::String(id)) if id.is_empty() || id == language.phoneme_alphabet() => Ok(()),
-        Some(value) => Err(VoiceError::new(format!(
-            "{}的音素集应为 {}，当前为 {value}",
-            language.label(),
-            language.phoneme_alphabet()
-        ))),
+        Some(value) => Err(VoiceError::new(trf!("{}的音素集应为 {}，当前为 {}", language.label(), language.phoneme_alphabet(), value))),
     }
 }
 

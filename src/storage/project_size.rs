@@ -1,3 +1,4 @@
+use crate::trf;
 use std::io::{self, Write};
 
 const MAX_PROJECT_MIB: u64 = 64;
@@ -5,7 +6,7 @@ pub(super) const MAX_PROJECT_BYTES: u64 = MAX_PROJECT_MIB * 1024 * 1024;
 
 pub(super) fn check_project_size(bytes: u64) -> Result<(), String> {
     if bytes > MAX_PROJECT_BYTES {
-        return Err(format!("工程超过 {MAX_PROJECT_MIB} MiB 文件大小上限"));
+        return Err(trf!("工程超过 {} MiB 文件大小上限", MAX_PROJECT_MIB));
     }
     Ok(())
 }

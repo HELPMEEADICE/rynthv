@@ -1,20 +1,21 @@
 use super::Editor;
 use crate::model::Language;
+use crate::tr;
 use serde_json::Value;
 
 impl Editor {
     pub fn set_track_voice(&mut self, singer: Option<(&str, &str, u32)>) -> Result<(), String> {
         if self.current_track().is_instrumental() {
-            return Err("伴奏轨不能设置歌手".into());
+            return Err(tr!("伴奏轨不能设置歌手").into());
         }
         if self
             .current_track()
             .references()
             .any(|r| !r.database.is_object())
         {
-            return Err("音轨的歌声 database 字段必须是对象".into());
+            return Err(tr!("音轨的歌声 database 字段必须是对象").into());
         }
-        self.begin("切换音轨歌手");
+        self.begin(tr!("切换音轨歌手"));
         let track = self
             .project
             .tracks
@@ -55,7 +56,7 @@ impl Editor {
         let database = target
             .database
             .as_object()
-            .ok_or("歌声的 database 字段必须是对象")?;
+            .ok_or(tr!("歌声的 database 字段必须是对象"))?;
         let value = language.map_or("", Language::id);
         let alphabet = language.map_or("", Language::phoneme_alphabet);
         if database
@@ -69,7 +70,7 @@ impl Editor {
         {
             return Ok(());
         }
-        self.begin("切换歌声语言");
+        self.begin(tr!("切换歌声语言"));
         let track = self
             .project
             .tracks

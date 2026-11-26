@@ -1,4 +1,4 @@
-use crate::{app::App, editor::Editor, ui::theme::*};
+use crate::{app::App, editor::Editor, tr, ui::theme::*};
 use eframe::egui::{
     text::{CCursor, CCursorRange},
     *,
@@ -26,13 +26,13 @@ impl BpmEdit {
             .iter()
             .any(|t| t.position == self.position)
         {
-            return Err("所编辑的曲速事件已不存在".into());
+            return Err(tr!("所编辑的曲速事件已不存在").into());
         }
         let bpm = self
             .text
             .trim()
             .parse::<f64>()
-            .map_err(|_| "请输入有效的 BPM 数值")?;
+            .map_err(|_| tr!("请输入有效的 BPM 数值"))?;
         editor.set_tempo(self.position, bpm)
     }
 }

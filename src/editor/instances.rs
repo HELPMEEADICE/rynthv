@@ -1,5 +1,6 @@
 use super::Editor;
 use crate::model::{EntityId, Group, GroupRef, Track, new_id};
+use crate::tr;
 
 impl Editor {
     pub fn copy_track(&mut self, track: EntityId) -> Option<EntityId> {
@@ -9,7 +10,7 @@ impl Editor {
             .iter()
             .find(|item| item.id == track)?
             .clone();
-        self.begin("复制音轨");
+        self.begin(tr!("复制音轨"));
         copy.id = new_id();
         copy.name.push_str(" Copy");
         copy.disp_order = self.project.tracks.len() as i32;
@@ -50,7 +51,7 @@ impl Editor {
             .iter()
             .position(|item| item.id == track && !item.is_instrumental())
             .ok_or("Target must be a vocal track")?;
-        self.begin("复制音符组实例");
+        self.begin(tr!("复制音符组实例"));
         if let Some(group) = group {
             self.project.library.push(group);
         }
@@ -74,7 +75,7 @@ impl Editor {
                 .group(&source.group_id)
                 .ok_or("Missing group definition")?,
         );
-        self.begin("独立化音符组实例");
+        self.begin(tr!("独立化音符组实例"));
         self.project
             .tracks
             .iter_mut()
@@ -97,7 +98,7 @@ impl Editor {
         right.blick_absolute_begin = at;
         right.renew_identity();
         let right_id = right.id;
-        self.begin("拆分音符组实例");
+        self.begin(tr!("拆分音符组实例"));
         self.project.tracks[track].groups[index].blick_absolute_end = at;
         self.project.tracks[track].groups.insert(index + 1, right);
         self.finish();
@@ -125,7 +126,7 @@ impl Editor {
             );
         }
         let end = b.blick_absolute_end;
-        self.begin("合并音符组实例");
+        self.begin(tr!("合并音符组实例"));
         self.project.tracks[track].groups[left].blick_absolute_end = end;
         self.project.tracks[track].groups.remove(right);
         self.finish();
@@ -146,7 +147,7 @@ impl Editor {
             .position(|item| item.id == track && !item.is_instrumental())
             .ok_or("Target must be a vocal track")?;
         let reference = shifted(&self.project.tracks[source].groups[index], delta)?;
-        self.begin("移动音符组实例");
+        self.begin(tr!("移动音符组实例"));
         if source == target {
             self.project.tracks[source].groups[index] = reference;
         } else {

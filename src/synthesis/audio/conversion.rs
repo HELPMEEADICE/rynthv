@@ -1,5 +1,6 @@
 //! Offline, band-limited rate conversion. Preview retains native PCM.
 use super::{AudioError, ChannelLayout, RenderedAudio};
+use crate::{tr};
 
 pub(crate) fn convert(
     audio: &RenderedAudio,
@@ -31,7 +32,7 @@ pub(crate) fn convert_samples(
     let count = usize::try_from(frames)
         .ok()
         .and_then(|n| n.checked_mul(channels))
-        .ok_or_else(|| AudioError::Wave("导出音频长度溢出".into()))?;
+        .ok_or_else(|| AudioError::Wave(tr!("导出音频长度溢出").into()))?;
     let mut samples = Vec::new();
     samples
         .try_reserve_exact(count)

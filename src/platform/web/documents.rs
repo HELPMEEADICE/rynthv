@@ -24,7 +24,7 @@ extern "C" {
 
 pub async fn json<T: DeserializeOwned>(promise: Promise) -> Result<T, String> {
     let value = JsFuture::from(promise).await.map_err(js_error)?;
-    let value = value.as_string().ok_or("无效的浏览器数据")?;
+    let value = value.as_string().ok_or(crate::tr!("无效的浏览器数据"))?;
     serde_json::from_str(&value).map_err(|error| error.to_string())
 }
 

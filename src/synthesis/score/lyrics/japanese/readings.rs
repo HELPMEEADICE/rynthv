@@ -3,6 +3,7 @@
 use crate::platform::fs;
 use crate::synthesis::voice::{Result, VoiceError};
 use std::{collections::HashMap, path::Path};
+use crate::{trf};
 
 const HEADER: [u8; 10] = [0, 0, 1, 0, 0, 0, 3, 0, 0, 0];
 const BOUNDARY: &str = "#";
@@ -27,7 +28,7 @@ impl Readings {
         let bytes =
             fs::read(path).map_err(|e| VoiceError::new(format!("{}：{e}", path.display())))?;
         Self::parse(&bytes)
-            .ok_or_else(|| VoiceError::new(format!("日语读音模型格式无效：{}", path.display())))
+            .ok_or_else(|| VoiceError::new(trf!("日语读音模型格式无效：{}", path.display())))
     }
 
     fn parse(bytes: &[u8]) -> Option<Self> {

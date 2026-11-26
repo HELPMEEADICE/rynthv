@@ -1,3 +1,4 @@
+use crate::{tr, trf};
 use crate::platform::fs;
 use std::path::Path;
 
@@ -51,12 +52,12 @@ fn entry(
         .collect::<Vec<_>>();
     let conditioning = FlatConditioning::from_manifest(manifest);
     let availability = if !missing.is_empty() {
-        VoiceAvailability::Unsupported(format!("缺少 Flat 模型：{}", missing.join("、")))
+        VoiceAvailability::Unsupported(trf!("缺少 Flat 模型：{0}", missing.join(tr!("、"))))
     } else if dependencies
         .iter()
         .any(|dependency| dependency.role == ModelRole::SingingAssistant)
     {
-        VoiceAvailability::Unsupported("此声库声明了暂不支持的 Flat sing_model".into())
+        VoiceAvailability::Unsupported(tr!("此声库声明了暂不支持的 Flat sing_model").into())
     } else if let Err(error) = &conditioning {
         VoiceAvailability::Unsupported(error.to_string())
     } else {

@@ -4,6 +4,7 @@ use super::Editor;
 use crate::{
     midi::MidiFile,
     model::{Group, GroupRef, Project, Track},
+    tr,
 };
 use plan::ImportPlan;
 
@@ -26,7 +27,7 @@ impl Editor {
     ) -> Result<ImportSummary, String> {
         let plan = ImportPlan::prepare(midi, selected, &self.project)?;
         self.finish();
-        self.begin("导入 MIDI 音轨");
+        self.begin(tr!("导入 MIDI 音轨"));
         let summary = self.append_midi(plan);
         self.finish();
         Ok(summary)
@@ -39,7 +40,7 @@ impl Editor {
         blank.tracks.clear();
         let plan = ImportPlan::prepare(midi, selected, &blank)?;
         let mut editor = Self::new(Project::default());
-        editor.begin("导入 MIDI");
+        editor.begin(tr!("导入 MIDI"));
         editor.project.tracks.clear();
         editor.project.time = midi.time.clone();
         let summary = editor.append_midi(plan);

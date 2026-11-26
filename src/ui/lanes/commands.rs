@@ -1,6 +1,6 @@
 use super::clipboard::ParameterClipboard;
 use super::{active_lane, editable_bounds, reconcile};
-use crate::{app::App, model::QUARTER};
+use crate::{app::App, model::QUARTER, tr, trf};
 use eframe::egui::Context;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -68,7 +68,7 @@ pub fn parameter_copy(app: &mut App, ctx: &Context) {
     match clipboard_text(app) {
         Ok(Some((text, count))) => {
             ctx.copy_text(text);
-            app.status = format!("已复制 {count} 个参数控制点");
+            app.status = trf!("已复制 {} 个参数控制点", count);
         }
         Ok(None) => {}
         Err(error) => app.error = Some(error),
@@ -86,9 +86,9 @@ pub fn parameter_cut(app: &mut App, ctx: &Context) {
     match clipboard_text(app) {
         Ok(Some((text, count))) => {
             ctx.copy_text(text);
-            if remove(app, &points, "剪切参数控制点") {
+            if remove(app, &points, tr!("剪切参数控制点")) {
                 parameter_clear(app);
-                app.status = format!("已剪切 {count} 个参数控制点");
+                app.status = trf!("已剪切 {} 个参数控制点", count);
             }
         }
         Ok(None) => {}
@@ -101,7 +101,7 @@ pub fn parameter_delete(app: &mut App) {
         return;
     }
     let points = selected(app);
-    if !points.is_empty() && remove(app, &points, "删除参数控制点") {
+    if !points.is_empty() && remove(app, &points, tr!("删除参数控制点")) {
         parameter_clear(app);
     }
 }
@@ -139,10 +139,16 @@ pub fn parameter_paste_text(app: &mut App, text: &str) {
         .position
         .checked_sub(reference.blick_offset)
     else {
-        app.status = "播放位置超出参数控制点的可用时间范围。".into();
+        app.status = tr!("播放位置超出参数控制点的可用时间范围。").into();
         return;
     };
-    insert(app, clipboard.points, clipboard.range, at, "粘贴参数控制点");
+    insert(
+        app,
+        clipboard.points,
+        clipboard.range,
+        at,
+        tr!("粘贴参数控制点"),
+    );
 }
 
 pub fn parameter_duplicate(app: &mut App) {
@@ -154,11 +160,11 @@ pub fn parameter_duplicate(app: &mut App) {
         return;
     };
     let Some(at) = last.checked_add(QUARTER) else {
-        app.status = "复制位置超出参数控制点的可用时间范围。".into();
+        app.status = tr!("复制位置超出参数控制点的可用时间范围。").into();
         return;
     };
     let range = app.parameter_lane.owner.as_ref().unwrap().target.range();
-    insert(app, points, range, at, "重复参数控制点");
+    insert(app, points, range, at, tr!("重复参数控制点"));
 }
 
 pub(super) fn shift_selected(app: &mut App, delta_time: i64, delta_value: f64) {
@@ -191,7 +197,7 @@ pub(super) fn shift_selected(app: &mut App, delta_time: i64, delta_value: f64) {
         let minimum = low - lowest;
         let maximum = high - highest;
         if minimum > maximum {
-            app.status = "所选参数控制点的取值跨度超出可编辑范围。".into();
+            app.status = tr!("所选参数控制点的取值跨度超出可编辑范围。").into();
             return;
         }
         delta_value.clamp(minimum, maximum)
@@ -210,7 +216,7 @@ pub(super) fn shift_selected(app: &mut App, delta_time: i64, delta_value: f64) {
         .iter()
         .any(|point| !selected_times.contains(&point.0) && moved_times.contains(&point.0))
     {
-        app.status = "移动后会与未选中的参数控制点重合。".into();
+        app.status = tr!("移动后会与未选中的参数控制点重合。").into();
         return;
     }
     let mut replacement: BTreeMap<_, _> = original
@@ -218,7 +224,11 @@ pub(super) fn shift_selected(app: &mut App, delta_time: i64, delta_value: f64) {
         .filter(|point| !selected_times.contains(&point.0))
         .collect();
     replacement.extend(moved);
-    if replace(app, replacement.into_iter().collect(), "移动参数控制点") {
+    if replace(
+        app,
+        replacement.into_iter().collect(),
+        tr!("移动参数控制点"),
+    ) {
         app.parameter_lane.selected = moved_times;
         app.parameter_lane.anchor = app.parameter_lane.selected.first().copied();
     }
@@ -287,18 +297,18 @@ fn insert(app: &mut App, source: Vec<(i64, f64)>, source_range: (f64, f64), at: 
     let (low, high) = target.range();
     let (source_low, source_high) = source_range;
     if !source_low.is_finite() || !source_high.is_finite() || source_low >= source_high {
-        app.error = Some("参数控制点剪贴板的取值范围无效。".into());
+        app.error = Some(tr!("参数控制点剪贴板的取值范围无效。").into());
         return;
     }
     let mut inserted = Vec::with_capacity(source.len());
     for (time, value) in source {
         let shifted = i128::from(at) + i128::from(time) - i128::from(first);
         if shifted < i128::from(begin) || shifted > i128::from(end) {
-            app.status = "粘贴的参数控制点超出当前音符组的可编辑范围。".into();
+            app.status = tr!("粘贴的参数控制点超出当前音符组的可编辑范围。").into();
             return;
         }
         if !value.is_finite() {
-            app.error = Some("参数控制点剪贴板包含无效的数值。".into());
+            app.error = Some(tr!("参数控制点剪贴板包含无效的数值。").into());
             return;
         }
         let mapped = if source_range == (low, high) {
@@ -321,7 +331,7 @@ fn insert(app: &mut App, source: Vec<(i64, f64)>, source_range: (f64, f64), at: 
     if replace(app, replacement.into_iter().collect(), label) {
         app.parameter_lane.selected = times;
         app.parameter_lane.anchor = app.parameter_lane.selected.first().copied();
-        app.status = format!("已粘贴 {count} 个参数控制点");
+        app.status = trf!("已粘贴 {} 个参数控制点", count);
     }
 }
 

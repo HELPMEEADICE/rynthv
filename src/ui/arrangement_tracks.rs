@@ -1,5 +1,5 @@
 use super::{group_edit, theme::*, timeline::*, track_color::TrackColors};
-use crate::{app::App, editor::GroupEdit, model::*};
+use crate::{app::App, editor::GroupEdit, model::*, tr};
 use eframe::egui::*;
 
 pub(super) const ROW_HEIGHT: f32 = 56.0;
@@ -77,7 +77,7 @@ pub fn show(app: &mut App, ui: &mut Ui, timeline_left: f32, first_y: f32) {
             app.editor.select_track(track_id);
         }
         response.context_menu(|ui| {
-            if ui.button("插入新的音符组").clicked() {
+            if ui.button(tr!("插入新的音符组")).clicked() {
                 let at = ui
                     .ctx()
                     .data(|d| d.get_temp::<i64>(context_id))
@@ -87,8 +87,8 @@ pub fn show(app: &mut App, ui: &mut Ui, timeline_left: f32, first_y: f32) {
                 ui.close();
             }
             ui.separator();
-            ui.add_enabled(false, Button::new("粘贴"));
-            ui.add_enabled(false, Button::new("作为链接音符组粘贴"));
+            ui.add_enabled(false, Button::new(tr!("粘贴")));
+            ui.add_enabled(false, Button::new(tr!("作为链接音符组粘贴")));
         });
         for reference in references {
             group(app, ui, body, track_id, colors, &reference);

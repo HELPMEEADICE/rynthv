@@ -58,7 +58,7 @@ fn config_root() -> Result<PathBuf, String> {
     std::env::var_os("LOCALAPPDATA")
         .map(PathBuf::from)
         .filter(|path| path.is_absolute())
-        .ok_or_else(|| "LOCALAPPDATA 未设置为绝对路径，无法定位用户配置目录。".into())
+        .ok_or_else(|| crate::tr!("LOCALAPPDATA 未设置为绝对路径，无法定位用户配置目录。").into())
 }
 
 #[cfg(target_os = "linux")]
@@ -74,7 +74,9 @@ fn config_root() -> Result<PathBuf, String> {
         .map(PathBuf::from)
         .filter(|path| path.is_absolute())
         .map(|home| home.join(".config"))
-        .ok_or_else(|| "XDG_CONFIG_HOME 和 HOME 未设置为绝对路径，无法定位用户配置目录。".into())
+        .ok_or_else(|| {
+            crate::tr!("XDG_CONFIG_HOME 和 HOME 未设置为绝对路径，无法定位用户配置目录。").into()
+        })
 }
 
 #[cfg(all(target_os = "android", feature = "gui"))]
@@ -94,5 +96,5 @@ fn config_root() -> Result<PathBuf, String> {
     all(target_os = "android", feature = "gui")
 )))]
 fn config_root() -> Result<PathBuf, String> {
-    Err("当前平台尚未支持用户配置目录。".into())
+    Err(crate::tr!("当前平台尚未支持用户配置目录。").into())
 }

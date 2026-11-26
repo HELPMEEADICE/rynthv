@@ -1,5 +1,6 @@
 use crate::{
     model::RetakeComponent,
+    tr, trf,
     ui::{icons::Icon, theme::*},
 };
 use eframe::egui::*;
@@ -36,10 +37,10 @@ pub(super) fn show(ui: &mut Ui, duration_unavailable: Option<&str>) -> Option<Re
 fn button(ui: &mut Ui, width: f32, component: RetakeComponent) -> Response {
     let enabled = ui.is_enabled();
     let label = match component {
-        RetakeComponent::All | RetakeComponent::PitchAndTimbre => "全部",
-        RetakeComponent::Duration => "时值",
-        RetakeComponent::Pitch => "音高",
-        RetakeComponent::Timbre => "音色",
+        RetakeComponent::All | RetakeComponent::PitchAndTimbre => tr!("全部"),
+        RetakeComponent::Duration => tr!("时值"),
+        RetakeComponent::Pitch => tr!("音高"),
+        RetakeComponent::Timbre => tr!("音色"),
     };
     let (rect, response) = ui.allocate_exact_size(
         vec2(width, 88.0),
@@ -85,7 +86,7 @@ fn button(ui: &mut Ui, width: f32, component: RetakeComponent) -> Response {
         FontId::proportional(12.0),
         ink,
     );
-    response.on_hover_text(format!("重录{label}采样"))
+    response.on_hover_text(trf!("重录{}采样", label))
 }
 
 fn lips(ui: &Ui, center: Pos2, ink: Color32) {

@@ -1,4 +1,4 @@
-use crate::ui::theme::*;
+use crate::{tr, trf, ui::theme::*};
 use eframe::egui::*;
 
 /// Values are normalized so the controls share the same pointer and key handling.
@@ -57,18 +57,18 @@ pub(super) fn expression(ui: &mut Ui, value: &mut [f64; 2], mixed: bool) -> Resp
         Stroke::new(1.0, button_color()),
     );
     for (position, anchor, text) in [
-        (rect.min + vec2(8.0, 8.0), Align2::LEFT_TOP, "鲜活"),
+        (rect.min + vec2(8.0, 8.0), Align2::LEFT_TOP, tr!("鲜活")),
         (
             rect.right_top() + vec2(-8.0, 8.0),
             Align2::RIGHT_TOP,
-            "精修",
+            tr!("精修"),
         ),
         (
             rect.left_bottom() + vec2(8.0, -8.0),
             Align2::LEFT_BOTTOM,
-            "机械",
+            tr!("机械"),
         ),
-        (rect.max - vec2(8.0, 8.0), Align2::RIGHT_BOTTOM, "原生"),
+        (rect.max - vec2(8.0, 8.0), Align2::RIGHT_BOTTOM, tr!("原生")),
     ] {
         painter.text(
             position,
@@ -92,14 +92,14 @@ pub(super) fn expression(ui: &mut Ui, value: &mut [f64; 2], mixed: bool) -> Resp
         painter.text(
             rect.center() + vec2(0.0, 18.0),
             Align2::CENTER_TOP,
-            "多个值",
+            tr!("多个值"),
             FontId::proportional(11.0),
             muted_color(),
         );
     }
-    response.on_hover_cursor(CursorIcon::Crosshair).on_hover_text(
-        "拖动调整所选音符的演绎；方向键微调，Shift 加方向键精细调整。双击或 Home 恢复默认，Esc 取消本次拖动。",
-    )
+    response.on_hover_cursor(CursorIcon::Crosshair).on_hover_text(tr!(
+        "拖动调整所选音符的演绎；方向键微调，Shift 加方向键精细调整。双击或 Home 恢复默认，Esc 取消本次拖动。"
+    ))
 }
 
 pub(super) fn slider(
@@ -170,8 +170,9 @@ pub(super) fn slider(
     ui.painter().circle_filled(center, 3.0, text_color());
     response
         .on_hover_cursor(CursorIcon::PointingHand)
-        .on_hover_text(format!(
-            "拖动调整所选音符的{label}；方向键微调，Shift 加方向键精细调整。双击或 Home 恢复默认，Esc 取消本次拖动。"
+        .on_hover_text(trf!(
+            "拖动调整所选音符的{}；方向键微调，Shift 加方向键精细调整。双击或 Home 恢复默认，Esc 取消本次拖动。",
+            label
         ))
 }
 

@@ -9,6 +9,7 @@ use crate::synthesis::{
     dictionary_import,
     voice::{flat, svpk},
 };
+use crate::{tr, trf};
 
 pub(super) enum OperationResult {
     Voices {
@@ -73,7 +74,7 @@ impl Runtime {
                     Err(error) => failures.push(format!("{}：{error}", path.display())),
                 }
             }
-            let message = format!("已导入 {count} 个声库。");
+            let message = trf!("已导入 {} 个声库。", count);
             let feedback = if failures.is_empty() {
                 Ok(message)
             } else {
@@ -100,7 +101,7 @@ impl Runtime {
         self.start_resource_operation(move || {
             let feedback = root.and_then(|root| {
                 flat::remove_import(&root, &path)
-                    .map(|()| "已移除导入的 Flat 声库。".into())
+                    .map(|()| tr!("已移除导入的 Flat 声库。").into())
                     .map_err(|error| error.to_string())
             });
             OperationResult::Voices {
@@ -118,7 +119,7 @@ impl Runtime {
             Ok(result) => result,
             Err(TryRecvError::Disconnected) => OperationResult::Voices {
                 changed: false,
-                feedback: Err("资源处理线程意外终止。".into()),
+                feedback: Err(tr!("资源处理线程意外终止。").into()),
             },
             Err(TryRecvError::Empty) => return,
         };
@@ -137,12 +138,12 @@ impl Runtime {
                     return Err(self
                         .library
                         .settings_error()
-                        .unwrap_or("无法保存词典设置")
+                        .unwrap_or(tr!("无法保存词典设置"))
                         .to_owned());
                 }
                 let _ = directory.keep();
                 self.clear_voices();
-                Ok("已导入并启用发音词典。".into())
+                Ok(tr!("已导入并启用发音词典。").into())
             }),
         };
         self.library.resource_feedback = Some(feedback);
@@ -166,7 +167,7 @@ impl Runtime {
             }) {
             Ok(_) => self.library.resource_operation = Some(receiver),
             Err(error) => {
-                self.library.resource_feedback = Some(Err(format!("无法启动资源处理任务：{error}")))
+                self.library.resource_feedback = Some(Err(trf!("无法启动资源处理任务：{}", error)))
             }
         }
     }

@@ -19,18 +19,19 @@ import java.util.UUID
 
 class DocumentStore(context: Context) {
     private val resolver = context.contentResolver
+    private val strings = context.resources
     private val root = File(context.filesDir, "RynthV/imports")
     private val shares = File(context.cacheDir, "shares")
     private val renders = File(context.cacheDir, "renders")
 
     fun importFile(uri: Uri, extensions: String): File {
         val rows = resolver.query(uri, COLUMNS, null, null, null)
-            ?: throw IOException("无法读取文档名称")
+            ?: throw IOException(strings.getString(R.string.document_name_unreadable))
         rows.use {
-            if (!it.moveToFirst()) throw IOException("无法读取文档名称")
+            if (!it.moveToFirst()) throw IOException(strings.getString(R.string.document_name_unreadable))
             val name = safeName(it.getString(0))
             if (extensions.isNotEmpty() && !hasExtension(name, extensions))
-                throw IOException("不支持此文件类型：$name")
+                throw IOException(strings.getString(R.string.file_type_unsupported, name))
             val bytes = it.getLong(1)
             val modified = it.getLong(2)
             val revision = if (bytes > 0 && modified > 0) hash("$uri\n$bytes\n$modified")
@@ -47,15 +48,15 @@ class DocumentStore(context: Context) {
     }
 
     private fun copyDirectory(tree: Uri, id: String, destination: File, depth: Int) {
-        if (depth > 40) throw IOException("资源目录层级过深")
+        if (depth > 40) throw IOException(strings.getString(R.string.resource_directory_too_deep))
         val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, id)
         val rows = resolver.query(children, CHILD_COLUMNS, null, null, null)
-            ?: throw IOException("无法读取资源目录")
+            ?: throw IOException(strings.getString(R.string.resource_directory_unreadable))
         rows.use {
             val names = HashSet<String>()
             while (it.moveToNext()) {
                 val name = safeName(it.getString(0))
-                if (!names.add(name)) throw IOException("资源目录有同名条目：$name")
+                if (!names.add(name)) throw IOException(strings.getString(R.string.resource_directory_duplicate_entry, name))
                 val childId = it.getString(3)
                 if (Document.MIME_TYPE_DIR == it.getString(4)) {
                     val next = File(destination, name)
@@ -77,14 +78,16 @@ class DocumentStore(context: Context) {
         requireSpace(parent, bytes)
         val staging = File.createTempFile(".import-", ".part", parent)
         try {
-            val descriptor = resolver.openFileDescriptor(uri, "r") ?: throw IOException("文档无法打开：$name")
+            val descriptor = resolver.openFileDescriptor(uri, "r")
+                ?: throw IOException(strings.getString(R.string.document_cannot_open, name))
             ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { input ->
                 FileOutputStream(staging).use { output ->
                     copy(input, output, parent)
                     output.fd.sync()
                 }
             }
-            if (bytes > 0 && staging.length() != bytes) throw IOException("文档在读取期间变更：$name")
+            if (bytes > 0 && staging.length() != bytes)
+                throw IOException(strings.getString(R.string.document_changed_while_reading, name))
             if (modified > 0) staging.setLastModified(modified)
             Files.move(staging.toPath(), destination.toPath(), StandardCopyOption.ATOMIC_MOVE,
                 StandardCopyOption.REPLACE_EXISTING)
@@ -95,7 +98,8 @@ class DocumentStore(context: Context) {
     fun publish(source: File, uri: Uri) {
         try {
             FileInputStream(source).use { input ->
-                val descriptor = resolver.openFileDescriptor(uri, "wt") ?: throw IOException("无法打开目标文档")
+                val descriptor = resolver.openFileDescriptor(uri, "wt")
+                    ?: throw IOException(strings.getString(R.string.document_target_cannot_open))
                 ParcelFileDescriptor.AutoCloseOutputStream(descriptor).use { output -> copy(input, output, null) }
             }
         } catch (error: Exception) {
@@ -121,6 +125,43 @@ class DocumentStore(context: Context) {
         pruneTransientFiles(renders, cutoff)
     }
 
+    private fun copy(input: FileInputStream, output: FileOutputStream, volume: File?) {
+        val buffer = ByteArray(64 * 1024)
+        var untilCheck = 0
+        while (true) {
+            val count = input.read(buffer)
+            if (count == -1) break
+            if (volume != null && untilCheck <= 0) {
+                requireSpace(volume, buffer.size.toLong())
+                untilCheck = 8 * 1024 * 1024
+            }
+            output.write(buffer, 0, count)
+            untilCheck -= count
+        }
+    }
+
+    private fun requireSpace(volume: File, bytes: Long) {
+        if (StatFs(volume.path).availableBytes - RESERVE < maxOf(0L, bytes))
+            throw IOException(strings.getString(R.string.storage_insufficient))
+    }
+
+    private fun ensureDirectory(directory: File) { Files.createDirectories(directory.toPath()) }
+
+    private fun safeName(name: String?): String {
+        if (name.isNullOrEmpty() || name == "." || name == ".." ||
+            '/' in name || '\\' in name || '\u0000' in name)
+            throw IOException(strings.getString(R.string.document_name_invalid))
+        return name
+    }
+
+    private fun hasExtension(name: String, extensions: String): Boolean {
+        val lower = name.lowercase(Locale.ROOT)
+        return extensions.split(',').any { lower.endsWith(".$it") }
+    }
+
+    private fun hash(text: String): String = MessageDigest.getInstance("SHA-256")
+        .digest(text.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(Locale.ROOT, it.toInt() and 255) }
+
     companion object {
         private const val RESERVE = 32L * 1024 * 1024
         private val COLUMNS = arrayOf(Document.COLUMN_DISPLAY_NAME, Document.COLUMN_SIZE, Document.COLUMN_LAST_MODIFIED)
@@ -137,35 +178,5 @@ class DocumentStore(context: Context) {
                 } catch (error: IOException) { Log.w("RynthV", "Could not prune temporary exports", error) }
             }
         }
-        private fun copy(input: FileInputStream, output: FileOutputStream, volume: File?) {
-            val buffer = ByteArray(64 * 1024)
-            var untilCheck = 0
-            while (true) {
-                val count = input.read(buffer)
-                if (count == -1) break
-                if (volume != null && untilCheck <= 0) {
-                    requireSpace(volume, buffer.size.toLong())
-                    untilCheck = 8 * 1024 * 1024
-                }
-                output.write(buffer, 0, count)
-                untilCheck -= count
-            }
-        }
-        private fun requireSpace(volume: File, bytes: Long) {
-            if (StatFs(volume.path).availableBytes - RESERVE < maxOf(0L, bytes))
-                throw IOException("应用存储空间不足")
-        }
-        private fun ensureDirectory(directory: File) { Files.createDirectories(directory.toPath()) }
-        private fun safeName(name: String?): String {
-            if (name.isNullOrEmpty() || name == "." || name == ".." ||
-                '/' in name || '\\' in name || '\u0000' in name) throw IOException("文档名称无效")
-            return name
-        }
-        private fun hasExtension(name: String, extensions: String): Boolean {
-            val lower = name.lowercase(Locale.ROOT)
-            return extensions.split(',').any { lower.endsWith(".$it") }
-        }
-        private fun hash(text: String): String = MessageDigest.getInstance("SHA-256")
-            .digest(text.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(Locale.ROOT, it.toInt() and 255) }
     }
 }
