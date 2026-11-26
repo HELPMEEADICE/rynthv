@@ -50,7 +50,6 @@ impl Offline {
     ) -> Result<(BTreeMap<OwnerId, StageTimings>, PreviewMetrics), String> {
         let demand = options.preview.expect("preview demand");
         let plan = self.prepare_owners(project, options, routes, cancelled, progress)?;
-        let use_cpu_workers = self.use_cpu_workers(options.backend);
         let compute = self.compute.as_ref().expect("preview compute").2.clone();
         if !routes.is_empty() {
             compute
@@ -101,7 +100,7 @@ impl Offline {
                 Ok::<(), String>(())
             };
         scheduler.seed(&self.cache, &mut self.partial)?;
-        if use_cpu_workers {
+        if options.backend.resolve_auto() == Backend::Cpu {
             let result = execution::scope(cancellation, || {
                 self.cpu_pool.run_batch(|pool| {
                     cpu::render(

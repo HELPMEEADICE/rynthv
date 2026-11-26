@@ -9,7 +9,7 @@ CPU Worker 消息缺少槽位	CPU Worker 訊息缺少槽位
 CPU Worker 消息缺少进度数据	CPU Worker 訊息缺少進度資料
 PCM 开始位置超出地址范围	PCM 開始位置超出位址範圍
 PCM 结束位置溢出	PCM 結束位置溢位
-WebGPU 未完成任何模型算子。请检查设备限制，或选择 Auto／CPU。	WebGPU 未完成任何模型算子。請檢查裝置限制，或選擇 Auto／CPU。
+WebGPU 未完成任何模型算子。请检查设备限制，或选择 CPU。	WebGPU 未完成任何模型算子。請檢查裝置限制，或選擇 CPU。
 gainDecibel 产生了非有限增益	gainDecibel 產生了非有限增益
 {} 有多个词典读音，请填写显式音素	{} 有多個詞典讀音，請填寫明確音素
 {} 有多个读音，请使用注音或显式音素	{} 有多個讀音，請使用注音或明確音素

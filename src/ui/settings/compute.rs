@@ -8,7 +8,8 @@ use crate::{
 };
 use eframe::egui::{ComboBox, Label, Ui};
 
-const BACKENDS: [(Backend, &str); 3] = [
+const BACKENDS: &[(Backend, &str)] = &[
+    #[cfg(not(target_arch = "wasm32"))]
     (Backend::Auto, "自动选择（Auto）"),
     (Backend::WebGpu, "GPU（WebGPU）"),
     (Backend::Cpu, "CPU"),
@@ -17,6 +18,8 @@ const BACKENDS: [(Backend, &str); 3] = [
 pub(super) fn settings(app: &mut App, ui: &mut Ui) {
     section(ui, tr!("模型推理"));
     let current = app.synthesis.library.settings.compute_backend;
+    #[cfg(target_arch = "wasm32")]
+    let current = current.resolve_auto();
     let mut selected = current;
     row(ui, tr!("推理计算设备"), |ui| {
         let label = BACKENDS
@@ -28,13 +31,15 @@ pub(super) fn settings(app: &mut App, ui: &mut Ui) {
             .width(ui.available_width())
             .selected_text(tr!(label))
             .show_ui(ui, |ui| {
-                for (value, label) in BACKENDS {
+                for &(value, label) in BACKENDS {
                     ui.selectable_value(&mut selected, value, tr!(label));
                 }
             });
     });
     let adapter = adapter_picker(app, ui, selected);
-    app.synthesis.set_compute_settings(selected, adapter);
+    if selected != current || adapter != app.synthesis.library.settings.compute_adapter {
+        app.synthesis.set_compute_settings(selected, adapter);
+    }
 
     let Some(diagnostics) = app.synthesis.compute_diagnostics() else {
         ui.weak(tr!("正在初始化推理设备…"));

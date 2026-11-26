@@ -16,6 +16,7 @@ default = ["gui", "cli"]
 gui = ["dep:eframe", "dep:egui_extras", "dep:rfd", "dep:cpal", "dep:android-activity", "dep:jni", "dep:log", "dep:memmap2", "wgpu/gles"]
 cli = ["dep:clap", "dep:ctrlc", "dep:rustyline", "dep:shell-words"]
 web = ["dep:eframe", "dep:egui_extras", "dep:futures-channel", "dep:js-sys", "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:web-sys", "wgpu/webgl"]
+webgpu-renderer = ["web"]
 # Opt-in CPU timing spans; absent from normal editor builds.
 synth-profile = []
 

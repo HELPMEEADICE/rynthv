@@ -219,7 +219,7 @@ impl Offline {
             .check()
             .map_err(|error| format!("COMPUTE_UNAVAILABLE: {error}"))?;
         #[cfg(target_arch = "wasm32")]
-        if self.use_cpu_workers(options.backend) {
+        if options.backend.resolve_auto() == Backend::Cpu {
             return self.render_cpu_owners(
                 &plan,
                 settings,

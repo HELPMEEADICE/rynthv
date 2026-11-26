@@ -32,6 +32,7 @@ jobs:
       - name: Check Rust and browser scripts
         run: |
           python3 packaging/web/build.py --check
+          python3 packaging/web/build.py --check --webgpu-renderer
           for script in packaging/web/*.js; do node --input-type=module --check < "$script"; done
       - name: Install the locked wasm-bindgen CLI
         run: |

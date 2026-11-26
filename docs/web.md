@@ -5,9 +5,9 @@ RynthV Web 由同一套 Rust 编辑器、SVP 编解码器、模型解析器和�
 ## 浏览器要求
 
 - 使用 HTTPS 或 `http://localhost`。浏览器须开放 OPFS、IndexedDB、AudioWorklet 和 Dedicated Worker。
-- WASM 使用 SIMD128 与 JS Promise Integration（JSPI）。Chromium 137 起默认启用 JSPI。其他浏览器请核对 JSPI 支持，启动页会检测能力。浏览器同时需要 WebGPU 或 WebGL 2 绘制编辑器。[JSPI 支持表](https://wasm-bindgen.github.io/wasm-bindgen/reference/jspi.html)
-- **CPU** 在单个 Worker 内执行 WASM SIMD128。当前 Web 构建为单线程，不使用 SharedArrayBuffer 或线程版 Rayon。COOP/COEP 对常规运行可选，跨源隔离不会自动开启多线程。
-- **Auto** 优先尝试 Worker WebGPU，根据设备限制和算子工作量调度。**WebGPU** 请求计算专用设备。首次 GPU 批次完成后，小算子也按工作量阈值调度，减少频繁提交和回读。初始化和执行错误会显示在渲染面板。设置显示实际 CPU／WebGPU／混合路径及 GPU 提交和回读耗时。编辑器图形后端与推理设备分开。[WebGPU API](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API)
+- WASM 使用 SIMD128 与 JS Promise Integration（JSPI）。Chromium 137 起默认启用 JSPI。其他浏览器请核对 JSPI 支持，启动页会检测能力。默认构建需要 WebGL 2 绘制编辑器。[JSPI 支持表](https://wasm-bindgen.github.io/wasm-bindgen/reference/jspi.html)
+- 歌声预览和 WAV 导出默认使用 **CPU**，通过独立的 Worker 运行 WASM SIMD128。每个 Worker 中的 WASM 实例为单线程。
+- 在 **设置 → 渲染 → 模型推理** 选择 **GPU（WebGPU）** 后，合成 Worker 才会请求 WebGPU 设备。该设置会保存在浏览器中。首次 GPU 批次完成后，小算子按工作量调度，减少频繁提交和回读。初始化和执行错误会显示在渲染面板，设置中可查看实际执行路径及 GPU 提交和回读耗时。[WebGPU API](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API)
 
 ## 构建与静态部署
 
@@ -22,6 +22,8 @@ python -m http.server 8080 --bind 127.0.0.1 --directory dist/web
 ```
 
 `--check` 执行 WASM 编译检查和严格 Clippy。`--debug` 生成开发包。默认使用 release、Thin LTO 和 Rust 的性能优化级别，保留推理内核的速度。脚本固定字体版本与 SHA-256，构建时缓存字体与许可证，运行时字体从同站点加载。
+
+如果部署需要用 WebGPU 绘制编辑器，执行 `python packaging/web/build.py --webgpu-renderer`。此构建要求浏览器在主页面提供 WebGPU。歌声合成设备仍由设置中的模型推理选项决定。
 
 上传 `dist/web/` 全部内容，或解压 `dist/rynthv-web.zip` 到 GitHub Pages、Cloudflare Pages 或 Nginx。入口 `index.html` 引用同一个 `assets/<内容哈希>/` 目录，主页面模块、Worker、AudioWorklet、WASM 和字体都使用该目录内的相对路径，支持站点子目录。发布时先上传本次资源目录，再切换 `index.html`。可配置 HTTP 缓存时，为入口 HTML 设置 `Cache-Control: no-cache`，为内容哈希目录设置 `Cache-Control: public, max-age=31536000, immutable`。从旧的平铺包更新时，清除部署缓存中的旧入口和旧资源 URL。
 
@@ -49,6 +51,6 @@ WebAssembly 工作流在 PR、main 提交和手动触发时生成部署 ZIP，�
 
 1. 在目标站点打开编辑器。调整窗口与页面缩放，检查 Canvas、中文和日文输入、剪贴板、快捷键及触控双指缩放。
 2. 导入一个 `.svpk`、Flat 声库和 `clf-data`。如有 SV2 资源，额外导入 SV2 目录与该歌声的便携上下文。刷新页面，检查目录和配置留存。
-3. 先选择 CPU，录入短句并播放。再选择 WebGPU，确认实际推理状态、GPU 提交及回读计数。用相同工程分别导出 WAV，比较长度、采样率和听感。
+3. 在新浏览器配置中打开编辑器，确认模型推理默认为 CPU。录入短句并播放，再选择 WebGPU，确认实际推理状态、GPU 提交及回读计数。用相同工程分别导出 WAV，比较长度、采样率和听感。
 4. 加入伴奏、第二条人声音轨和循环区。检查跳转、暂停、静音、增益、声像与分轨导出。合成期间连续编辑并撤销，确认最终播放的是最新工程。
 5. 保存工程、下载 SVP、刷新并重新打开。验证自动恢复、模型上下文和伴奏重连。最后在移动浏览器检查布局、长按、双指操作及软键盘。

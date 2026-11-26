@@ -56,7 +56,7 @@ AppImage 在 Ubuntu 24.04 上构建。运行依赖系统的 glibc 和 `libgcc_s.
 
 从 [GitHub Releases](https://github.com/HELPMEEADICE/rynthv/releases) 或 [WebAssembly 工作流](https://github.com/HELPMEEADICE/rynthv/actions/workflows/web.yml) 获取 `rynthv-web.zip`。解压到 HTTPS 静态站点即可使用，声库、工程和推理均留在浏览器本地。
 
-需要支持 WASM SIMD128、JSPI 和 OPFS 的现代浏览器。WebGPU 推理还需要浏览器在 Dedicated Worker 中提供可用的 WebGPU 设备。构建、导入、部署和实机验证见 [Web 指南](docs/web.md)。
+默认构建需要支持 WASM SIMD128、JSPI、OPFS 和 WebGL 2 的现代浏览器。歌声预览和导出默认使用 CPU，在设置中选择 WebGPU 后才请求 Worker 中的 WebGPU 设备。构建、导入、部署和实机验证见 [Web 指南](docs/web.md)。
 
 ## 声库与配置
 

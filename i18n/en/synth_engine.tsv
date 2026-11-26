@@ -9,7 +9,7 @@ CPU Worker 消息缺少槽位	CPU worker message is missing the slot index
 CPU Worker 消息缺少进度数据	CPU worker message is missing progress data
 PCM 开始位置超出地址范围	PCM start position is out of address range
 PCM 结束位置溢出	PCM end position overflowed
-WebGPU 未完成任何模型算子。请检查设备限制，或选择 Auto／CPU。	WebGPU completed no model operators. Check the device limits or choose Auto／CPU.
+WebGPU 未完成任何模型算子。请检查设备限制，或选择 CPU。	WebGPU completed no model operators. Check the device limits or select CPU.
 gainDecibel 产生了非有限增益	gainDecibel produced a non-finite gain
 {} 有多个词典读音，请填写显式音素	{} has several dictionary readings; specify explicit phonemes
 {} 有多个读音，请使用注音或显式音素	{} has several readings; use a reading annotation or explicit phonemes

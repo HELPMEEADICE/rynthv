@@ -16,7 +16,6 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[2]
 WEB = ROOT / "packaging" / "web"
 TARGET = "wasm32-unknown-unknown"
-FEATURES = ("--locked", "--no-default-features", "--features", "web", "--lib", "--target", TARGET)
 FONT_ROOT = "https://raw.githubusercontent.com/notofonts/noto-cjk/Sans2.004"
 ASSETS = {
     "NotoSansCJKsc-Regular.otf": (
@@ -158,8 +157,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="Run compile and strict Clippy checks only")
     parser.add_argument("--debug", action="store_true", help="Package an unoptimized development build")
+    parser.add_argument("--webgpu-renderer", action="store_true", help="Use WebGPU for the editor canvas")
     parser.add_argument("--output-dir", type=Path, default=ROOT / "dist", help="Directory for the site and deployment archive")
     args = parser.parse_args()
+    features = "webgpu-renderer" if args.webgpu_renderer else "web"
+    build_args = ("--locked", "--no-default-features", "--features", features, "--lib", "--target", TARGET)
     cargo = os.environ.get("CARGO", "cargo")
     env = os.environ.copy()
     target_dir = Path(env.get("CARGO_TARGET_DIR", ROOT / "target" / "wasm"))
@@ -173,13 +175,13 @@ def main():
         flags = env.get("RUSTFLAGS", env.get("CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS", ""))
         env["RUSTFLAGS"] = f"{flags} -C target-feature=+simd128".strip()
     if args.check:
-        run(cargo, "check", *FEATURES, env=env)
-        run(cargo, "clippy", *FEATURES, "--", "-D", "warnings", env=env)
+        run(cargo, "check", *build_args, env=env)
+        run(cargo, "clippy", *build_args, "--", "-D", "warnings", env=env)
         return
     bindgen = bindgen_path()
     if not args.debug:
         env["CARGO_PROFILE_RELEASE_STRIP"] = "debuginfo"
-    run(cargo, "build", *FEATURES, *(() if args.debug else ("--release",)), env=env)
+    run(cargo, "build", *build_args, *(() if args.debug else ("--release",)), env=env)
     wasm = target_dir / TARGET / ("debug" if args.debug else "release") / "rynthv.wasm"
     dist = args.output_dir
     if not dist.is_absolute():

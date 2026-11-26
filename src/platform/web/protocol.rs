@@ -1,5 +1,5 @@
 use crate::synthesis::{
-    inference::compute::{AdapterInfo, Backend, Diagnostics, Status},
+    inference::compute::{AdapterInfo, Diagnostics, Status},
     offline::{PreviewMetrics, cpu},
     render_cache::CacheStats,
     rendered::{PitchTrack, RenderedPhonemeTrack},
@@ -113,24 +113,9 @@ pub struct ComputeDiagnostics {
 }
 
 impl ComputeDiagnostics {
-    pub fn for_render(
-        diagnostics: Diagnostics,
-        mut activity: cpu::Activity,
-    ) -> Result<Self, String> {
+    pub fn for_render(diagnostics: Diagnostics, activity: cpu::Activity) -> Result<Self, String> {
         let mut report = Self::try_from(diagnostics)?;
         if !activity.is_empty() {
-            if report.status.requested == Backend::Auto {
-                let reason = if report.status.device.is_some() {
-                    "GPU execution unavailable"
-                } else {
-                    "GPU unavailable"
-                };
-                for reasons in activity.values_mut() {
-                    if let Some(count) = reasons.remove("CPU selected") {
-                        *reasons.entry(reason.into()).or_default() += count;
-                    }
-                }
-            }
             report.actual = "cpu".into();
             report.activity["cpu_operators"] =
                 serde_json::to_value(activity).map_err(|error| error.to_string())?;

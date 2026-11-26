@@ -24,10 +24,21 @@ pub use diagnostics::{Activity, Diagnostics};
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Backend {
-    #[default]
+    #[cfg_attr(not(target_arch = "wasm32"), default)]
     Auto,
+    #[cfg_attr(target_arch = "wasm32", default)]
     Cpu,
     WebGpu,
+}
+
+#[cfg(target_arch = "wasm32")]
+impl Backend {
+    pub(crate) fn resolve_auto(self) -> Self {
+        match self {
+            Self::Auto => Self::default(),
+            backend => backend,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -58,6 +69,8 @@ thread_local! {
 impl Session {
     /// May initialize a native device. Call from a synthesis or setup thread.
     pub fn new(requested: Backend, adapter: Option<&AdapterId>) -> Self {
+        #[cfg(target_arch = "wasm32")]
+        let requested = requested.resolve_auto();
         let started = Instant::now();
         let (adapters, device, initialization_error) = match requested {
             Backend::Cpu => (Vec::new(), None, None),

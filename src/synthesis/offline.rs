@@ -461,9 +461,7 @@ impl Offline {
             && !diagnostics.activity.cpu_operators.is_empty()
         {
             self.cache.reset();
-            return Err(
-                tr!("WebGPU 未完成任何模型算子。请检查设备限制，或选择 Auto／CPU。").into(),
-            );
+            return Err(tr!("WebGPU 未完成任何模型算子。请检查设备限制，或选择 CPU。").into());
         }
         #[cfg(not(target_arch = "wasm32"))]
         if stats.current_render_bytes > options.cache_bytes {
