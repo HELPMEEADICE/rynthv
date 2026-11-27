@@ -19,9 +19,8 @@ use std::{
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
-        mpsc::{self, Receiver},
+        mpsc::Receiver,
     },
-    time::Duration,
 };
 use web_time::Instant;
 
@@ -138,10 +137,11 @@ pub(super) fn run(
         state.cache.reuse_queued();
         state.publish(&events);
         let Some((owner, target)) = state.next_work() else {
-            match commands.recv_timeout(Duration::from_millis(100)) {
-                Ok(command) => state.apply(command),
-                Err(mpsc::RecvTimeoutError::Timeout) => {}
-                Err(mpsc::RecvTimeoutError::Disconnected) => break,
+            let Ok(command) = commands.recv() else {
+                break;
+            };
+            if alive.load(Ordering::Acquire) {
+                state.apply(command);
             }
             continue;
         };
@@ -265,6 +265,7 @@ fn advance<'network, 'tree>(
                     .as_ref()
                     .is_none_or(|cursor| cursor.is_finished())
             {
+                drop(session.cursor);
                 finish(state, events, &session.job, session.prepared.finish());
             } else {
                 state.sessions.insert(owner, session);

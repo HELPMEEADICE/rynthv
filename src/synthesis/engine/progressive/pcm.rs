@@ -14,7 +14,7 @@ use crate::synthesis::{
     voice::{Result, VoiceError},
 };
 use clock::Clock;
-use std::{ops::Range, sync::Arc};
+use std::ops::Range;
 
 const BLOCK: i64 = PREVIEW_BLOCK_SAMPLES as i64;
 const LOOKAHEAD: i64 = 1_024;
@@ -56,11 +56,11 @@ impl PcmStore {
 
     /// Dirty blocks remain available solely as seam context, not playback.
     pub fn from_existing(base: &PcmComponents, dirty: Range<i64>) -> Result<Self> {
-        if base.primary.len() != base.secondary.len() || dirty.start >= dirty.end {
+        if dirty.start >= dirty.end {
             return Err(VoiceError::new("Invalid progressive PCM baseline"));
         }
-        let mut store = Self::with_samples(base.start_seconds, base.primary.len(), || {
-            [base.primary.to_vec(), base.secondary.to_vec()]
+        let mut store = Self::with_samples(base.start_seconds, base.primary().len(), || {
+            [base.primary().to_vec(), base.secondary().to_vec()]
         })?;
         store.ready.fill(true);
         for (index, ready) in store.ready.iter_mut().enumerate() {
@@ -126,12 +126,10 @@ impl PcmStore {
                 "Cannot finish PCM with unpublished model blocks",
             ));
         }
-        let [primary, secondary] = self.samples;
-        Ok(PcmComponents {
-            start_seconds: self.clock.origin as f64 / RATE,
-            primary: Arc::from(primary),
-            secondary: Arc::from(secondary),
-        })
+        Ok(PcmComponents::from_ready(
+            self.clock.origin as f64 / RATE,
+            self.samples,
+        ))
     }
 
     fn block_ready(&self, block: i64) -> bool {

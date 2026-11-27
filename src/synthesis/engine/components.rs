@@ -4,7 +4,6 @@
 use crate::synthesis::{
     audio::{ChannelLayout, RenderedAudio},
     score::SAMPLE_RATE,
-    stages::vocoder::VocoderOutput,
     voice::{Result, VoiceError},
 };
 use std::sync::Arc;
@@ -12,52 +11,55 @@ use std::sync::Arc;
 #[derive(Clone, Debug)]
 pub struct PcmComponents {
     pub start_seconds: f64,
-    pub primary: Arc<[f32]>,
-    pub secondary: Arc<[f32]>,
+    samples: Arc<[Box<[f32]>; 2]>,
 }
 
 impl PcmComponents {
-    pub fn new(start_seconds: f64, output: VocoderOutput) -> Result<Self> {
+    pub fn new(start_seconds: f64, samples: [Vec<f32>; 2]) -> Result<Self> {
         if !start_seconds.is_finite()
-            || output.primary.values.len() != output.secondary.values.len()
-            || output
-                .primary
-                .values
-                .iter()
-                .chain(&output.secondary.values)
-                .any(|v| !v.is_finite())
+            || samples[0].len() != samples[1].len()
+            || samples.iter().flatten().any(|v| !v.is_finite())
         {
             return Err(VoiceError::new("Invalid vocoder component timeline"));
         }
-        Ok(Self {
+        Ok(Self::from_ready(start_seconds, samples))
+    }
+
+    /// Adopt the progressive store's two completed buffers.
+    pub(super) fn from_ready(start_seconds: f64, samples: [Vec<f32>; 2]) -> Self {
+        Self {
             start_seconds,
-            primary: output.primary.values.into(),
-            secondary: output.secondary.values.into(),
-        })
+            samples: Arc::new(samples.map(Vec::into_boxed_slice)),
+        }
+    }
+
+    pub fn primary(&self) -> &[f32] {
+        &self.samples[0]
+    }
+
+    pub fn secondary(&self) -> &[f32] {
+        &self.samples[1]
     }
 
     pub fn publish(&self, begin_seconds: f64, end_seconds: Option<f64>) -> Result<RenderedAudio> {
         let rate = f64::from(SAMPLE_RATE);
         let range = visible_offsets(
             self.start_seconds,
-            self.primary.len(),
+            self.primary().len(),
             begin_seconds,
             end_seconds,
         );
         let (first, end) = (range.start, range.end);
-        if first >= end || self.primary.len() != self.secondary.len() {
+        if first >= end {
             return Err(VoiceError::new(
                 "Rendered components have no visible samples",
             ));
         }
-        let samples: Vec<_> = self.primary[first..end]
+        let samples = self.primary()[first..end]
             .iter()
-            .zip(&self.secondary[first..end])
+            .zip(&self.secondary()[first..end])
             .map(|(&a, &b)| a + b)
             .collect();
-        if samples.iter().any(|value| !value.is_finite()) {
-            return Err(VoiceError::new("Vocoder produced non-finite mono samples"));
-        }
         RenderedAudio::new(
             SAMPLE_RATE,
             self.start_seconds + first as f64 / rate,
@@ -68,8 +70,8 @@ impl PcmComponents {
     }
 
     pub fn memory_bytes(&self) -> usize {
-        std::mem::size_of_val(self.primary.as_ref())
-            .saturating_add(std::mem::size_of_val(self.secondary.as_ref()))
+        std::mem::size_of_val(self.primary())
+            .saturating_add(std::mem::size_of_val(self.secondary()))
     }
 }
 

@@ -3,7 +3,7 @@
 mod conversion;
 
 use super::AudioError;
-use std::sync::{Arc, RwLock, RwLockReadGuard};
+use std::sync::{RwLock, RwLockReadGuard};
 
 pub const LIVE_SAMPLE_RATE: u32 = 48_000;
 pub const LIVE_BLOCK_FRAMES: usize = 24_000;
@@ -14,7 +14,7 @@ pub const LIVE_CHANNELS: usize = 2;
 pub(crate) enum LiveBlock {
     Pending,
     Silence,
-    Pcm(Arc<[f32]>),
+    Pcm(Box<[f32]>),
 }
 
 /// One revision of the complete project timeline in 48 kHz stereo.
@@ -62,7 +62,7 @@ impl LiveAudio {
     /// Publish immutable interleaved stereo PCM. The buffer must have exactly
     /// the block's frame count, including the shorter final block. Call only
     /// from a worker: replacing a block may wait for an active callback read.
-    pub fn publish(&self, index: usize, samples: Arc<[f32]>) -> Result<(), AudioError> {
+    pub fn publish(&self, index: usize, samples: Vec<f32>) -> Result<(), AudioError> {
         let frames = self.block_frames(index).ok_or_else(|| {
             AudioError::InvalidPcm(format!("Live PCM block {index} is outside the timeline"))
         })?;
@@ -78,7 +78,7 @@ impl LiveAudio {
                 "Live PCM block {index} contains a nonfinite sample"
             )));
         }
-        self.set(index, LiveBlock::Pcm(samples))
+        self.set(index, LiveBlock::Pcm(samples.into_boxed_slice()))
     }
 
     /// Mark a block as known silence without allocating a sample buffer.

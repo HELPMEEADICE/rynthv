@@ -22,15 +22,17 @@ pub(super) fn build<T: SizedSample + FromSample<f32>>(
     device.build_output_stream(
         config,
         move |output: &mut [T], _| {
-            output.fill(T::EQUILIBRIUM);
             #[cfg(target_os = "android")]
             if !crate::platform::android::lifecycle::audio_allowed() {
+                output.fill(T::EQUILIBRIUM);
                 return;
             }
             if state.failure.load(Ordering::Acquire) != 0 {
+                output.fill(T::EQUILIBRIUM);
                 return;
             }
             piano.begin_buffer();
+            let audition_active = piano.is_active();
             // The control thread installs/reclaims complete source revisions.
             // This guard avoids Arc disposal and blocking on source replacement.
             let guard = source.try_read().ok();
@@ -44,6 +46,10 @@ pub(super) fn build<T: SizedSample + FromSample<f32>>(
                     }
                     playing
                 });
+            if session.is_none() && !audition_active {
+                output.fill(T::EQUILIBRIUM);
+                return;
+            }
             let controls = session.map(|session| &session.controls);
             let start = controls.map_or(0, |controls| controls.position.load(Ordering::Acquire));
             let mut cursor = Controls::frame(start);
@@ -62,7 +68,8 @@ pub(super) fn build<T: SizedSample + FromSample<f32>>(
             let mut natural_end = false;
             let mut sampler = session.map(|session| MixSampler::new(&session.audio));
             let mut project_active = session.is_some();
-            for frame in output.chunks_exact_mut(channels) {
+            let mut frames = output.chunks_exact_mut(channels);
+            for frame in frames.by_ref() {
                 let mut stereo = [0.0; 2];
                 if project_active
                     && let (Some(controls), Some(sampler)) = (controls, sampler.as_mut())
@@ -89,7 +96,7 @@ pub(super) fn build<T: SizedSample + FromSample<f32>>(
                         project_active = false;
                     }
                 }
-                let audition = piano.sample();
+                let audition = if audition_active { piano.sample() } else { 0.0 };
                 for (channel, sample) in frame.iter_mut().enumerate() {
                     let value = match (channels, channel) {
                         (1, _) => (stereo[0] * 0.5 + stereo[1] * 0.5) * gain + audition,
@@ -99,6 +106,7 @@ pub(super) fn build<T: SizedSample + FromSample<f32>>(
                     *sample = T::from_sample(value.clamp(-1.0, 1.0));
                 }
             }
+            frames.into_remainder().fill(T::EQUILIBRIUM);
             // A simultaneous seek wins over this old callback's progress.
             if let Some(controls) = controls
                 && controls

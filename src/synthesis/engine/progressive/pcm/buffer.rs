@@ -1,4 +1,4 @@
-use super::{Clock, PcmComponents, Result, VoiceError};
+use super::{Clock, Result, VoiceError};
 use std::ops::Range;
 
 /// A bounded rolling buffer. Already published samples are discarded rather
@@ -12,22 +12,18 @@ pub(super) struct Buffer {
 }
 
 impl Buffer {
-    pub fn append(&mut self, pcm: &PcmComponents) -> Result<()> {
-        if pcm.primary.is_empty() {
-            if !pcm.secondary.is_empty() || !pcm.start_seconds.is_finite() {
+    pub fn append(&mut self, start_seconds: f64, samples: [Vec<f32>; 2]) -> Result<()> {
+        if samples[0].is_empty() {
+            if !samples[1].is_empty() || !start_seconds.is_finite() {
                 return Err(VoiceError::new("Invalid empty progressive vocoder chunk"));
             }
             // The network can consume frames without releasing PCM yet. An
             // empty return supplies no sample-clock evidence or ready audio.
             return Ok(());
         }
-        let clock = Clock::new(pcm.start_seconds, pcm.primary.len())?;
-        if pcm.primary.len() != pcm.secondary.len()
-            || pcm
-                .primary
-                .iter()
-                .chain(pcm.secondary.iter())
-                .any(|v| !v.is_finite())
+        let clock = Clock::new(start_seconds, samples[0].len())?;
+        if samples[0].len() != samples[1].len()
+            || samples.iter().flatten().any(|v| !v.is_finite())
             || self.received_end.is_some_and(|end| end != clock.origin)
         {
             return Err(VoiceError::new(
@@ -36,9 +32,12 @@ impl Buffer {
         }
         if self.received_end.is_none() {
             self.origin = clock.origin;
+            self.samples = samples;
+        } else {
+            for (buffer, input) in self.samples.iter_mut().zip(samples) {
+                buffer.extend_from_slice(&input);
+            }
         }
-        self.samples[0].extend_from_slice(&pcm.primary);
-        self.samples[1].extend_from_slice(&pcm.secondary);
         self.received_end = Some(clock.end);
         Ok(())
     }

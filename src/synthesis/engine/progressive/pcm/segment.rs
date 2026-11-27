@@ -1,6 +1,6 @@
 use super::{
-    BLOCK, LOOKAHEAD, PREVIEW_BLOCK_SAMPLES, PREVIEW_SAMPLE_RATE, PcmComponents, PcmStore,
-    RenderedAudio, Result, SegmentPlan, VoiceError, buffer::Buffer,
+    BLOCK, LOOKAHEAD, PREVIEW_BLOCK_SAMPLES, PREVIEW_SAMPLE_RATE, PcmStore, RenderedAudio, Result,
+    SegmentPlan, VoiceError, buffer::Buffer,
 };
 use crate::synthesis::rendered::patch::{splice_head, splice_tail};
 
@@ -43,7 +43,8 @@ impl PcmStore {
     pub fn push(
         &mut self,
         segment: &mut Segment,
-        fresh: &PcmComponents,
+        start_seconds: f64,
+        samples: [Vec<f32>; 2],
         natural_final: bool,
     ) -> Result<Vec<RenderedAudio>> {
         if segment.finished || segment.plan.clock != self.clock {
@@ -53,7 +54,7 @@ impl PcmStore {
         }
         if segment.buffer.received_end().is_none()
             && !segment.plan.has_head
-            && (fresh.start_seconds * super::RATE - self.clock.origin as f64).abs() < 0.0001
+            && (start_seconds * super::RATE - self.clock.origin as f64).abs() < 0.0001
             && (self.first_block..segment.plan.first_sample.div_euclid(BLOCK))
                 .all(|block| !self.block_ready(block))
         {
@@ -63,8 +64,9 @@ impl PcmStore {
             segment.plan.first_sample = self.clock.origin;
             segment.next_sample = self.clock.origin;
         }
-        segment.buffer.append(fresh)?;
-        if fresh.primary.is_empty() && !natural_final {
+        let empty = samples[0].is_empty();
+        segment.buffer.append(start_seconds, samples)?;
+        if empty && !natural_final {
             return Ok(Vec::new());
         }
         if segment

@@ -58,7 +58,7 @@ pub struct RenderedAudio {
     sample_rate: u32,
     start_seconds: f64,
     layout: ChannelLayout,
-    samples: Arc<[f32]>,
+    samples: Arc<Box<[f32]>>,
 }
 
 impl RenderedAudio {
@@ -96,7 +96,8 @@ impl RenderedAudio {
             sample_rate,
             start_seconds,
             layout,
-            samples: samples.into(),
+            // Keep the existing sample allocation when sharing the clip.
+            samples: Arc::new(samples.into_boxed_slice()),
         })
     }
 

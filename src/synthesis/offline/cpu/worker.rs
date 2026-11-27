@@ -230,8 +230,8 @@ impl Worker {
         let text = serde_json::to_string(&message).map_err(|error| error.to_string())?;
         let packet = Array::of3(
             &text.into(),
-            &Float32Array::from(components.primary.as_ref()),
-            &Float32Array::from(components.secondary.as_ref()),
+            &Float32Array::from(components.primary()),
+            &Float32Array::from(components.secondary()),
         );
         self.remember(job.serial, job.input, complete.state);
         Ok(packet)

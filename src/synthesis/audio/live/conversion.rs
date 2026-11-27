@@ -42,7 +42,7 @@ impl LiveAudio {
                         (a * (1.0 - fraction) + b * fraction) as f32;
                 }
             }
-            output.publish(index, samples.into())?;
+            output.publish(index, samples)?;
         }
         Ok(output)
     }

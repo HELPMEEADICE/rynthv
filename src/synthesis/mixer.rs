@@ -271,9 +271,9 @@ fn prepare_span(
             [(output_start - origin) * channels..(output_end - origin) * channels],
         VocalStem::Primary | VocalStem::Aspiration => {
             let source = if stem == VocalStem::Primary {
-                &owner.components.primary
+                owner.components.primary()
             } else {
-                &owner.components.secondary
+                owner.components.secondary()
             };
             let component_origin =
                 (owner.components.start_seconds * f64::from(NATIVE_SAMPLE_RATE)).round();

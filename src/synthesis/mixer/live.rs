@@ -70,15 +70,20 @@ impl LiveMixer {
             );
         }
         let source = (total_frames > 0).then(|| Arc::new(LiveAudio::new(total_frames)));
-        let mixer = Self { source, owners };
-        // Regions with no audible dependency are known immediately, even when
-        // an earlier/later owner is still preparing its acoustic context.
-        mixer.publish_blocks(0..total_frames)?;
-        Ok(mixer)
+        Ok(Self { source, owners })
     }
 
     pub(crate) fn source(&self) -> Option<Arc<LiveAudio>> {
         self.source.clone()
+    }
+
+    /// Publish an entire replacement source after restoring its ready spans.
+    pub(crate) fn publish_all(&self) -> Result<(), String> {
+        let total_frames = self
+            .source
+            .as_ref()
+            .map_or(0, |source| source.total_frames());
+        self.publish_blocks(0..total_frames)
     }
 
     /// Equivalent inputs share one numerical result. Update every matching
@@ -89,6 +94,17 @@ impl LiveMixer {
         ids: &[OwnerId],
         audio: Arc<RenderedAudio>,
     ) -> Result<(), String> {
+        if let Some(range) = self.stage_audio(ids, audio)? {
+            self.publish_blocks(range)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn stage_audio(
+        &mut self,
+        ids: &[OwnerId],
+        audio: Arc<RenderedAudio>,
+    ) -> Result<Option<Range<usize>>, String> {
         let mut dirty: Option<Range<usize>> = None;
         for id in ids {
             let Some(owner) = self.owners.get_mut(id) else {
@@ -105,10 +121,7 @@ impl LiveMixer {
                 });
             }
         }
-        match dirty {
-            Some(range) => self.publish_blocks(range),
-            None => Ok(()),
-        }
+        Ok(dirty)
     }
 
     /// Completing an owner confirms that requested coverage outside the
@@ -119,15 +132,26 @@ impl LiveMixer {
         id: OwnerId,
         audio: Arc<RenderedAudio>,
     ) -> Result<(), String> {
+        if let Some(range) = self.stage_completed(id, audio)? {
+            self.publish_blocks(range)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn stage_completed(
+        &mut self,
+        id: OwnerId,
+        audio: Arc<RenderedAudio>,
+    ) -> Result<Option<Range<usize>>, String> {
         let Some(owner) = self.owners.get_mut(&id) else {
-            return Ok(());
+            return Ok(None);
         };
         if owner
             .completed_audio
             .as_ref()
             .is_some_and(|prev| Arc::ptr_eq(prev, &audio))
         {
-            return Ok(());
+            return Ok(None);
         }
         let range = owner.coverage.clone();
         let mut ready = ReadySpans::default();
@@ -135,15 +159,27 @@ impl LiveMixer {
         ready.insert_audio(Arc::clone(&audio), &range)?;
         owner.ready = ready;
         owner.completed_audio = Some(audio);
-        self.publish_blocks(range)
+        Ok(Some(range))
     }
 
     /// The prepared model's exact native sample range proves the silence
     /// outside it. Intersect with the mixer's own converted coverage bounds so
     /// independently rounded project seconds cannot leave a sample pending.
     pub(crate) fn prepared(&mut self, id: OwnerId, model: Range<i64>) -> Result<(), String> {
+        if let Some([before, after]) = self.stage_prepared(id, model)? {
+            self.publish_blocks(before)?;
+            self.publish_blocks(after)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn stage_prepared(
+        &mut self,
+        id: OwnerId,
+        model: Range<i64>,
+    ) -> Result<Option<[Range<usize>; 2]>, String> {
         let Some(owner) = self.owners.get_mut(&id) else {
-            return Ok(());
+            return Ok(None);
         };
         owner.completed_audio = None;
         if model.end < model.start {
@@ -158,8 +194,7 @@ impl LiveMixer {
         // can have both silent sides inside the very same playback block.
         owner.ready.insert_silence(before.clone());
         owner.ready.insert_silence(after.clone());
-        self.publish_blocks(before)?;
-        self.publish_blocks(after)
+        Ok(Some([before, after]))
     }
 
     /// Whether this owner prevents the requested half-second block playing.
@@ -242,7 +277,7 @@ impl LiveMixer {
                 owner.ready.mix_into(&range, &owner.controls, &mut samples);
             }
             source
-                .publish(index, samples.into())
+                .publish(index, samples)
                 .map_err(|error| error.to_string())?;
         }
         Ok(())

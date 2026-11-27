@@ -1,7 +1,7 @@
 use super::{Network, PreparedRender, network::Stream, pcm::Segment, pipeline};
 use crate::synthesis::{
     audio::RenderedAudio,
-    engine::{PcmComponents, RenderStage},
+    engine::RenderStage,
     score::{FRAME_SECONDS, SAMPLE_RATE},
     stages::timbre::TimbreOutput,
     voice::{PreparedVoice, Result, VoiceError},
@@ -179,10 +179,12 @@ impl PreparedRender {
             .produced_samples
             .checked_add(output.pcm.primary.values.len())
             .ok_or_else(|| VoiceError::new("Progressive PCM sample count overflow"))?;
-        let fresh = PcmComponents::new(origin, output.pcm)?;
-        let chunks = self
-            .pcm
-            .push(&mut cursor.segment, &fresh, output.natural_final)?;
+        let chunks = self.pcm.push(
+            &mut cursor.segment,
+            origin,
+            [output.pcm.primary.values, output.pcm.secondary.values],
+            output.natural_final,
+        )?;
         if cursor.segment.is_finished() {
             // A tail seam can finish before the true model end. Stop any
             // prefetched successor batches without flushing a fabricated end.

@@ -132,4 +132,9 @@ impl PianoSynth {
             .map(|voice| voice.sample(self.attack_frames, self.minimum_frames, self.release_decay))
             .sum()
     }
+
+    #[cfg(feature = "gui")]
+    pub fn is_active(&self) -> bool {
+        self.voices.iter().any(Voice::active)
+    }
 }

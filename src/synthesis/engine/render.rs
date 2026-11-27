@@ -57,7 +57,7 @@ pub fn synthesize(
     let profile = crate::synthesis::profiling::span("stage.pcm_publication");
     let origin = phrase.start_seconds
         + acoustic.timbre.first_frame as f64 * crate::synthesis::score::FRAME_SECONDS;
-    let components = PcmComponents::new(origin, output)?;
+    let components = PcmComponents::new(origin, [output.primary.values, output.secondary.values])?;
     let audio = components.publish(phrase.visible_begin_seconds, phrase.visible_end_seconds)?;
     #[cfg(feature = "synth-profile")]
     drop(profile);

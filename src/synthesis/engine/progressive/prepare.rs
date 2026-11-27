@@ -37,8 +37,7 @@ pub fn prepare(
         .filter(|_| {
             let (_, previous) = base.expect("an edit requires a baseline");
             let pcm = &previous.components;
-            previous.pitch.pitch.len().checked_mul(HOP_SAMPLES) == Some(pcm.primary.len())
-                && pcm.primary.len() == pcm.secondary.len()
+            previous.pitch.pitch.len().checked_mul(HOP_SAMPLES) == Some(pcm.primary().len())
                 && ((pcm.start_seconds - phrase.start_seconds) * f64::from(SAMPLE_RATE)).abs()
                     < 0.0001
         });

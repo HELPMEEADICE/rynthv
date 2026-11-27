@@ -236,11 +236,8 @@ impl Pool {
                 *counts.entry(reason).or_default() += count;
             }
         }
-        let components = PcmComponents {
-            start_seconds: result.pcm_origin,
-            primary: pcm(packet, 1)?.into(),
-            secondary: pcm(packet, 2)?.into(),
-        };
+        let components = PcmComponents::new(result.pcm_origin, [pcm(packet, 1)?, pcm(packet, 2)?])
+            .map_err(|error| error.to_string())?;
         let audio = Arc::new(
             components
                 .publish(result.visible_begin, result.visible_end)

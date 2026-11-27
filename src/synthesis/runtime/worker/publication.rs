@@ -28,21 +28,22 @@ impl<'network, 'tree> WorkState<'network, 'tree> {
             let built = (|| {
                 let mut live = LiveMixer::new(&self.plan, &self.solo_tracks)?;
                 for owner in snapshot.as_deref().unwrap_or_default() {
-                    live.complete(owner.owner, Arc::clone(&owner.audio))?;
+                    live.stage_completed(owner.owner, Arc::clone(&owner.audio))?;
                 }
                 for (&owner, session) in &self.sessions {
                     let mirrors = self.mirrors(owner);
                     for &mirror in mirrors {
-                        live.prepared(mirror, session.prepared.model_samples())?;
+                        live.stage_prepared(mirror, session.prepared.model_samples())?;
                     }
                     for audio in session
                         .prepared
                         .ready_audio()
                         .map_err(|error| error.to_string())?
                     {
-                        live.publish_for(mirrors, Arc::new(audio))?;
+                        live.stage_audio(mirrors, Arc::new(audio))?;
                     }
                 }
+                live.publish_all()?;
                 Ok::<_, String>(live)
             })();
             match built {
